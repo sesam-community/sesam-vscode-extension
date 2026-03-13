@@ -152,12 +152,13 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
-    "build": "webpack --mode production",
-    "build:dev": "webpack --mode development",
-    "watch": "webpack --mode development --watch",
+    "build": "vite build --config vite.config.client.ts && vite build --config vite.config.server.ts",
+    "build:dev": "vite build --config vite.config.client.ts --mode development && vite build --config vite.config.server.ts --mode development",
+    "watch": "vite build --config vite.config.client.ts --watch & vite build --config vite.config.server.ts --watch",
     "compile": "tsc -p client/tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit",
     "lint": "eslint src client/src server/src --ext .ts",
-    "test": "node ./dist/test/runTest.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "package": "vsce package"
   },
   "dependencies": {
@@ -169,9 +170,8 @@
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.0.0",
-    "ts-loader": "^9.5.0",
     "typescript": "^5.4.0",
-    "webpack": "^5.91.0",
-    "webpack-cli": "^5.1.4"
+    "vite": "^5.0.0",
+    "vitest": "^4.1.0"
   }
 }
