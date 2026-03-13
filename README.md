@@ -1,4 +1,4 @@
-# DTL Language Support
+# Sesam
 
 Full-featured VS Code extension for **Sesam Data Transformation Language (DTL)** — the declarative JSON-array language used to define pipe transformations in the [Sesam](https://sesam.io) integration platform.
 
