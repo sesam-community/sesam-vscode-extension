@@ -4,7 +4,12 @@ on:
   push:
     branches: ["**"]
   pull_request:
+    types: [closed]
     branches: ["**"]
+
+# Only run the merge trigger when the PR was actually merged (not just closed)
+env:
+  SKIP_IF_UNMERGED: ${{ github.event_name == 'pull_request' && github.event.pull_request.merged == false }}
 
 jobs:
   test:
@@ -12,6 +17,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Skip if PR closed without merging
+        if: env.SKIP_IF_UNMERGED == 'true'
+        run: echo "PR was closed without merging — skipping." && exit 0
+
       - uses: actions/checkout@v4
 
       - name: Set up Node.js
