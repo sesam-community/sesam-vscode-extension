@@ -190,12 +190,13 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 
 ---
 
+## Development
+
+For information on setting up the development environment, running tests, and contributing, see the [Development Guide](docs/DEVELOPMENT.md).
+
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
 
 ---
-
-## Development
-
-For information on setting up the development environment, running tests, and contributing, see the [Development Guide](docs/DEVELOPMENT.md).
