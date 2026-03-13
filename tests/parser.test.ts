@@ -56,7 +56,7 @@ describe("parseDtlText — dtl extension", () => {
     const { calls } = parseDtlText(text, "dtl");
     const call = calls.find((c) => c.functionName === "add");
     expect(call?.range.start.offset).toBeLessThan(
-      call?.nameRange!.start.offset,
+      call!.nameRange!.start.offset,
     );
   });
 

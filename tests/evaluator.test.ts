@@ -3,7 +3,7 @@ import { evaluate } from "../src/shared/dtl-evaluator";
 
 // Shorthand: evaluate rules against a source entity and return the output
 function run(rules: unknown[], source: Record<string, unknown> = {}) {
-  return evaluate(rules, source);
+  return evaluate(rules, source as Parameters<typeof evaluate>[1]);
 }
 
 // ---------------------------------------------------------------------------
