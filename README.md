@@ -1,5 +1,25 @@
 # Sesam
 
+## Table of Contents
+
+- [Features](#features)
+  - [Syntax Highlighting](#syntax-highlighting)
+  - [Auto-Completion](#auto-completion)
+  - [Hover Documentation](#hover-documentation)
+  - [Diagnostics (Linting)](#diagnostics-linting)
+  - [Formatter](#formatter)
+  - [Code Snippets](#code-snippets)
+  - [Pipe Graph Explorer](#pipe-graph-explorer)
+  - [Pipe Preview](#pipe-preview)
+- [Getting Started](#getting-started)
+- [DTL Primer](#dtl-primer)
+- [Extension Settings](#extension-settings)
+- [Requirements](#requirements)
+- [Known Limitations](#known-limitations)
+- [License](#license)
+
+---
+
 Full-featured VS Code extension for **Sesam Data Transformation Language (DTL)** — the declarative JSON-array language used to define pipe transformations in the [Sesam](https://sesam.io) integration platform.
 
 ---

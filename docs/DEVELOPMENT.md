@@ -1,5 +1,22 @@
 # Development Guide
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Project Structure](#project-structure)
+- [Development Workflow](#development-workflow)
+- [Testing Locally in VS Code](#testing-locally-in-vs-code)
+- [Packaging](#packaging)
+  - [Install the .vsix manually](#install-the-vsix-manually)
+- [Publishing to the VS Code Marketplace](#publishing-to-the-vs-code-marketplace)
+  - [One-time setup](#one-time-setup)
+  - [Publish](#publish)
+  - [Pre-publish checklist](#pre-publish-checklist)
+- [Installing from the Marketplace](#installing-from-the-marketplace)
+
+---
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) v20+
