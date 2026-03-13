@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "DTL injection into JSON",
+  "scopeName": "source.dtl.injection",
+  "injectionSelector": "L:source.json",
+  "patterns": [{ "include": "#dtl-context" }],
+  "repository": {
+    "dtl-context": {
+      "comment": "Target DTL arrays inside Sesam pipe config keys: transform, rules, default, apply",
+      "patterns": [
+        {
+          "comment": "Match strings that look like DTL variables: _S.x, _T.x, _P.x, _R.x, _B.x, _",
+          "match": "\"(_S|_T|_P|_R|_B)(\\.[a-zA-Z_$][a-zA-Z0-9_.\\-]*)?\"|\"(_)\"",
+          "captures": {
+            "1": { "name": "variable.language.source.dtl" },
+            "2": { "name": "variable.other.property.dtl" },
+            "3": { "name": "variable.language.current.dtl" }
+          }
+        },
+        {
+          "comment": "DTL transform function names as first string in an array",
+          "match": "(?<=\\[\\s*)\"(add|add-if|copy|default|make-ni|merge|merge-union|remove|rename|create|create-child|filter|discard|case|case-eq|comment|fail!|sleep!|trip!)\"",
+          "captures": {
+            "1": { "name": "keyword.control.transform.dtl" }
+          }
+        },
+        {
+          "comment": "DTL expression function names",
+          "match": "(?<=\\[\\s*)\"(all|and|any|or|not|eq|neq|gt|gte|lt|lte|concat|join|split|upper|lower|strip|lstrip|rstrip|replace|substring|length|string|is-string|list|map|map-dict|map-values|first|last|nth|count|distinct|flatten|combine|group|group-by|sorted|sorted-descending|reversed|slice|range|in|insert|enumerate|is-list|is-empty|is-not-empty|sum|min|max|datetime|datetime-parse|datetime-format|datetime-diff|datetime-plus|datetime-shift|is-datetime|now|if|if-null|coalesce|coalesce-args|is-null|is-not-null|dict|path|keys|values|items|key-values|has-key|is-dict|apply|apply-hops|apply-ns|strip-ns|hops|lookup-entity|integer|float|decimal|hex|is-integer|is-float|is-decimal|base64-encode|base64-decode|bytes|is-bytes|encrypt|decrypt|encrypt-pgp|decrypt-pgp|encrypt-pki|decrypt-pki|json|json-parse|json-transit|json-transit-parse|ni|ni-id|ni-ns|is-ni|uri|is-uri|url-quote|url-unquote|uuid|is-uuid|difference|intersection|intersects|union|hash128|literal|tuples|completeness|is-changed|boolean|is-boolean|phonenumber-parse|phonenumber-format|\\+|-|\\*|/|%|\\^|abs|ceil|floor|round|sqrt|cos|sin|tan|pow|mod|divide|minus|multiply|plus|matches|ljust|rjust)\"",
+          "captures": {
+            "1": { "name": "support.function.dtl" }
+          }
+        },
+        {
+          "comment": "Sesam entity reserved fields",
+          "match": "\"(_id|_deleted|_filtered|_hash|_previous|_tracked|_ts|_updated|\\$children|\\$ids|\\$replaced)\"",
+          "name": "support.variable.entity.dtl"
+        }
+      ]
+    }
+  }
+}

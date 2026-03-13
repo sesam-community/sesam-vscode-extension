@@ -1,0 +1,191 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "DTL",
+  "scopeName": "source.dtl",
+  "fileTypes": ["dtl"],
+  "patterns": [{ "include": "#array" }, { "include": "#value" }],
+  "repository": {
+    "array": {
+      "name": "meta.array.dtl",
+      "begin": "\\[",
+      "end": "\\]",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.array.begin.dtl" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.array.end.dtl" }
+      },
+      "patterns": [{ "include": "#dtl-function-name" }, { "include": "#value" }]
+    },
+    "dtl-function-name": {
+      "comment": "The first string element of a DTL array — the function/transform name",
+      "patterns": [
+        {
+          "comment": "Transform functions (have side-effects)",
+          "match": "(?<=\\[\\s*)\"(add|add-if|copy|default|make-ni|merge|merge-union|remove|rename|create|create-child|filter|discard|case|case-eq|if|comment|fail!|sleep!|trip!)\"",
+          "captures": {
+            "1": { "name": "keyword.control.transform.dtl" }
+          }
+        },
+        {
+          "comment": "Expression functions — Boolean & logic",
+          "match": "(?<=\\[\\s*)\"(all|and|any|or|not)\"",
+          "captures": { "1": { "name": "keyword.operator.logical.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Comparisons",
+          "match": "(?<=\\[\\s*)\"(eq|neq|gt|gte|lt|lte)\"",
+          "captures": { "1": { "name": "keyword.operator.comparison.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Math",
+          "match": "(?<=\\[\\s*)\"(\\+|-|\\*|/|%|\\^|abs|ceil|floor|round|sqrt|cos|sin|tan|pow|mod|divide|minus|multiply|plus)\"",
+          "captures": { "1": { "name": "keyword.operator.arithmetic.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Strings",
+          "match": "(?<=\\[\\s*)\"(concat|join|split|upper|lower|strip|lstrip|rstrip|replace|substring|length|ljust|rjust|matches|string|is-string)\"",
+          "captures": { "1": { "name": "support.function.string.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Lists",
+          "match": "(?<=\\[\\s*)\"(list|map|map-dict|map-values|filter|first|last|nth|count|distinct|flatten|combine|group|group-by|sorted|sorted-descending|reversed|slice|range|in|insert|enumerate|is-list|is-empty|is-not-empty|sum|min|max)\"",
+          "captures": { "1": { "name": "support.function.list.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Date & time",
+          "match": "(?<=\\[\\s*)\"(datetime|datetime-parse|datetime-format|datetime-diff|datetime-plus|datetime-shift|is-datetime|now)\"",
+          "captures": { "1": { "name": "support.function.datetime.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Conditionals",
+          "match": "(?<=\\[\\s*)\"(if|if-null|coalesce|coalesce-args|case|case-eq)\"",
+          "captures": { "1": { "name": "keyword.control.conditional.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Nulls",
+          "match": "(?<=\\[\\s*)\"(is-null|is-not-null|if-null|coalesce|coalesce-args)\"",
+          "captures": { "1": { "name": "support.function.null.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Dictionaries",
+          "match": "(?<=\\[\\s*)\"(dict|path|keys|values|items|key-values|has-key|is-dict|apply|apply-hops|apply-ns|strip-ns)\"",
+          "captures": { "1": { "name": "support.function.dict.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Hops",
+          "match": "(?<=\\[\\s*)\"(hops|lookup-entity)\"",
+          "captures": { "1": { "name": "support.function.hops.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Numbers",
+          "match": "(?<=\\[\\s*)\"(integer|float|decimal|hex|is-integer|is-float|is-decimal)\"",
+          "captures": { "1": { "name": "support.function.number.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Bytes & Encryption",
+          "match": "(?<=\\[\\s*)\"(base64-encode|base64-decode|bytes|is-bytes|encrypt|decrypt|encrypt-pgp|decrypt-pgp|encrypt-pki|decrypt-pki)\"",
+          "captures": { "1": { "name": "support.function.crypto.dtl" } }
+        },
+        {
+          "comment": "Expression functions — JSON",
+          "match": "(?<=\\[\\s*)\"(json|json-parse|json-transit|json-transit-parse)\"",
+          "captures": { "1": { "name": "support.function.json.dtl" } }
+        },
+        {
+          "comment": "Expression functions — NI, URI, UUID, Sets",
+          "match": "(?<=\\[\\s*)\"(ni|ni-id|ni-ns|is-ni|uri|is-uri|url-quote|url-unquote|uuid|is-uuid|difference|intersection|intersects|union)\"",
+          "captures": { "1": { "name": "support.function.misc.dtl" } }
+        },
+        {
+          "comment": "Expression functions — Misc",
+          "match": "(?<=\\[\\s*)\"(hash128|literal|tuples|completeness|is-changed|boolean|is-boolean|phonenumber-parse|phonenumber-format)\"",
+          "captures": { "1": { "name": "support.function.misc.dtl" } }
+        }
+      ]
+    },
+    "value": {
+      "patterns": [
+        { "include": "#variable" },
+        { "include": "#entity-reserved" },
+        { "include": "#string" },
+        { "include": "#number" },
+        { "include": "#boolean" },
+        { "include": "#null" },
+        { "include": "#array" },
+        { "include": "#object" }
+      ]
+    },
+    "variable": {
+      "comment": "DTL built-in variables: _S, _T, _P, _R, _B, _ with optional property path",
+      "patterns": [
+        {
+          "match": "\"(_S|_T|_P|_R|_B)(\\.[a-zA-Z_$][a-zA-Z0-9_$-]*(\\.[a-zA-Z_$][a-zA-Z0-9_$-]*)*)?\"",
+          "captures": {
+            "1": { "name": "variable.language.source.dtl" },
+            "2": { "name": "variable.other.property.dtl" }
+          }
+        },
+        {
+          "match": "\"(_)\"",
+          "captures": {
+            "1": { "name": "variable.language.current.dtl" }
+          }
+        }
+      ]
+    },
+    "entity-reserved": {
+      "comment": "Sesam entity reserved fields",
+      "match": "\"(_id|_deleted|_filtered|_hash|_previous|_tracked|_ts|_updated|\\$children|\\$ids|\\$replaced)\"",
+      "captures": {
+        "0": { "name": "support.variable.entity.dtl" }
+      }
+    },
+    "string": {
+      "name": "string.quoted.double.dtl",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.dtl",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "number": {
+      "name": "constant.numeric.dtl",
+      "match": "-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?"
+    },
+    "boolean": {
+      "name": "constant.language.boolean.dtl",
+      "match": "\\b(true|false)\\b"
+    },
+    "null": {
+      "name": "constant.language.null.dtl",
+      "match": "\\bnull\\b"
+    },
+    "object": {
+      "name": "meta.object.dtl",
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.object.begin.dtl" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.object.end.dtl" }
+      },
+      "patterns": [
+        {
+          "name": "meta.object.member.dtl",
+          "begin": "\"([^\"]+)\"\\s*(:)",
+          "beginCaptures": {
+            "1": { "name": "support.type.property-name.dtl" },
+            "2": { "name": "punctuation.separator.key-value.dtl" }
+          },
+          "end": "(?=[,}])",
+          "patterns": [{ "include": "#value" }]
+        }
+      ]
+    }
+  }
+}

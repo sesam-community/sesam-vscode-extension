@@ -1,0 +1,261 @@
+{
+  "DTL add": {
+    "scope": "dtl,json",
+    "prefix": "add",
+    "body": ["[\"add\", \"${1:property}\", ${2:\"_S.${3:source}\"}]"],
+    "description": "Add a property to the target entity."
+  },
+  "DTL add-if": {
+    "scope": "dtl,json",
+    "prefix": "add-if",
+    "body": ["[\"add-if\", \"${1:property}\", ${2:\"_S.${3:source}\"}]"],
+    "description": "Add a property only if the value is truthy."
+  },
+  "DTL copy": {
+    "scope": "dtl,json",
+    "prefix": "copy",
+    "body": ["[\"copy\", \"${1:*}\"]"],
+    "description": "Copy a property (or wildcard) from source to target."
+  },
+  "DTL remove": {
+    "scope": "dtl,json",
+    "prefix": "remove",
+    "body": ["[\"remove\", \"${1:property}\"]"],
+    "description": "Remove a property from the target entity."
+  },
+  "DTL rename": {
+    "scope": "dtl,json",
+    "prefix": "rename",
+    "body": ["[\"rename\", \"${1:new-name}\", \"_S.${2:old-name}\"]"],
+    "description": "Rename a property."
+  },
+  "DTL default": {
+    "scope": "dtl,json",
+    "prefix": "default",
+    "body": ["[\"default\", \"${1:property}\", ${2:null}]"],
+    "description": "Set a property only if not already set."
+  },
+  "DTL merge": {
+    "scope": "dtl,json",
+    "prefix": "merge",
+    "body": ["[\"merge\", ${1:\"_S.\"}]"],
+    "description": "Merge all properties of a dict into the target entity."
+  },
+  "DTL filter": {
+    "scope": "dtl,json",
+    "prefix": "filter",
+    "body": ["[\"filter\", [\"eq\", \"_S.${1:property}\", \"${2:value}\"]]"],
+    "description": "Keep entity only if condition is truthy."
+  },
+  "DTL discard": {
+    "scope": "dtl,json",
+    "prefix": "discard",
+    "body": ["[\"discard\"]"],
+    "description": "Unconditionally discard the current entity."
+  },
+  "DTL if": {
+    "scope": "dtl,json",
+    "prefix": "if",
+    "body": [
+      "[\"if\",",
+      "  [\"${1:eq}\", \"_S.${2:property}\", \"${3:value}\"],",
+      "  [\"${4:add}\", \"${5:result}\", \"${6:value}\"],",
+      "  [\"${7:add}\", \"${8:result}\", \"${9:default}\"]",
+      "]"
+    ],
+    "description": "Conditional transform."
+  },
+  "DTL case": {
+    "scope": "dtl,json",
+    "prefix": "case",
+    "body": [
+      "[\"case\",",
+      "  [\"${1:eq}\", \"_S.${2:property}\", \"${3:value1}\"],",
+      "  [\"add\", \"${4:result}\", \"${5:result1}\"],",
+      "  [\"${6:eq}\", \"_S.${2:property}\", \"${7:value2}\"],",
+      "  [\"add\", \"${4:result}\", \"${8:result2}\"],",
+      "  [\"add\", \"${4:result}\", \"${9:default}\"]",
+      "]"
+    ],
+    "description": "Case/switch style conditional transform."
+  },
+  "DTL case-eq": {
+    "scope": "dtl,json",
+    "prefix": "case-eq",
+    "body": [
+      "[\"case-eq\", \"_S.${1:property}\",",
+      "  \"${2:value1}\", [\"add\", \"${3:result}\", \"${4:result1}\"],",
+      "  \"${5:value2}\", [\"add\", \"${3:result}\", \"${6:result2}\"],",
+      "  [\"add\", \"${3:result}\", \"${7:default}\"]",
+      "]"
+    ],
+    "description": "Equality-based case transform."
+  },
+  "DTL create": {
+    "scope": "dtl,json",
+    "prefix": "create",
+    "body": ["[\"create\",", "  [\"apply\", \"${1:rule-id}\", \"_S.\"]", "]"],
+    "description": "Create a new entity in the output stream."
+  },
+  "DTL create-child": {
+    "scope": "dtl,json",
+    "prefix": "create-child",
+    "body": [
+      "[\"create-child\",",
+      "  [\"apply\", \"${1:rule-id}\", \"_S.\"]",
+      "]"
+    ],
+    "description": "Create child entities added to $children."
+  },
+  "DTL comment": {
+    "scope": "dtl,json",
+    "prefix": "comment",
+    "body": ["[\"comment\", \"${1:Comment text}\"]"],
+    "description": "Inline documentation comment (no-op at runtime)."
+  },
+  "DTL hops": {
+    "scope": "dtl,json",
+    "prefix": "hops",
+    "body": [
+      "[\"hops\", {",
+      "  \"datasets\": [\"${1:dataset-name} ${2:ALIAS}\"],",
+      "  \"where\": [",
+      "    [\"eq\", \"_S._id\", \"${2:ALIAS}.${3:ref-property}\"]",
+      "  ],",
+      "  \"return\": \"${2:ALIAS}\"",
+      "}]"
+    ],
+    "description": "Hop to related entities in another dataset."
+  },
+  "DTL apply-hops": {
+    "scope": "dtl,json",
+    "prefix": "apply-hops",
+    "body": [
+      "[\"apply-hops\", \"${1:rule-id}\", {",
+      "  \"datasets\": [\"${2:dataset-name} ${3:ALIAS}\"],",
+      "  \"where\": [",
+      "    [\"eq\", \"_S._id\", \"${3:ALIAS}.${4:ref-property}\"]",
+      "  ]",
+      "}]"
+    ],
+    "description": "Apply a rule to entities fetched via hops."
+  },
+  "DTL map": {
+    "scope": "dtl,json",
+    "prefix": "map",
+    "body": ["[\"map\", \"_S.${1:list-property}\", [\"${2:upper}\", \"_\"]]"],
+    "description": "Transform each element in a list."
+  },
+  "DTL concat": {
+    "scope": "dtl,json",
+    "prefix": "concat",
+    "body": ["[\"concat\", \"_S.${1:first}\", \" \", \"_S.${2:second}\"]"],
+    "description": "Concatenate strings."
+  },
+  "DTL eq": {
+    "scope": "dtl,json",
+    "prefix": "eq",
+    "body": ["[\"eq\", \"_S.${1:property}\", \"${2:value}\"]"],
+    "description": "Equality comparison."
+  },
+  "DTL coalesce": {
+    "scope": "dtl,json",
+    "prefix": "coalesce",
+    "body": [
+      "[\"coalesce\", \"_S.${1:property1}\", \"_S.${2:property2}\", ${3:null}]"
+    ],
+    "description": "Return first non-null value."
+  },
+  "DTL if-null": {
+    "scope": "dtl,json",
+    "prefix": "if-null",
+    "body": ["[\"if-null\", \"_S.${1:property}\", ${2:\"default-value\"}]"],
+    "description": "Return value or default if null."
+  },
+  "DTL datetime-format": {
+    "scope": "dtl,json",
+    "prefix": "datetime-format",
+    "body": [
+      "[\"datetime-format\", \"${1:%Y-%m-%d}\", \"_S.${2:date-property}\"]"
+    ],
+    "description": "Format a datetime value."
+  },
+  "DTL now": {
+    "scope": "dtl,json",
+    "prefix": "now",
+    "body": ["[\"now\"]"],
+    "description": "Current UTC datetime."
+  },
+  "DTL integer": {
+    "scope": "dtl,json",
+    "prefix": "integer",
+    "body": ["[\"integer\", \"_S.${1:property}\"]"],
+    "description": "Cast value to integer."
+  },
+  "DTL string": {
+    "scope": "dtl,json",
+    "prefix": "string",
+    "body": ["[\"string\", \"_S.${1:property}\"]"],
+    "description": "Cast value to string."
+  },
+  "DTL ni": {
+    "scope": "dtl,json",
+    "prefix": "ni",
+    "body": ["[\"ni\", \"${1:namespace}\", \"_S.${2:id-property}\"]"],
+    "description": "Create a namespaced identifier."
+  },
+  "DTL make-ni": {
+    "scope": "dtl,json",
+    "prefix": "make-ni",
+    "body": [
+      "[\"make-ni\", \"${1:property}\", \"${2:namespace}\", \"_S.${3:id-property}\"]"
+    ],
+    "description": "Create a namespaced identifier and add to target."
+  },
+  "DTL hash128": {
+    "scope": "dtl,json",
+    "prefix": "hash128",
+    "body": ["[\"hash128\", \"_S.${1:property}\"]"],
+    "description": "128-bit hash of value as hex string."
+  },
+  "DTL Pipe config template": {
+    "scope": "json",
+    "prefix": "dtl-pipe",
+    "body": [
+      "{",
+      "  \"_id\": \"${1:pipe-id}\",",
+      "  \"type\": \"pipe\",",
+      "  \"source\": {",
+      "    \"type\": \"dataset\",",
+      "    \"dataset\": \"${2:source-dataset}\"",
+      "  },",
+      "  \"transform\": {",
+      "    \"type\": \"dtl\",",
+      "    \"rules\": {",
+      "      \"default\": [",
+      "        [\"copy\", \"*\"],",
+      "        [\"add\", \"${3:new-property}\", \"_S.${4:source-property}\"]",
+      "      ]",
+      "    }",
+      "  }",
+      "}"
+    ],
+    "description": "Sesam pipe configuration template with DTL transform."
+  },
+  "DTL rules block": {
+    "scope": "json",
+    "prefix": "dtl-rules",
+    "body": [
+      "\"transform\": {",
+      "  \"type\": \"dtl\",",
+      "  \"rules\": {",
+      "    \"default\": [",
+      "      [\"copy\", \"*\"],",
+      "      $0",
+      "    ]",
+      "  }",
+      "}"
+    ],
+    "description": "DTL transform rules block for a pipe config."
+  }
+}

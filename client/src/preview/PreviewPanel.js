@@ -1,0 +1,377 @@
+"use strict";
+/**
+ * Pipe Preview Panel
+ * Opens a VS Code WebviewPanel with three panes:
+ *   Left:   Editable input entity (JSON)
+ *   Middle: DTL transform rules (read-only, synced from document)
+ *   Right:  Computed output entity
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PreviewPanel = void 0;
+const vscode = __importStar(require("vscode"));
+const dtl_evaluator_1 = require("../../src/shared/dtl-evaluator");
+class PreviewPanel {
+    static createOrShow(extensionUri, document) {
+        const column = vscode.window.activeTextEditor
+            ? vscode.window.activeTextEditor.viewColumn
+            : undefined;
+        if (PreviewPanel.currentPanel) {
+            PreviewPanel.currentPanel._panel.reveal(column ? column + 1 : vscode.ViewColumn.Two);
+            PreviewPanel.currentPanel.updateDocument(document);
+            return;
+        }
+        const panel = vscode.window.createWebviewPanel(PreviewPanel.viewType, "DTL Preview", vscode.ViewColumn.Beside, {
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, "resources")],
+        });
+        PreviewPanel.currentPanel = new PreviewPanel(panel, extensionUri, document);
+    }
+    constructor(panel, extensionUri, document) {
+        this._disposables = [];
+        this._panel = panel;
+        this._extensionUri = extensionUri;
+        this._document = document;
+        this._panel.webview.html = this._buildHtml();
+        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+        this._panel.webview.onDidReceiveMessage((message) => {
+            if (message.type === "ready") {
+                this._sendTransforms();
+            }
+            else if (message.type === "evaluate") {
+                this._runEvaluation(message.inputJson);
+            }
+        }, null, this._disposables);
+    }
+    updateDocument(document) {
+        if (document.languageId !== "dtl" && document.languageId !== "json")
+            return;
+        this._document = document;
+        this._sendTransforms();
+    }
+    _sendTransforms() {
+        const text = this._document.getText();
+        const rules = extractRules(text);
+        this._panel.webview.postMessage({
+            type: "transforms",
+            rules: JSON.stringify(rules, null, 2),
+            filename: this._document.fileName.split("/").pop(),
+        });
+    }
+    _runEvaluation(inputJson) {
+        let inputEntity;
+        try {
+            inputEntity = JSON.parse(inputJson);
+        }
+        catch (e) {
+            this._panel.webview.postMessage({
+                type: "error",
+                message: `Invalid input JSON: ${String(e)}`,
+            });
+            return;
+        }
+        const text = this._document.getText();
+        const rules = extractRules(text);
+        if (!rules || !Array.isArray(rules)) {
+            this._panel.webview.postMessage({
+                type: "error",
+                message: "Could not extract DTL rules from the active document.",
+            });
+            return;
+        }
+        const result = (0, dtl_evaluator_1.evaluate)(rules, inputEntity);
+        this._panel.webview.postMessage({ type: "result", result });
+    }
+    dispose() {
+        PreviewPanel.currentPanel = undefined;
+        this._panel.dispose();
+        this._disposables.forEach((d) => d.dispose());
+    }
+    // ── HTML ──────────────────────────────────────────────────────────────────
+    _buildHtml() {
+        return /* html */ `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DTL Preview</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--vscode-font-family);
+      font-size: var(--vscode-font-size);
+      color: var(--vscode-foreground);
+      background: var(--vscode-editor-background);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--vscode-titleBar-activeBackground);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 14px; font-weight: 600; }
+    header .file-name {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .run-btn {
+      margin-left: auto;
+      padding: 4px 12px;
+      cursor: pointer;
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      border-radius: 3px;
+      font-size: 13px;
+    }
+    .run-btn:hover { background: var(--vscode-button-hoverBackground); }
+
+    .panes {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0;
+      overflow: hidden;
+    }
+    .pane {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--vscode-panel-border);
+      overflow: hidden;
+    }
+    .pane:last-child { border-right: none; }
+    .pane-header {
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--vscode-descriptionForeground);
+      background: var(--vscode-sideBar-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+    }
+    textarea, .output-box {
+      flex: 1;
+      padding: 10px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: var(--vscode-editor-font-size, 13px);
+      background: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
+      border: none;
+      outline: none;
+      resize: none;
+      overflow: auto;
+      white-space: pre;
+    }
+    .output-box { user-select: text; }
+    .status-bar {
+      padding: 4px 12px;
+      font-size: 11px;
+      color: var(--vscode-statusBar-foreground);
+      background: var(--vscode-statusBar-background);
+      border-top: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+      min-height: 22px;
+    }
+    .status-bar.ok     { background: var(--vscode-statusBarItem-remoteBackground, #007c00); color: #fff; }
+    .status-bar.error  { background: var(--vscode-inputValidation-errorBackground, #5a1d1d); color: #f48771; }
+    .status-bar.discard{ background: #6b4c00; color: #ffc66d; }
+    .warning {
+      padding: 4px 10px;
+      font-size: 11px;
+      color: #ffc66d;
+      background: #3a2e00;
+      border-top: 1px solid #5c4700;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DTL Preview</h1>
+    <span class="file-name" id="file-name">—</span>
+    <button class="run-btn" id="run-btn" onclick="runEval()">▶ Evaluate</button>
+  </header>
+
+  <div class="panes">
+    <!-- Input Entity -->
+    <div class="pane">
+      <div class="pane-header">Input Entity (_S)</div>
+      <textarea id="input-entity" spellcheck="false" placeholder='{\n  "_id": "example-1",\n  "name": "Alice"\n}'>{
+  "_id": "example-1",
+  "name": "Alice",
+  "status": "active"
+}</textarea>
+    </div>
+
+    <!-- DTL Transforms (read-only) -->
+    <div class="pane">
+      <div class="pane-header">DTL Rules (active file)</div>
+      <div class="output-box" id="transforms-box" style="color: var(--vscode-descriptionForeground);">
+        Open a .dtl or pipe config .json file and run preview.
+      </div>
+    </div>
+
+    <!-- Output Entity -->
+    <div class="pane">
+      <div class="pane-header">Output Entity (_T)</div>
+      <div class="output-box" id="output-box" style="color: var(--vscode-descriptionForeground);">
+        Press ▶ Evaluate to see output.
+      </div>
+    </div>
+  </div>
+
+  <div id="warnings-box" style="display:none"></div>
+  <div class="status-bar" id="status-bar">Ready.</div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+
+    function runEval() {
+      const inputJson = document.getElementById('input-entity').value;
+      vscode.postMessage({ type: 'evaluate', inputJson });
+    }
+
+    // Ctrl+Enter shortcut
+    document.getElementById('input-entity').addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        runEval();
+      }
+    });
+
+    window.addEventListener('message', (event) => {
+      const msg = event.data;
+
+      if (msg.type === 'transforms') {
+        document.getElementById('file-name').textContent = msg.filename || '';
+        document.getElementById('transforms-box').textContent = msg.rules || '(no rules found)';
+      }
+
+      if (msg.type === 'result') {
+        const r = msg.result;
+        const outputBox = document.getElementById('output-box');
+        const statusBar = document.getElementById('status-bar');
+        const warningsBox = document.getElementById('warnings-box');
+
+        statusBar.className = 'status-bar ' + r.status;
+
+        if (r.status === 'discarded') {
+          outputBox.textContent = '(entity discarded by filter/discard)';
+          statusBar.textContent = '✓ Entity discarded.';
+        } else if (r.status === 'error') {
+          outputBox.textContent = '(evaluation error)';
+          statusBar.textContent = '✗ Error during evaluation.';
+        } else {
+          outputBox.textContent = JSON.stringify(r.output, null, 2);
+          statusBar.textContent = '✓ OK — ' + Object.keys(r.output).length + ' properties.';
+        }
+
+        if (r.warnings && r.warnings.length > 0) {
+          warningsBox.style.display = 'block';
+          warningsBox.innerHTML = r.warnings
+            .map((w) => '<div class="warning">' + escHtml(w) + '</div>')
+            .join('');
+        } else {
+          warningsBox.style.display = 'none';
+          warningsBox.innerHTML = '';
+        }
+      }
+
+      if (msg.type === 'error') {
+        const statusBar = document.getElementById('status-bar');
+        statusBar.className = 'status-bar error';
+        statusBar.textContent = msg.message;
+      }
+    });
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // Notify extension that we are ready
+    vscode.postMessage({ type: 'ready' });
+  </script>
+</body>
+</html>`;
+    }
+}
+exports.PreviewPanel = PreviewPanel;
+PreviewPanel.viewType = "dtlPreview";
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function extractRules(text) {
+    try {
+        const parsed = JSON.parse(text);
+        // Bare array — treat as rules list directly
+        if (Array.isArray(parsed))
+            return parsed;
+        if (typeof parsed !== "object" || parsed === null)
+            return null;
+        const obj = parsed;
+        // Full pipe config
+        const transform = obj["transform"];
+        if (!transform)
+            return null;
+        // Shorthand direct array
+        if (Array.isArray(transform))
+            return transform;
+        const rules = transform["rules"];
+        if (!rules)
+            return null;
+        // Return the "default" rule, or the first rule found
+        if (Array.isArray(rules["default"])) {
+            return rules["default"];
+        }
+        const firstKey = Object.keys(rules)[0];
+        if (firstKey && Array.isArray(rules[firstKey])) {
+            return rules[firstKey];
+        }
+    }
+    catch {
+        // Not valid JSON
+    }
+    return null;
+}
+//# sourceMappingURL=PreviewPanel.js.map
