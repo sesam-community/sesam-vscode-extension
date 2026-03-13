@@ -1,7 +1,8 @@
 node_modules/
 dist/
 *.vsix
-.vscode-test/
-out/
 *.js.map
-*.d.ts
+# Compiled JS next to TypeScript sources
+client/src/**/*.js
+server/src/**/*.js
+src/**/*.js
