@@ -15,65 +15,61 @@
 
 **Gap**: The extension is isolated from the actual sesam-py CLI and Sesam node. Developers constantly context-switch to terminal and have no IDE-level integration with their node or tests.
 
----
-
 ## Feature Groups
 
-### A. sesam-py Command Integration
+### 1. sesam-py Command Integration
 - Command palette + toolbar buttons: upload, download, run, test, verify, validate, status, format, wipe, stop
 - Status bar: show active NODE name, connection status
 - Output panel: stream sesam-py output in a dedicated channel
 - Task provider: define sesam tasks in tasks.json
 
-### B. Config File Intelligence
+### 2. Config File Intelligence
 - `.syncconfig` — syntax validation, hover docs for NODE/JWT keys, quick-pick known node names
 - `.sesamconfig.json` — JSON schema for formatstyle options, IntelliSense
 - `.authconfig` — syntax validation, secure credential masking
 - `.jinja_vars` — syntax highlighting, key-value completion
 
-### C. Secure Credential Management
+### 3. Secure Credential Management
 - Store JWT/secrets via VS Code SecretStorage API (not plaintext .syncconfig)
 - Multi-environment support: quick-switch between dev/test/prod nodes
 - Credential status in status bar
 
-### D. Node-Connected Live Preview
+### 4. Node-Connected Live Preview
 - Extend PreviewPanel to optionally connect to the Sesam node (use NODE+JWT from .syncconfig)
 - Enable hops, apply-hops, lookup-entity to resolve against real node data
 - Show actual pipe output from the node inline
 
-### E. Test Management (Testing API)
+### 5. Test Management (Testing API)
 - Register `.test.json` files with VS Code Testing API (test explorer panel)
 - Run individual tests or all tests with green/red inline indicators
 - Show expected vs actual diff when a test fails
 - `.test.json` schema validation: `_id`, `type`, `pipe`, `file`, `blacklist`, `ignore`, `endpoint`, `stage`, `parameters`
 
-### F. Status / Diff View
+### 6. Status / Diff View
 - `sesam status` shown as a git-style diff panel (local vs node config)
 - Inline gutter indicators for modified pipes
 - Quick action to sync individual pipe up or down
 
-### G. Pipe Graph Enhancements
+### 7. Pipe Graph Enhancements
 - Full interactive graph visualization (D3/vis-network in webview) vs current tree
 - Visual indicators: which pipes are failing on node, which have unresolved hops
 - Filter/search by pipe _id
 
-### H. Connector Development Tools
+### 8. Connector Development Tools
 - Connector init wizard (form-based UI for connectorpy init)
 - Template expansion preview (`connectorpy expand` output shown in sidebar)
 - OAuth2 flow: launch browser auth from a VS Code command, capture tokens, update .authconfig
 - manifest.json schema validation with IntelliSense
 
-### I. Copilot Agent Participant (@sesam)
+### 9. Copilot Agent Participant (@sesam)
 - `@sesam` chat participant that understands DTL, pipe configs, sesam-py commands
 - Skills: generate pipe configs from natural language, explain transforms, fix lint errors, write test entities + expected outputs, recommend sesam-py command for a task
 - Tool calls: read local pipes/systems, validate DTL, call node API for live data
 
-### J. Inline Output & Diagnostics from Node
+### 10. Inline Output & Diagnostics from Node
 - After `sesam run`, show per-pipe statistics inline (entities processed, errors)
 - After `sesam download`, show diff notification with one-click open
 - Surface node-side errors as diagnostics in the editor
-
----
 
 ## Key Files to Modify/Add
 
