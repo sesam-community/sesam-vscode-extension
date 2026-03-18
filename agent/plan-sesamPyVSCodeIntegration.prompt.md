@@ -1,5 +1,7 @@
 # Plan: VS Code Extension Feature Suggestions for sesam-py Integration
 
+**TL;DR**: The extension currently only covers DTL language editing in isolation. The biggest wins come from bridging the constant context-switch to the terminal, wiring the extension into the Sesam node directly, and adding a Copilot `@sesam` agent participant that understands the full Sesam ecosystem.
+
 ## Context
 
 **sesam-py** is the Sesam CLI tool. Developer workflow:
