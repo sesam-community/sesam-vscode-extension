@@ -83,3 +83,15 @@
 - New: `client/src/sesam/CredentialManager.ts` — SecretStorage-backed credential store
 - New: `client/src/testing/TestProvider.ts` — VS Code Testing API provider
 - New: `client/src/chat/SesamChatParticipant.ts` — Copilot @sesam agent
+
+## Suggested Priority Order
+
+1. **sesam-py commands** (immediate daily-driver value, straightforward to build)
+2. **@sesam agent** (high leverage, multiplies all other features)
+3. **Test Management** (fills the biggest testing visibility gap)
+4. **Config file intelligence** (daily friction, quick wins via JSON Schema)
+5. **Credential security** (security correctness, currently a risk)
+6. **Node-connected preview** (unlocks hops/apply-hops, high dev value)
+7. **Status/diff view** (polishes the upload/download loop)
+8. **Graph enhancements** (visual upgrade)
+9. **Connector tools** (narrower audience, higher complexity)
