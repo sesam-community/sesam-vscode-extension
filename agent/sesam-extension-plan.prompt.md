@@ -58,9 +58,12 @@
 
 ### 3. Entity navigation for pipes and datasets
 
-- Browse and inspect pipe/dataset entities directly from the editor
+- Two-pane layout: scrollable entity list (left, ~25%) + JSON viewer (right, ~75%)
+- Entity list shows `_id`, last-updated timestamp, and sequence number per item
+- Clicking an entity opens its full JSON in a read-only editor panel with syntax highlighting
+- Full entity schema visible: `_id`, `_updated`, `_previous`, `_deleted`, `_ts`, `_hash`, plus any user-defined fields
 - No need to open the Management Studio for data exploration
-- Uses the Sesam node API; exact integration details to be defined
+- Uses the Sesam node API (`GET /datasets/<id>/entities`); VS Code UI target: custom webview panel or TreeView + read-only editor
 
 ## Feature Groups
 
