@@ -3,7 +3,7 @@
 > **Status**: `planned`
 > **Rollout Phase**: Phase 1 - MVP
 > **Depends on**: F00 (binary resolved)
-> **Tracking**: [impl-plan.prompt.md](impl-plan.prompt.md)
+> **Tracking**: [README.md](README.md)
 
 ---
 

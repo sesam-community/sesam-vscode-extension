@@ -2,7 +2,7 @@
 
 > **Status**: `planned`
 > **Rollout Phase**: Phase 1 - MVP
-> **Tracking**: [impl-plan.prompt.md](impl-plan.prompt.md)
+> **Tracking**: [README.md](README.md)
 
 ---
 

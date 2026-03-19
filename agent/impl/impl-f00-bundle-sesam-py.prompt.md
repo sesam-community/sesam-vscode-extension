@@ -3,7 +3,7 @@
 > **Status**: `planned`
 > **Rollout Phase**: Phase 1 - MVP
 > **Overarching Goal**: Overarching Goal 1 (TS rewrite) + Overarching Goal 2 (zero-install bundle)
-> **Tracking**: [impl-plan.prompt.md](impl-plan.prompt.md)
+> **Tracking**: [README.md](README.md)
 
 ---
 

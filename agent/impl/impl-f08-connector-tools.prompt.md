@@ -2,7 +2,7 @@
 
 > **Status**: `planned`
 > **Rollout Phase**: Phase 4 - AI & Visual Polish
-> **Tracking**: [impl-plan.prompt.md](impl-plan.prompt.md)
+> **Tracking**: [README.md](README.md)
 
 ---
 

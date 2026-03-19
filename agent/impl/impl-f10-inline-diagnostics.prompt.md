@@ -2,7 +2,7 @@
 
 > **Status**: `planned`
 > **Rollout Phase**: Phase 3 - Node Connectivity
-> **Tracking**: [impl-plan.prompt.md](impl-plan.prompt.md)
+> **Tracking**: [README.md](README.md)
 
 ---
 
