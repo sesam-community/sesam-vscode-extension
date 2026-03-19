@@ -19,6 +19,8 @@ export default defineConfig({
     rollupOptions: {
       external: [
         "vscode",
+        "vscode-languageclient",
+        "vscode-languageclient/node",
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
       ],

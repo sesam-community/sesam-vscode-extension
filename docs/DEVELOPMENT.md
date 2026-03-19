@@ -39,12 +39,49 @@ yarn install
 ## Project Structure
 
 ```
-client/src/         # VS Code extension host (UI, commands, webviews)
-server/src/         # Language Server Protocol (LSP) implementation
-src/shared/         # Utilities shared by both client and server
-syntaxes/           # TextMate grammar for syntax highlighting
-snippets/           # Code snippet definitions
-docs/               # Developer documentation
+.
+├── package.json                        # Extension manifest: activation events, contributes, scripts, dependencies
+├── tsconfig.json                       # Root TypeScript config (references client & server sub-projects)
+├── vite.config.client.ts               # Vite build config for the client bundle (outputs dist/client/extension.js)
+├── vite.config.server.ts               # Vite build config for the server bundle (outputs dist/server/server.js)
+├── vitest.config.ts                    # Vitest config for the test suite
+├── language-configuration.json         # VS Code language config: bracket pairs, comment tokens, auto-closing rules for .dtl files
+│
+├── client/
+│   ├── tsconfig.json                   # TypeScript config for the extension host (targets VS Code API, no emit — Vite handles bundling)
+│   └── src/
+│       ├── extension.ts                # Extension entry point: activates the LSP client, registers the sidebar tree view and the preview command
+│       ├── graph/
+│       │   └── PipeGraphProvider.ts    # TreeDataProvider that scans the workspace for pipe/system JSON configs and exposes DTL hop relationships in the "Pipe Graph" sidebar panel
+│       └── preview/
+│           └── PreviewPanel.ts         # WebviewPanel that renders a three-pane DTL live preview (editable input entity → transform rules → computed output entity), calling dtl-evaluator directly inside the extension host
+│
+├── server/
+│   ├── tsconfig.json                   # TypeScript config for the language server (targets Node 20, no emit — Vite handles bundling)
+│   └── src/
+│       ├── server.ts                   # LSP server entry point: wires up completions, hover documentation, diagnostics, and document formatting handlers via vscode-languageserver
+│       ├── dtl-parser.ts               # Lightweight positional parser: tokenises document text and produces a list of DtlCall nodes (function name + argument count + source ranges) without relying on JSON.parse, so source positions are preserved
+│       └── dtl-validator.ts            # Diagnostic producer: consumes DtlCall nodes from the parser and emits LSP Diagnostic objects for unknown functions, wrong argument counts, transforms used as expressions, and unknown variable prefixes
+│
+├── src/
+│   └── shared/
+│       ├── dtl-registry.ts             # Single source of truth for all ~160 DTL built-in functions, variables, and reserved entity fields; imported by both the server (hover/completions/validation) and the client (preview evaluator)
+│       └── dtl-evaluator.ts            # Client-side mini-interpreter: evaluates a supported subset of DTL transform rules against an input entity and returns the resulting output entity (used by PreviewPanel; hops and encryption are flagged as unsupported)
+│
+├── syntaxes/
+│   ├── dtl.tmLanguage.json             # TextMate grammar for standalone .dtl files: highlights transform keywords, all built-in function names by category, variables (_S, _T, …), and reserved entity fields
+│   └── dtl-injection.tmLanguage.json   # TextMate injection grammar: applies the same DTL highlighting inside regular .json pipe config files without requiring a separate file type
+│
+├── snippets/
+│   └── dtl.code-snippets.json          # VS Code snippet definitions for common DTL patterns (pipe skeleton, add/copy/filter transforms, hops template, etc.)
+│
+├── tests/
+│   ├── evaluator.test.ts               # Unit tests for dtl-evaluator: covers all supported transforms and expressions, discard/filter behaviour, and error handling
+│   ├── parser.test.ts                  # Unit tests for dtl-parser: verifies correct extraction of function names, argument counts, and source positions from both .dtl and pipe JSON formats
+│   └── validator.test.ts               # Unit tests for dtl-validator: checks that correct diagnostics (unknown function, wrong arg count, transform-as-expression, unknown variable) are produced for various inputs
+│
+└── docs/
+    └── DEVELOPMENT.md                  # This file — developer setup, workflow, testing, packaging, and publishing guide
 ```
 
 ---
