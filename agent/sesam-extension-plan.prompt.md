@@ -1,5 +1,27 @@
 # Plan: VS Code Extension Feature Suggestions for sesam-py Integration
 
+## Table of Contents
+
+- [Context](#context)
+- [Overarching Goal](#overarching-goal)
+- [Feature Groups](#feature-groups)
+  - [1. sesam-py Command Integration](#1-sesam-py-command-integration)
+  - [2. Config File Intelligence](#2-config-file-intelligence)
+  - [3. Secure Credential Management](#3-secure-credential-management)
+  - [4. Node-Connected Live Preview](#4-node-connected-live-preview)
+  - [5. Test Management](#5-test-management-testing-api)
+  - [6. Status / Diff View](#6-status--diff-view)
+  - [7. Pipe Graph Enhancements](#7-pipe-graph-enhancements)
+  - [8. Connector Development Tools](#8-connector-development-tools)
+  - [9. Copilot Agent Participant](#9-copilot-agent-participant-sesam)
+  - [10. Inline Output & Diagnostics](#10-inline-output--diagnostics-from-node)
+- [Key Files to Modify/Add](#key-files-to-modifyadd)
+- [Phased Rollout](#phased-rollout)
+  - [Phase 1: MVP](#phase-1--mvp-the-daily-command-loop)
+  - [Phase 2: Testing & Diff](#phase-2--close-the-testing--diff-loop)
+  - [Phase 3: Node Connectivity](#phase-3--node-connectivity)
+  - [Phase 4: AI & Visual Polish](#phase-4--ai--visual-polish)
+
 **TL;DR**: The extension currently only covers DTL language editing in isolation. The overarching goal is to bundle sesam-py inside the extension so users never need a separate install, then progressively bridge the terminal context-switch, wire the editor into the Sesam node, and add a Copilot `@sesam` agent. The work is broken into 4 phases : starting with a lean MVP, then adding test integration, node connectivity, and AI features.
 
 ## Context
