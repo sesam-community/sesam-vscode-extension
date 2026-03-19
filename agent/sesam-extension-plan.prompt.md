@@ -44,15 +44,23 @@
 
 ### 1. Reimplement sesam-py in TypeScript/Node.js
 
-Maintain a separate TypeScript/Node.js port of sesam-py as its own repo/package. This eliminates the Python runtime dependency entirely, enables tighter VS Code API integration, simplifies bundling, and makes the extension fully self-contained. The bundled binary approach (goal 2) is the short-term bridge until this rewrite is complete.
+- Port sesam-py to TypeScript/Node.js as a separate repo/package
+- Eliminates Python runtime dependency entirely
+- Enables tighter VS Code API integration and simpler bundling
+- Goal 2 (bundled binary) is the short-term bridge until this is complete
 
 ### 2. Bundle the new re-implemented sesam-py inside the extension
 
-Users should be able to install the VS Code extension and immediately use all sesam-py functionality : no separate `pip install`, no PATH configuration, no version mismatch. Until the TypeScript rewrite (goal 1) is complete, the extension ships with a pinned sesam-py binary (or Python wheel) for each supported platform (Linux, macOS, Windows) and invokes it internally. A setting allows advanced users to point to their own installation instead.
+- Zero-install experience: no `pip install`, no PATH setup, no version mismatch
+- Ship the TypeScript reimplementation (goal 1) bundled inside the extension
+- Until rewrite is complete, ship pinned platform binaries (Linux, macOS, Windows)
+- `dtl.sesampy.executablePath` setting lets advanced users override with their own binary
 
 ### 3. Entity navigation for pipes and datasets
 
-Expose the Sesam node API to let developers browse and inspect pipe/dataset entities directly from the editor - without opening the Management Studio. The API for fetching entities is available on the node; exact integration details to be defined.
+- Browse and inspect pipe/dataset entities directly from the editor
+- No need to open the Management Studio for data exploration
+- Uses the Sesam node API; exact integration details to be defined
 
 ## Feature Groups
 
