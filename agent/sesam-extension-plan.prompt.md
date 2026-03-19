@@ -45,16 +45,17 @@
 
 ### 1. Reimplement sesam-py in TypeScript/Node.js
 
-- Port sesam-py to TypeScript/Node.js as a separate repo/package
+- Split into two packages: `@sesam/core` (pure library, typed API) and `@sesam/cli` (thin shell on core for terminal users)
+- `@sesam/core`: no CLI dependencies, all functions return typed objects - this is what the extension bundles
+- `@sesam/cli`: depends on `@sesam/core`, adds argument parsing + formatted output - drop-in sesam-py replacement for terminal users
 - Eliminates Python runtime dependency entirely
-- Enables tighter VS Code API integration and simpler bundling
-- Goal 2 (bundled binary) is the short-term bridge until this is complete
 
 ### 2. Bundle the new re-implemented sesam-py inside the extension
 
 - Zero-install experience: no `pip install`, no PATH setup, no version mismatch
-- Ship the TypeScript reimplementation (goal 1) as an npm dependency bundled inside the VSIX
-- `dtl.sesampy.executablePath` setting lets advanced users override with a custom binary
+- Ship `@sesam/core` (the library package) bundled as an npm dependency inside the VSIX
+- `@sesam/cli` is NOT bundled - it is the standalone terminal replacement, published separately
+- `dtl.sesampy.executablePath` setting lets advanced users override with a custom binary (spawned as subprocess)
 
 ### 3. Entity navigation for pipes and datasets
 
