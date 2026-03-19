@@ -50,10 +50,15 @@
 - Task provider: define sesam tasks in tasks.json
 
 ### 2. Config File Intelligence
-- `.syncconfig` : syntax validation, hover docs for NODE/JWT keys, quick-pick known node names
-- `.sesamconfig.json` : JSON schema for formatstyle options, IntelliSense
-- `.authconfig` : syntax validation, secure credential masking
-- `.jinja_vars` : syntax highlighting, key-value completion
+
+All three sesam-py config files below are created manually by developers in their repo root to control the CLI's behaviour (source: sesam-py `readme.usage.md`). Currently there is zero IDE support for any of them.
+
+| File | What it does | What to add |
+|---|---|---|
+| `.syncconfig` | Holds `NODE` (datahub URL) and `JWT` for authenticating the CLI against a Sesam node | Syntax validation; hover docs for keys; quick-pick recently used nodes |
+| `.sesamconfig.json` | Controls `sesam format` output style — indentation, spacing, array layout. Optional; defaults apply if absent | Full JSON Schema with IntelliSense for all `formatstyle` properties |
+| `.authconfig` | Credentials for connector external-service auth: OAuth2 `client_id`/`client_secret`, Tripletex tokens, or API key. Used by `sesam upload` / `sesam authenticate` | Syntax validation; mask secrets in hover; warn when file is git-tracked |
+| `.jinja_vars` | Key=value pairs defining custom Jinja template parameters substituted during `upload`/`download` in transit-encoded configs | Syntax highlighting; key=value pair autocompletion |
 
 ### 3. Secure Credential Management
 - Store JWT/secrets via VS Code SecretStorage API (not plaintext .syncconfig)
