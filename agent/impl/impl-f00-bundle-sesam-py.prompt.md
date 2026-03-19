@@ -51,6 +51,34 @@ validate(dir: string): Promise<ValidationResult>
 
 ---
 
+## Repository Structure
+
+Both packages live in a **single monorepo** using **pnpm workspaces** (no extra tooling needed for two
+packages; Turborepo can be added later if the repo grows).
+
+```
+sesam-ts/                        ← monorepo root
+  package.json                   ← workspaces: ["packages/*"]
+  packages/
+    core/                        ← @sesam/core
+      package.json
+      src/
+        upload.ts
+        download.ts
+        ...
+    cli/                         ← @sesam/cli
+      package.json               ← dependencies: { "@sesam/core": "workspace:*" }
+      src/
+        index.ts                 ← commander entrypoint
+```
+
+**Why monorepo:**
+- `@sesam/cli` depends directly on `@sesam/core` — linked locally via `workspace:*`, no publish needed during development
+- Breaking API changes in `@sesam/core` are caught immediately because both packages build together
+- One CI pipeline, one issue tracker, one PR touches both packages when porting a command
+
+---
+
 ## Implementation Phases
 
 ### Phase A: `@sesam/core` Library
