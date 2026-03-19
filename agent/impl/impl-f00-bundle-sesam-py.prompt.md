@@ -53,8 +53,11 @@ validate(dir: string): Promise<ValidationResult>
 
 ## Repository Structure
 
-Both packages live in a **single monorepo** using **pnpm workspaces** (no extra tooling needed for two
-packages; Turborepo can be added later if the repo grows).
+> Full decision rationale and migration steps: [impl-f00-monorepo-structure.prompt.md](impl-f00-monorepo-structure.prompt.md)
+
+Both packages live in a **single monorepo** (`sesam-ts`) together with the vscode-extension, using
+**pnpm workspaces**. No packages are published to any registry — all cross-package references use
+`workspace:*` (resolved locally). Turborepo can be added later if the repo grows.
 
 ```
 sesam-ts/                        ← monorepo root
