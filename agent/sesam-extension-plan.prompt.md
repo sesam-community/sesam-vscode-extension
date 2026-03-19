@@ -3,7 +3,10 @@
 ## Table of Contents
 
 - [Context](#context)
-- [Overarching Goal](#overarching-goal)
+- [Overarching Goals](#overarching-goals)
+  - [1. Reimplement sesam-py in TypeScript/Node.js](#1-reimplement-sesam-py-in-typescriptnodejs)
+  - [2. Bundle the re-implemented sesam-py inside the extension](#2-bundle-the-new-re-implemented-sesam-py-inside-the-extension)
+  - [3. Entity navigation for pipes and datasets](#3-entity-navigation-for-pipes-and-datasets)
 - [Feature Groups](#feature-groups)
   - [1. sesam-py Command Integration](#1-sesam-py-command-integration)
   - [2. Config File Intelligence](#2-config-file-intelligence)
@@ -21,6 +24,7 @@
   - [Phase 2: Testing & Diff](#phase-2--close-the-testing--diff-loop)
   - [Phase 3: Node Connectivity](#phase-3--node-connectivity)
   - [Phase 4: AI & Visual Polish](#phase-4--ai--visual-polish)
+  - [Phase 5: Management Studio in VS Code](#phase-5--management-studio-functionalities-long-term--post-mvp)
 
 **TL;DR**: The extension currently only covers DTL language editing in isolation. The overarching goal is to bundle sesam-py inside the extension so users never need a separate install, then progressively bridge the terminal context-switch, wire the editor into the Sesam node, and add a Copilot `@sesam` agent. The work is broken into 4 phases : starting with a lean MVP, then adding test integration, node connectivity, and AI features.
 
@@ -37,9 +41,30 @@
 
 **Gap**: The extension is isolated from the actual sesam-py CLI and Sesam node. Developers constantly context-switch to terminal and have no IDE-level integration with their node or tests.
 
-## Overarching Goal
+## Overarching Goals
 
-**Bundle sesam-py inside the extension.** Users should be able to install the VS Code extension and immediately use all sesam-py functionality : no separate `pip install`, no PATH configuration, no version mismatch. The extension ships with a pinned sesam-py binary (or Python wheel) for each supported platform (Linux, macOS, Windows) and invokes it internally. A setting allows advanced users to point to their own installation instead.
+### 1. Reimplement sesam-py in TypeScript/Node.js
+
+- Port sesam-py to TypeScript/Node.js as a separate repo/package
+- Eliminates Python runtime dependency entirely
+- Enables tighter VS Code API integration and simpler bundling
+- Goal 2 (bundled binary) is the short-term bridge until this is complete
+
+### 2. Bundle the new re-implemented sesam-py inside the extension
+
+- Zero-install experience: no `pip install`, no PATH setup, no version mismatch
+- Ship the TypeScript reimplementation (goal 1) bundled inside the extension
+- Until rewrite is complete, ship pinned platform binaries (Linux, macOS, Windows)
+- `dtl.sesampy.executablePath` setting lets advanced users override with their own binary
+
+### 3. Entity navigation for pipes and datasets
+
+- Two-pane layout: scrollable entity list (left, ~25%) + JSON viewer (right, ~75%)
+- Entity list shows `_id`, last-updated timestamp, and sequence number per item
+- Clicking an entity opens its full JSON in a read-only editor panel with syntax highlighting
+- Full entity schema visible: `_id`, `_updated`, `_previous`, `_deleted`, `_ts`, `_hash`, plus any user-defined fields
+- No need to open the Management Studio for data exploration
+- Uses the Sesam node API (`GET /datasets/<id>/entities`); VS Code UI target: custom webview panel or TreeView + read-only editor
 
 ## Feature Groups
 
@@ -50,10 +75,15 @@
 - Task provider: define sesam tasks in tasks.json
 
 ### 2. Config File Intelligence
-- `.syncconfig` : syntax validation, hover docs for NODE/JWT keys, quick-pick known node names
-- `.sesamconfig.json` : JSON schema for formatstyle options, IntelliSense
-- `.authconfig` : syntax validation, secure credential masking
-- `.jinja_vars` : syntax highlighting, key-value completion
+
+All three sesam-py config files below are created manually by developers in their repo root to control the CLI's behaviour (source: sesam-py `readme.usage.md`). Currently there is zero IDE support for any of them.
+
+| File | What it does | What to add |
+|---|---|---|
+| `.syncconfig` | Holds `NODE` (datahub URL) and `JWT` for authenticating the CLI against a Sesam node | Syntax validation; hover docs for keys; quick-pick recently used nodes |
+| `.sesamconfig.json` | Controls `sesam format` output style - indentation, spacing, array layout. Optional; defaults apply if absent | Full JSON Schema with IntelliSense for all `formatstyle` properties |
+| `.authconfig` | Credentials for connector external-service auth: OAuth2 `client_id`/`client_secret`, Tripletex tokens, or API key. Used by `sesam upload` / `sesam authenticate` | Syntax validation; mask secrets in hover; warn when file is git-tracked |
+| `.jinja_vars` | Key=value pairs defining custom Jinja template parameters substituted during `upload`/`download` in transit-encoded configs | Syntax highlighting; key=value pair autocompletion |
 
 ### 3. Secure Credential Management
 - Store JWT/secrets via VS Code SecretStorage API (not plaintext .syncconfig)
@@ -147,3 +177,10 @@
 - **8. Connector Development Tools** : connector init wizard; template expansion preview; OAuth2 in-editor flow
 
 **New file:** `SesamChatParticipant.ts`
+
+### Phase 5 : Management Studio Functionalities (Long-term / post-MVP)
+> Goal: bring key Management Studio workflows into VS Code, so developers rarely need to leave the editor.
+
+- **Pipe preview / debug** : run a pipe against live or sample data and inspect the output entity-by-entity directly in VS Code, with step-through debugging of DTL transforms
+- **Save systems/pipes to node** : write individual pipe or system configs back to the node via the REST API without a full `sesam upload`; enables fast single-pipe iteration
+- **Run pipes from editor** : trigger a single pipe or a subset of pipes on the node from a CodeLens / command, with output streamed into the Output Channel

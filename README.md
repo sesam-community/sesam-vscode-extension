@@ -17,11 +17,14 @@
 - [Requirements](#requirements)
 - [Known Limitations](#known-limitations)
 - [Development](#development)
+- [Roadmap](#roadmap)
 - [License](#license)
 
 ---
 
 Full-featured VS Code extension for **Sesam Data Transformation Language (DTL)** — the declarative JSON-array language used to define pipe transformations in the [Sesam](https://sesam.io) integration platform.
+
+The long-term goal is to make this extension the single tool Sesam developers need: bundling sesam-py so no separate install is required, integrating all CLI commands into the editor, and progressively replacing key [Management Studio](https://sesam.io) workflows with native VS Code panels. See the full plan in [`agent/sesam-extension-plan.prompt.md`](agent/sesam-extension-plan.prompt.md).
 
 ---
 
@@ -194,6 +197,19 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 
 For information on setting up the development environment, running tests, and contributing, see the [Development Guide](docs/DEVELOPMENT.md).
 
+---
+
+## Roadmap
+
+The extension is being expanded in 5 phases. See [`agent/sesam-extension-plan.prompt.md`](agent/sesam-extension-plan.prompt.md) for the full plan.
+
+| Phase | Focus | Key deliverables |
+|---|---|---|
+| **1 - MVP** | Zero-install daily command loop | Bundle sesam-py, Command Palette integration, config file IntelliSense, secure credential storage |
+| **2** | Testing & diff visibility | VS Code Testing API for `.test.json`, git-style local-vs-node diff view |
+| **3** | Node connectivity | Node-connected live preview (unlocks `hops`/`apply-hops`), inline pipe diagnostics |
+| **4** | AI & visual polish | `@sesam` Copilot agent, interactive pipe graph, connector dev tools |
+| **5** | Management Studio in VS Code | Pipe preview/debug, save individual pipes/systems to node, run pipes from editor |
 
 ## License
 
