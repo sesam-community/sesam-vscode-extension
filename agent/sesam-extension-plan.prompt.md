@@ -4,6 +4,9 @@
 
 - [Context](#context)
 - [Overarching Goals](#overarching-goals)
+  - [1. Reimplement sesam-py in TypeScript/Node.js](#1-reimplement-sesam-py-in-typescriptnodejs)
+  - [2. Bundle the re-implemented sesam-py](#2-bundle-the-new-re-implemented-sesam-py-inside-the-extension)
+  - [3. Entity navigation for pipes and datasets](#3-entity-navigation-for-pipes-and-datasets)
 - [Feature Groups](#feature-groups)
   - [1. sesam-py Command Integration](#1-sesam-py-command-integration)
   - [2. Config File Intelligence](#2-config-file-intelligence)
@@ -43,7 +46,7 @@
 
 **2. Bundle the new re-implemented sesam-py inside the extension.** Users should be able to install the VS Code extension and immediately use all sesam-py functionality : no separate `pip install`, no PATH configuration, no version mismatch. Until the TypeScript rewrite (goal 1) is complete, the extension ships with a pinned sesam-py binary (or Python wheel) for each supported platform (Linux, macOS, Windows) and invokes it internally. A setting allows advanced users to point to their own installation instead.
 
-**3. Entity navigation for pipes and datasets.** Expose the Sesam node API to let developers browse and inspect pipe/dataset entities directly from the editor — without opening the Management Studio. The API for fetching entities is available on the node; exact integration details to be defined.
+**3. Entity navigation for pipes and datasets.** Expose the Sesam node API to let developers browse and inspect pipe/dataset entities directly from the editor - without opening the Management Studio. The API for fetching entities is available on the node; exact integration details to be defined.
 
 ## Feature Groups
 
@@ -60,7 +63,7 @@ All three sesam-py config files below are created manually by developers in thei
 | File | What it does | What to add |
 |---|---|---|
 | `.syncconfig` | Holds `NODE` (datahub URL) and `JWT` for authenticating the CLI against a Sesam node | Syntax validation; hover docs for keys; quick-pick recently used nodes |
-| `.sesamconfig.json` | Controls `sesam format` output style — indentation, spacing, array layout. Optional; defaults apply if absent | Full JSON Schema with IntelliSense for all `formatstyle` properties |
+| `.sesamconfig.json` | Controls `sesam format` output style - indentation, spacing, array layout. Optional; defaults apply if absent | Full JSON Schema with IntelliSense for all `formatstyle` properties |
 | `.authconfig` | Credentials for connector external-service auth: OAuth2 `client_id`/`client_secret`, Tripletex tokens, or API key. Used by `sesam upload` / `sesam authenticate` | Syntax validation; mask secrets in hover; warn when file is git-tracked |
 | `.jinja_vars` | Key=value pairs defining custom Jinja template parameters substituted during `upload`/`download` in transit-encoded configs | Syntax highlighting; key=value pair autocompletion |
 
