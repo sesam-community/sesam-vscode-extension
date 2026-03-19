@@ -1,6 +1,6 @@
 # Plan: VS Code Extension Feature Suggestions for sesam-py Integration
 
-**TL;DR**: The extension currently only covers DTL language editing in isolation. The biggest wins come from bridging the constant context-switch to the terminal, wiring the extension into the Sesam node directly, and adding a Copilot `@sesam` agent participant that understands the full Sesam ecosystem. The work is broken into 4 phases — starting with a lean MVP covering the daily command loop, then progressively adding test integration, node connectivity, and AI features.
+**TL;DR**: The extension currently only covers DTL language editing in isolation. The overarching goal is to bundle sesam-py inside the extension so users never need a separate install, then progressively bridge the terminal context-switch, wire the editor into the Sesam node, and add a Copilot `@sesam` agent. The work is broken into 4 phases — starting with a lean MVP, then adding test integration, node connectivity, and AI features.
 
 ## Context
 
@@ -14,6 +14,10 @@
 **VS Code Extension** (current): DTL language support — syntax highlighting, autocompletion, hover docs, linting, formatter, Pipe Graph sidebar, offline Pipe Preview.
 
 **Gap**: The extension is isolated from the actual sesam-py CLI and Sesam node. Developers constantly context-switch to terminal and have no IDE-level integration with their node or tests.
+
+## Overarching Goal
+
+**Bundle sesam-py inside the extension.** Users should be able to install the VS Code extension and immediately use all sesam-py functionality — no separate `pip install`, no PATH configuration, no version mismatch. The extension ships with a pinned sesam-py binary (or Python wheel) for each supported platform (Linux, macOS, Windows) and invokes it internally. A setting allows advanced users to point to their own installation instead.
 
 ## Feature Groups
 
@@ -87,13 +91,15 @@
 ## Phased Rollout
 
 ### Phase 1 — MVP: The Daily Command Loop
-> Goal: eliminate the terminal context-switch for the core sesam-py workflow.
+> Goal: ship a zero-install experience and eliminate the terminal context-switch for the core sesam-py workflow.
 
+- **0. Bundle sesam-py** — embed platform-specific sesam-py binaries in the extension; auto-select at runtime; fall back to user-installed binary via a `dtl.sesampy.executablePath` setting
 - **1. sesam-py Command Integration** — upload, download, run, test, verify, validate, status, format, wipe, stop from Command Palette + status bar
 - **2. Config File Intelligence** — schema + IntelliSense for `.syncconfig`, `.sesamconfig.json`, `.authconfig`, `.jinja_vars` (quick wins, zero setup required)
 - **3. Secure Credential Management** — move JWTs out of plaintext files into SecretStorage; warn on committed credentials
 
 **New files:** `SesamRunner.ts`, `CredentialManager.ts`
+**Build change:** add platform binary download step to `vite.config.client.ts` / CI pipeline
 
 ### Phase 2 — Close the Testing & Diff Loop
 > Goal: surface test results and config drift directly in the editor.
