@@ -53,9 +53,8 @@
 ### 2. Bundle the new re-implemented sesam-py inside the extension
 
 - Zero-install experience: no `pip install`, no PATH setup, no version mismatch
-- Ship the TypeScript reimplementation (goal 1) bundled inside the extension
-- Until rewrite is complete, ship pinned platform binaries (Linux, macOS, Windows)
-- `dtl.sesampy.executablePath` setting lets advanced users override with their own binary
+- Ship the TypeScript reimplementation (goal 1) as an npm dependency bundled inside the VSIX
+- `dtl.sesampy.executablePath` setting lets advanced users override with a custom binary
 
 ### 3. Entity navigation for pipes and datasets
 
@@ -145,7 +144,7 @@ All three sesam-py config files below are created manually by developers in thei
 ### Phase 1 : MVP: The Daily Command Loop
 > Goal: ship a zero-install experience and eliminate the terminal context-switch for the core sesam-py workflow.
 
-- **0. Bundle sesam-py** : embed platform-specific sesam-py binaries in the extension; auto-select at runtime; fall back to user-installed binary via a `dtl.sesampy.executablePath` setting
+- **0. Bundle sesam-py** : reimplement sesam-py as `@sesam/cli` (TypeScript/Node.js npm package) and bundle it inside the extension; `dtl.sesampy.executablePath` setting lets advanced users override with a custom binary
 - **1. sesam-py Command Integration** : upload, download, run, test, verify, validate, status, format, wipe, stop from Command Palette + status bar
 - **2. Config File Intelligence** : schema + IntelliSense for `.syncconfig`, `.sesamconfig.json`, `.authconfig`, `.jinja_vars` (quick wins, zero setup required)
 - **3. Secure Credential Management** : move JWTs out of plaintext files into SecretStorage; warn on committed credentials

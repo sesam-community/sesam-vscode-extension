@@ -1,4 +1,4 @@
-# F00: Bundle sesam-py (Binary + TypeScript Rewrite)
+# F00: Bundle sesam-py (TypeScript Rewrite)
 
 > **Status**: `planned`
 > **Rollout Phase**: Phase 1 - MVP
@@ -10,48 +10,24 @@
 ## Summary
 
 Users currently must have `sesam-py` installed globally (Python + PyPI). This feature eliminates that
-requirement in two steps:
+requirement by reimplementing sesam-py in TypeScript/Node.js and bundling it directly inside the extension
+as an npm dependency - no subprocess overhead, no platform binaries, no Python runtime needed.
 
-1. **Phase A (short-term)**: Detect or fall back to a bundled binary built from the existing Python sesam-py
-   project via PyInstaller. Ship platform-specific binaries in the extension's VSIX.
-2. **Phase B (long-term)**: Reimplement sesam-py in TypeScript/Node.js as a separate package, then bundle it
-   as a direct dependency - no subprocess overhead, no binary size, full parity.
+The `dtl.sesampy.executablePath` setting is retained as an escape hatch for advanced users who want to
+point to a custom build.
 
 ---
 
 ## Implementation Phases
 
-### Phase A: Bundle Platform Binaries
+### Phase A: TypeScript/Node.js CLI Rewrite
 
-1. Fork/clone sesam-py; add a CI step that calls `pyinstaller` to produce `sesam-linux`, `sesam-mac`,
-   `sesam-win.exe`.
-2. Publish the artifacts to GitHub Releases.
-3. Add a `postinstall` or `download-sesam-binary` script to the extension's `package.json` that downloads
-   the correct platform binary to `resources/bin/`.
-4. Add setting `dtl.sesampy.executablePath` (string, default: `""`):
-   - Not empty -> use the user-provided path.
-   - Empty -> resolve `resources/bin/sesam[-linux|-mac|-win.exe]` relative to the extension's install dir.
-5. On activation, health-check the resolved binary with `sesam-py --version`; surface errors via status bar.
-6. Gate all `F01` commands on a successful binary check.
-
-**Key files to touch:**
-- `package.json` - add `dtl.sesampy.executablePath` contribution point + `scripts.download-sesam-binary`
-- `client/src/extension.ts` - binary resolution + health check on activation
-- `resources/bin/` - gitignored directory for bundled binaries
-
-### Phase B: TypeScript/Node.js Rewrite
-
-> Prerequisite: Phase A shipped and stable. Rewrite lives in a **separate repository** (e.g.
-> `sesam-node` or `@sesam/cli`).
+> Lives in a **separate repository** (e.g. `@sesam/cli`).
 
 1. Create new repo `@sesam/cli` (scoped npm package).
 2. Port sesam-py commands one by one to TypeScript using `node-fetch` / `axios` for REST calls.
 3. Match sesam-py CLI flags exactly so existing scripts continue to work (`--node`, `--jwt`, `--single-mode`, etc.).
 4. Publish to npm.
-5. Add `@sesam/cli` as a dependency to the VS Code extension's `package.json`.
-6. Replace binary subprocess calls with direct `import { sesamRun } from '@sesam/cli'` calls in the
-   extension host process.
-7. Retire Phase A binary download script.
 
 **Commands to port (priority order):**
 
@@ -68,21 +44,32 @@ requirement in two steps:
 | `wipe` | low |
 | `stop` | low |
 
+### Phase B: Bundle in the VS Code Extension
+
+1. Add `@sesam/cli` as a dependency to the VS Code extension's `package.json`.
+2. Add setting `dtl.sesampy.executablePath` (string, default: `""`) as an escape hatch:
+   - Empty (default) -> use the bundled `@sesam/cli` module directly in-process.
+   - Not empty -> spawn the user-provided binary as a subprocess (for custom/dev builds).
+3. In `client/src/sesamRunner.ts`, implement a `SesamRunner` class that:
+   - Calls `@sesam/cli` functions directly when `executablePath` is empty.
+   - Falls back to spawning the provided binary path otherwise.
+4. On extension activation, verify `@sesam/cli` is importable and surface version to status bar.
+5. Gate all F01 commands on a successful runner check.
+
 ---
 
 ## Files to Modify / Add
 
 | File | Change |
 |---|---|
-| `package.json` | `dtl.sesampy.executablePath` setting, `download-sesam-binary` script |
-| `client/src/extension.ts` | Binary resolution util, activation check |
-| `client/src/sesamBinary.ts` (new) | `resolveBinary()`, `checkBinaryHealth()` |
-| `resources/bin/.gitkeep` (new) | Placeholder; actual binaries gitignored |
-| `.vscodeignore` | Exclude `.py` sources, keep `resources/bin/` |
+| `package.json` | Add `@sesam/cli` dependency; add `dtl.sesampy.executablePath` setting |
+| `client/src/extension.ts` | Instantiate `SesamRunner` on activation; surface version to status bar |
+| `client/src/sesamRunner.ts` (new) | `SesamRunner` - direct `@sesam/cli` calls or subprocess fallback |
+| `.vscodeignore` | Ensure `@sesam/cli` node_modules are included in the VSIX |
 
 ---
 
 ## Dependencies
 
-- F01 depends on Phase A being complete (commands need a binary to invoke)
-- Phase B depends on the `@sesam/cli` npm package being published
+- Phase A (`@sesam/cli` npm package published) must complete before Phase B can ship
+- F01 depends on Phase B being complete (commands need `SesamRunner` to execute)

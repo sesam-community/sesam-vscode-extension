@@ -2,7 +2,7 @@
 
 > **Status**: `planned`
 > **Rollout Phase**: Phase 1 - MVP
-> **Depends on**: F00 (binary resolved)
+> **Depends on**: F00 (SesamRunner available)
 > **Tracking**: [README.md](README.md)
 
 ---
@@ -31,11 +31,11 @@ a dedicated Output Channel, and VS Code Task definitions.
    | `sesam.status` | Sesam: Show status |
 
 2. Create `client/src/sesamCommands.ts`:
-   - `runSesamCommand(args: string[]): Promise<void>` - spawns binary (from F00 `resolveBinary()`),
+   - `runSesamCommand(args: string[]): Promise<void>` - invokes the command via F00 `SesamRunner`,
      streams stdout/stderr to a named Output Channel `"Sesam"`.
    - Each command listed above maps to a function that calls `runSesamCommand` with the right args.
 3. Register activation event `onCommand:sesam.*` (or `onStartupFinished`) in `package.json`.
-4. Add `when` clause `sesam.binaryReady` so commands are greyed out if binary check fails (F00).
+4. Add `when` clause `sesam.runnerReady` so commands are greyed out if the runner check fails (F00).
 
 ### Phase B: Status Bar Widget
 
@@ -84,5 +84,5 @@ a dedicated Output Channel, and VS Code Task definitions.
 
 ## Dependencies
 
-- **F00** - binary must be resolvable before any command can execute
+- **F00** - `SesamRunner` must be initialised before any command can execute
 - **F03** - credential management should be wired in before `upload`/`download` are widely used

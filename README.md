@@ -205,7 +205,7 @@ The extension is being expanded in 5 phases. See [`agent/impl/README.md`](agent/
 
 | Phase | Focus | Key deliverables |
 |---|---|---|
-| **1 - MVP** | Zero-install daily command loop | Bundle sesam-py, Command Palette integration, config file IntelliSense, secure credential storage |
+| **1 - MVP** | Zero-install daily command loop | Bundle sesam-py as a TypeScript/Node.js npm package, Command Palette integration, config file IntelliSense, secure credential storage |
 | **2** | Testing & diff visibility | VS Code Testing API for `.test.json`, git-style local-vs-node diff view |
 | **3** | Node connectivity | Node-connected live preview (unlocks `hops`/`apply-hops`), inline pipe diagnostics |
 | **4** | AI & visual polish | `@sesam` Copilot agent, interactive pipe graph, connector dev tools |

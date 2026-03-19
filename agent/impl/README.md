@@ -19,7 +19,7 @@
 
 | # | Feature | Rollout Phase | Status | Sub-plan |
 |---|---|---|---|---|
-| F00 | Bundle sesam-py (binary + TS rewrite) | Phase 1 | `planned` | [impl-f00-bundle-sesam-py.prompt.md](impl-f00-bundle-sesam-py.prompt.md) |
+| F00 | Bundle sesam-py (TS rewrite + npm bundle) | Phase 1 | `planned` | [impl-f00-bundle-sesam-py.prompt.md](impl-f00-bundle-sesam-py.prompt.md) |
 | F01 | sesam-py Command Integration | Phase 1 | `planned` | [impl-f01-sesam-commands.prompt.md](impl-f01-sesam-commands.prompt.md) |
 | F02 | Config File Intelligence | Phase 1 | `planned` | [impl-f02-config-file-intelligence.prompt.md](impl-f02-config-file-intelligence.prompt.md) |
 | F03 | Secure Credential Management | Phase 1 | `planned` | [impl-f03-credential-management.prompt.md](impl-f03-credential-management.prompt.md) |
