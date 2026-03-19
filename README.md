@@ -199,6 +199,26 @@ For information on setting up the development environment, running tests, and co
 
 ---
 
+## Installation
+
+This extension is for **internal use only** and is not published to the Visual Studio Marketplace.
+
+Download the latest `.vsix` from the GitHub Releases page of the `sesam-ts` monorepo, then install:
+
+```bash
+code --install-extension sesam-x.y.z.vsix
+```
+
+Or use the convenience script in the monorepo:
+
+```bash
+bash scripts/install-extension.sh
+```
+
+See [`agent/impl/impl-distribution.prompt.md`](agent/impl/impl-distribution.prompt.md) for the full distribution plan.
+
+---
+
 ## Roadmap
 
 The extension is being expanded in 5 phases. See [`agent/impl/README.md`](agent/impl/README.md) for the implementation tracker, or [`agent/sesam-extension-plan.prompt.md`](agent/sesam-extension-plan.prompt.md) for the full product plan.
