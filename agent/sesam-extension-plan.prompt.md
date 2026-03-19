@@ -3,7 +3,7 @@
 ## Table of Contents
 
 - [Context](#context)
-- [Overarching Goal](#overarching-goal)
+- [Overarching Goals](#overarching-goals)
 - [Feature Groups](#feature-groups)
   - [1. sesam-py Command Integration](#1-sesam-py-command-integration)
   - [2. Config File Intelligence](#2-config-file-intelligence)
@@ -39,9 +39,9 @@
 
 ## Overarching Goals
 
-**1. Bundle sesam-py inside the extension.** Users should be able to install the VS Code extension and immediately use all sesam-py functionality : no separate `pip install`, no PATH configuration, no version mismatch. The extension ships with a pinned sesam-py binary (or Python wheel) for each supported platform (Linux, macOS, Windows) and invokes it internally. A setting allows advanced users to point to their own installation instead.
+**1. Reimplement sesam-py in TypeScript/Node.js.** Maintain a separate TypeScript/Node.js port of sesam-py as its own repo/package. This eliminates the Python runtime dependency entirely, enables tighter VS Code API integration, simplifies bundling, and makes the extension fully self-contained. The bundled binary approach (goal 2) is the short-term bridge until this rewrite is complete.
 
-**2. Reimplement sesam-py in TypeScript/Node.js.** Long-term, maintain a separate TypeScript/Node.js port of sesam-py as its own repo/package. This eliminates the Python runtime dependency entirely, enables tighter VS Code API integration, simplifies bundling, and makes the extension fully self-contained. The bundled binary approach (goal 1) is the short-term bridge until this rewrite is complete.
+**2. Bundle the new re-implemented sesam-py inside the extension.** Users should be able to install the VS Code extension and immediately use all sesam-py functionality : no separate `pip install`, no PATH configuration, no version mismatch. Until the TypeScript rewrite (goal 1) is complete, the extension ships with a pinned sesam-py binary (or Python wheel) for each supported platform (Linux, macOS, Windows) and invokes it internally. A setting allows advanced users to point to their own installation instead.
 
 **3. Entity navigation for pipes and datasets.** Expose the Sesam node API to let developers browse and inspect pipe/dataset entities directly from the editor — without opening the Management Studio. The API for fetching entities is available on the node; exact integration details to be defined.
 
