@@ -24,6 +24,7 @@
   - [Phase 2: Testing & Diff](#phase-2--close-the-testing--diff-loop)
   - [Phase 3: Node Connectivity](#phase-3--node-connectivity)
   - [Phase 4: AI & Visual Polish](#phase-4--ai--visual-polish)
+  - [Phase 5: Management Studio in VS Code](#phase-5--management-studio-functionalities-long-term--post-mvp)
 
 **TL;DR**: The extension currently only covers DTL language editing in isolation. The overarching goal is to bundle sesam-py inside the extension so users never need a separate install, then progressively bridge the terminal context-switch, wire the editor into the Sesam node, and add a Copilot `@sesam` agent. The work is broken into 4 phases : starting with a lean MVP, then adding test integration, node connectivity, and AI features.
 
@@ -176,3 +177,10 @@ All three sesam-py config files below are created manually by developers in thei
 - **8. Connector Development Tools** : connector init wizard; template expansion preview; OAuth2 in-editor flow
 
 **New file:** `SesamChatParticipant.ts`
+
+### Phase 5 : Management Studio Functionalities (Long-term / post-MVP)
+> Goal: bring key Management Studio workflows into VS Code, so developers rarely need to leave the editor.
+
+- **Pipe preview / debug** : run a pipe against live or sample data and inspect the output entity-by-entity directly in VS Code, with step-through debugging of DTL transforms
+- **Save systems/pipes to node** : write individual pipe or system configs back to the node via the REST API without a full `sesam upload`; enables fast single-pipe iteration
+- **Run pipes from editor** : trigger a single pipe or a subset of pipes on the node from a CodeLens / command, with output streamed into the Output Channel
