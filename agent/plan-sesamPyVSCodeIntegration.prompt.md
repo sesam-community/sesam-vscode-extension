@@ -1,6 +1,6 @@
 # Plan: VS Code Extension Feature Suggestions for sesam-py Integration
 
-**TL;DR**: The extension currently only covers DTL language editing in isolation. The biggest wins come from bridging the constant context-switch to the terminal, wiring the extension into the Sesam node directly, and adding a Copilot `@sesam` agent participant that understands the full Sesam ecosystem.
+**TL;DR**: The extension currently only covers DTL language editing in isolation. The biggest wins come from bridging the constant context-switch to the terminal, wiring the extension into the Sesam node directly, and adding a Copilot `@sesam` agent participant that understands the full Sesam ecosystem. The work is broken into 4 phases — starting with a lean MVP covering the daily command loop, then progressively adding test integration, node connectivity, and AI features.
 
 ## Context
 
@@ -84,14 +84,38 @@
 - New: `client/src/testing/TestProvider.ts` — VS Code Testing API provider
 - New: `client/src/chat/SesamChatParticipant.ts` — Copilot @sesam agent
 
-## Suggested Priority Order
+## Phased Rollout
 
-1. **sesam-py commands** (immediate daily-driver value, straightforward to build)
-2. **@sesam agent** (high leverage, multiplies all other features)
-3. **Test Management** (fills the biggest testing visibility gap)
-4. **Config file intelligence** (daily friction, quick wins via JSON Schema)
-5. **Credential security** (security correctness, currently a risk)
-6. **Node-connected preview** (unlocks hops/apply-hops, high dev value)
-7. **Status/diff view** (polishes the upload/download loop)
-8. **Graph enhancements** (visual upgrade)
-9. **Connector tools** (narrower audience, higher complexity)
+### Phase 1 — MVP: The Daily Command Loop
+> Goal: eliminate the terminal context-switch for the core sesam-py workflow.
+
+- **1. sesam-py Command Integration** — upload, download, run, test, verify, validate, status, format, wipe, stop from Command Palette + status bar
+- **2. Config File Intelligence** — schema + IntelliSense for `.syncconfig`, `.sesamconfig.json`, `.authconfig`, `.jinja_vars` (quick wins, zero setup required)
+- **3. Secure Credential Management** — move JWTs out of plaintext files into SecretStorage; warn on committed credentials
+
+**New files:** `SesamRunner.ts`, `CredentialManager.ts`
+
+### Phase 2 — Close the Testing & Diff Loop
+> Goal: surface test results and config drift directly in the editor.
+
+- **5. Test Management** — VS Code Testing API integration for `.test.json` + `expected/` files; green/red per pipe; diff on failure
+- **6. Status / Diff View** — git-style local-vs-node diff panel; gutter indicators; CodeLens push/pull per pipe
+
+**New file:** `TestProvider.ts`
+
+### Phase 3 — Node Connectivity
+> Goal: connect the editor to the live Sesam node for real-time feedback.
+
+- **4. Node-Connected Live Preview** — "Connect to Node" toggle in PreviewPanel; unlock `hops`, `apply-hops`, `lookup-entity`
+- **10. Inline Output & Diagnostics from Node** — per-pipe run statistics inline; node-side errors as editor diagnostics
+
+**New file:** `NodeClient.ts`
+
+### Phase 4 — AI & Visual Polish
+> Goal: leverage all previous phases to provide intelligent assistance and richer visualisation.
+
+- **9. Copilot Agent Participant (@sesam)** — `@sesam` chat participant; generate pipes, explain transforms, write test data, suggest CLI flags
+- **7. Pipe Graph Enhancements** — interactive D3/vis-network graph; node-status overlay; search/filter
+- **8. Connector Development Tools** — connector init wizard; template expansion preview; OAuth2 in-editor flow
+
+**New file:** `SesamChatParticipant.ts`
