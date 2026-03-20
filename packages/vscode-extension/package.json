@@ -59,6 +59,11 @@
       {
         "command": "dtl.openDocs",
         "title": "DTL: Open Function Documentation"
+      },
+      {
+        "command": "dtl.newConfFile",
+        "title": "DTL: New Sesam Config File",
+        "icon": "$(new-file)"
       }
     ],
     "menus": {
@@ -67,6 +72,19 @@
           "command": "dtl.previewPipe",
           "when": "resourceLangId == json",
           "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "dtl.newConfFile",
+          "when": "workspaceFolderCount > 0",
+          "group": "2_workspace@99"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "dtl.newConfFile",
+          "when": "workspaceFolderCount > 0"
         }
       ]
     },
