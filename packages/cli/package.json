@@ -1,0 +1,22 @@
+{
+  "name": "@sesam/cli",
+  "version": "0.1.0",
+  "description": "Drop-in sesam-py replacement CLI (wraps @sesam/core)",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "sesam": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@sesam/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.0"
+  }
+}

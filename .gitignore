@@ -3,6 +3,6 @@ dist/
 *.vsix
 *.js.map
 # Compiled JS next to TypeScript sources
-client/src/**/*.js
-server/src/**/*.js
-src/**/*.js
+packages/vscode-extension/client/src/**/*.js
+packages/vscode-extension/server/src/**/*.js
+packages/vscode-extension/src/**/*.js
