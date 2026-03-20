@@ -133,12 +133,12 @@ export async function activate(
         const TEMPLATES = [
           {
             label: "$(symbol-namespace) Simple pipe",
-            description: '{ "_id", "type": "pipe" }',
+            description: '{ "_id", "type": "pipe", "source": { ... } }',
             id: "simple-pipe",
           },
           {
             label: "$(symbol-namespace) Pipe with DTL transform",
-            description: "Pipe + DTL rules block",
+            description: "Pipe + source + DTL rules block",
             id: "dtl-pipe",
           },
           {
@@ -154,7 +154,116 @@ export async function activate(
         });
         if (!template) return;
 
-        // ── Step 2: choose system type if needed ─────────────────────────
+        // ── Step 2: choose source type (pipes) or system type ────────────
+        const SOURCE_TYPES: Array<{
+          label: string;
+          description: string;
+          source: object;
+        }> = [
+          {
+            label: "dataset",
+            description: "Read from a Sesam dataset",
+            source: { type: "dataset", dataset: "<dataset-id>" },
+          },
+          {
+            label: "sql",
+            description: "Read from a SQL table via a SQL system",
+            source: { type: "sql", system: "<system-id>", table: "<table>" },
+          },
+          {
+            label: "rest",
+            description: "Read from a REST API via a REST system",
+            source: {
+              type: "rest",
+              system: "<system-id>",
+              operation: "<operation>",
+            },
+          },
+          {
+            label: "json",
+            description: "Read JSON from a URL via a URL/REST system",
+            source: { type: "json", system: "<system-id>", url: "<url>" },
+          },
+          {
+            label: "csv",
+            description: "Read CSV via a URL/REST system",
+            source: { type: "csv", system: "<system-id>", url: "<url>" },
+          },
+          {
+            label: "http_endpoint",
+            description: "Receive data pushed to an HTTP endpoint",
+            source: { type: "http_endpoint" },
+          },
+          {
+            label: "embedded",
+            description: "Inline entities defined in the config",
+            source: { type: "embedded", entities: [] },
+          },
+          {
+            label: "empty",
+            description: "Emits no entities (placeholder / testing)",
+            source: { type: "empty" },
+          },
+          {
+            label: "union_datasets",
+            description: "Union multiple datasets into one stream",
+            source: { type: "union_datasets", datasets: ["<dataset-id>"] },
+          },
+          {
+            label: "merge",
+            description: "Merge entities from multiple sources",
+            source: { type: "merge", sources: [] },
+          },
+          {
+            label: "merge_datasets",
+            description: "Merge datasets, keeping latest version per entity",
+            source: { type: "merge_datasets", datasets: ["<dataset-id>"] },
+          },
+          {
+            label: "conditional",
+            description: "Pick a source based on a runtime condition",
+            source: {
+              type: "conditional",
+              condition: "<expr>",
+              alternatives: {},
+            },
+          },
+          {
+            label: "kafka",
+            description: "Read from Kafka via a Kafka system",
+            source: { type: "kafka", system: "<system-id>" },
+          },
+          {
+            label: "ldap",
+            description: "Read from LDAP via an LDAP system",
+            source: { type: "ldap", system: "<system-id>" },
+          },
+          {
+            label: "binary",
+            description: "Read binary data via a system",
+            source: {
+              type: "binary",
+              system: "<system-id>",
+              operation: "<operation>",
+            },
+          },
+          {
+            label: "sdshare",
+            description: "Read from an SDShare feed",
+            source: { type: "sdshare", url: "<url>" },
+          },
+          {
+            label: "sparql",
+            description: "Read from a SPARQL endpoint",
+            source: { type: "sparql", url: "<url>" },
+          },
+          {
+            label: "rdf",
+            description: "Read RDF data from a URL",
+            source: { type: "rdf", url: "<url>" },
+          },
+        ];
+
         const SYSTEM_TYPES = [
           "system:elasticsearch",
           "system:kafka",
@@ -171,8 +280,18 @@ export async function activate(
           "system:url",
         ];
 
+        let sourceStub: object | null = null;
         let systemType = "";
-        if (template.id === "system") {
+
+        if (template.id === "simple-pipe" || template.id === "dtl-pipe") {
+          const picked = await vscode.window.showQuickPick(SOURCE_TYPES, {
+            placeHolder: "Select source type",
+            title: "New Sesam Config File — Source type",
+            matchOnDescription: true,
+          });
+          if (!picked) return;
+          sourceStub = picked.source;
+        } else {
           const picked = await vscode.window.showQuickPick(SYSTEM_TYPES, {
             placeHolder: "Select system type",
             title: "New Sesam Config File — System type",
@@ -197,11 +316,12 @@ export async function activate(
         // ── Step 4: build content ────────────────────────────────────────
         let content: object;
         if (template.id === "simple-pipe") {
-          content = { _id: configId, type: "pipe" };
+          content = { _id: configId, type: "pipe", source: sourceStub };
         } else if (template.id === "dtl-pipe") {
           content = {
             _id: configId,
             type: "pipe",
+            source: sourceStub,
             transform: {
               type: "dtl",
               rules: {
