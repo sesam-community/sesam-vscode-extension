@@ -48,12 +48,18 @@ export async function activate(
         language: "json",
         pattern: "**/{pipes,systems}/**/*.json",
       },
+      {
+        scheme: "file",
+        language: "json",
+        pattern: "**/*.conf.json",
+      },
     ],
     synchronize: {
       fileEvents: [
         vscode.workspace.createFileSystemWatcher(
           "**/{pipes,systems}/**/*.json",
         ),
+        vscode.workspace.createFileSystemWatcher("**/*.conf.json"),
       ],
     },
     traceOutputChannel: vscode.window.createOutputChannel(
@@ -88,6 +94,13 @@ export async function activate(
   watcher.onDidChange(() => graphProvider.refresh());
   watcher.onDidDelete(() => graphProvider.refresh());
   context.subscriptions.push(watcher);
+
+  const confWatcher =
+    vscode.workspace.createFileSystemWatcher("**/*.conf.json");
+  confWatcher.onDidCreate(() => graphProvider.refresh());
+  confWatcher.onDidChange(() => graphProvider.refresh());
+  confWatcher.onDidDelete(() => graphProvider.refresh());
+  context.subscriptions.push(confWatcher);
 
   // ── Commands ──────────────────────────────────────────────────────────────
   context.subscriptions.push(
