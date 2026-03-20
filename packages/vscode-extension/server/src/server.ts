@@ -439,7 +439,8 @@ function buildFunctionCompletions(): CompletionItem[] {
       fn.kind === "transform"
         ? CompletionItemKind.Method
         : CompletionItemKind.Function,
-    detail: fn.signature,
+    detail: fn.description,
+    labelDetails: { description: fn.signature },
     documentation: {
       kind: MarkupKind.Markdown,
       value: buildFunctionMarkdown(fn),
@@ -454,10 +455,10 @@ function buildVariableCompletions(): CompletionItem[] {
     ([name, desc]) => ({
       label: name,
       kind: CompletionItemKind.Variable,
-      detail: "DTL built-in variable",
+      detail: desc,
       documentation: {
         kind: MarkupKind.Markdown,
-        value: desc,
+        value: `**${name}** — DTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/dtl-variables.html)`,
       },
       insertText: name,
       sortText: `0_${name}`,
