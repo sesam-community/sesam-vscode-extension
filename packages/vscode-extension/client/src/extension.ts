@@ -43,8 +43,6 @@ export async function activate(
 
   const clientOptions: LanguageClientOptions = {
     documentSelector: [
-      { scheme: "file", language: "dtl" },
-      { scheme: "file", language: "json", pattern: "**/*.dtl" },
       {
         scheme: "file",
         language: "json",
@@ -53,7 +51,6 @@ export async function activate(
     ],
     synchronize: {
       fileEvents: [
-        vscode.workspace.createFileSystemWatcher("**/*.dtl"),
         vscode.workspace.createFileSystemWatcher(
           "**/{pipes,systems}/**/*.json",
         ),

@@ -102,7 +102,7 @@ async function validateDocument(document: TextDocument): Promise<void> {
     return;
   }
 
-  const ext = document.uri.endsWith(".dtl") ? "dtl" : "json";
+  const ext = "json";
   const parseResult = parseDtlText(document.getText(), ext);
 
   const validatorOptions: ValidatorOptions = {
@@ -321,31 +321,11 @@ connection.onDocumentFormatting(
     if (!document) return [];
 
     const text = document.getText();
-    const isDtl = document.uri.endsWith(".dtl");
 
     try {
       const parsed = JSON.parse(text);
-      if (isDtl) {
-        // Reformat the entire file as a prettily indented JSON array
-        const formatted = JSON.stringify(
-          parsed,
-          null,
-          params.options.tabSize ?? 2,
-        );
-        if (formatted === text) return [];
-        return [
-          TextEdit.replace(
-            Range.create(
-              Position.create(0, 0),
-              document.positionAt(text.length),
-            ),
-            formatted + "\n",
-          ),
-        ];
-      } else {
-        // JSON pipe config: format only transform.rules sub-arrays
-        return formatJsonPipeConfig(parsed, text, params.options.tabSize ?? 2);
-      }
+      // JSON pipe config: format only transform.rules sub-arrays
+      return formatJsonPipeConfig(parsed, text, params.options.tabSize ?? 2);
     } catch {
       // Not valid JSON — skip formatting
       return [];

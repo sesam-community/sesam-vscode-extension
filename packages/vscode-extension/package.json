@@ -27,35 +27,10 @@
   },
   "main": "./dist/client/extension.js",
   "activationEvents": [
-    "onLanguage:dtl",
-    "onLanguage:json",
-    "workspaceContains:**/*.dtl"
+    "onLanguage:json"
   ],
   "contributes": {
-    "languages": [
-      {
-        "id": "dtl",
-        "aliases": [
-          "DTL",
-          "Data Transformation Language",
-          "Sesam DTL"
-        ],
-        "extensions": [
-          ".dtl"
-        ],
-        "configuration": "./language-configuration.json",
-        "icon": {
-          "light": "./resources/icons/dtl-light.svg",
-          "dark": "./resources/icons/dtl-dark.svg"
-        }
-      }
-    ],
     "grammars": [
-      {
-        "language": "dtl",
-        "scopeName": "source.dtl",
-        "path": "./syntaxes/dtl.tmLanguage.json"
-      },
       {
         "scopeName": "source.dtl.injection",
         "path": "./syntaxes/dtl-injection.tmLanguage.json",
@@ -65,10 +40,6 @@
       }
     ],
     "snippets": [
-      {
-        "language": "dtl",
-        "path": "./snippets/dtl.code-snippets.json"
-      },
       {
         "language": "json",
         "path": "./snippets/dtl.code-snippets.json"
@@ -94,7 +65,7 @@
       "editor/title": [
         {
           "command": "dtl.previewPipe",
-          "when": "resourceLangId == dtl || resourceLangId == json",
+          "when": "resourceLangId == json",
           "group": "navigation"
         }
       ]

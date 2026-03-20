@@ -31,12 +31,10 @@ The long-term goal is to make this extension the single tool Sesam developers ne
 ## Features
 
 ### Syntax Highlighting
-- Dedicated `.dtl` language with TextMate grammar.
-- Transform keywords (`add`, `copy`, `filter`, `hops`, …) highlighted as control-flow.
 - All ~160 built-in functions highlighted by category (string, math, datetime, NI, …).
 - Built-in variables `_S`, `_T`, `_P`, `_R`, `_B`, `_` highlighted with property-path continuation.
 - Reserved entity fields (`_id`, `_deleted`, `_filtered`, …) distinguished from regular keys.
-- **JSON injection**: DTL variables and function names are also highlighted inside regular `.json` pipe config files — no separate file needed.
+- **JSON injection**: DTL variables and function names are highlighted inside `.json` pipe config files.
 
 ### Auto-Completion
 - Function name completions triggered after `["` inside any array context.
@@ -53,8 +51,7 @@ The long-term goal is to make this extension the single tool Sesam developers ne
 - **Unknown variable** — warning for `_X.` prefixes where X is not a known built-in variable.
 
 ### Formatter
-- Format `.dtl` files with **Shift+Alt+F** — pretty-prints the full DTL array with consistent indentation.
-- Format `.json` pipe configs — reformats only the `"rules"` block, leaving the rest of the config untouched.
+- Format `.json` pipe configs with **Shift+Alt+F** — reformats only the `"rules"` block, leaving the rest of the config untouched.
 
 ### Code Snippets
 30+ snippets covering all common patterns. Type the prefix and press Tab:
@@ -91,7 +88,7 @@ A sidebar panel (**DTL Graph**) that scans your workspace for pipe and system co
 ### Pipe Preview
 A live preview panel that evaluates DTL transforms against a sample input entity — without needing a running Sesam node.
 
-1. Open any `.dtl` file or pipe config `.json`.
+1. Open a pipe config `.json` file.
 2. Run **DTL: Preview Pipe** from the Command Palette (`Ctrl+Shift+P`).
 3. Edit the **Input Entity** (left pane) and press **▶ Evaluate** (or `Ctrl+Enter`).
 4. The **Output Entity** (right pane) updates instantly.
@@ -107,7 +104,6 @@ A live preview panel that evaluates DTL transforms against a sample input entity
 
 | File | How DTL is detected |
 |---|---|
-| `*.dtl` | Dedicated DTL language mode |
 | `pipes/*.json`, `systems/*.json` | JSON injection + LSP activated on pipe/system paths |
 
 ### Workspace Layout
@@ -121,7 +117,6 @@ my-sesam-project/
     order-enrich.json
   systems/
     crm.json
-  *.dtl          ← standalone DTL files
 ```
 
 ### Commands
