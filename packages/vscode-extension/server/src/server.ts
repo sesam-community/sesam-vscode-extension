@@ -269,6 +269,108 @@ async function validateDocumentWithNode(
 }
 
 // ---------------------------------------------------------------------------
+// Source-type completions data
+// ---------------------------------------------------------------------------
+interface SourceTypeInfo {
+  label: string;
+  detail: string;
+  doc: string;
+}
+
+const PIPE_SOURCE_TYPES: SourceTypeInfo[] = [
+  {
+    label: "dataset",
+    detail: "Read from a Sesam dataset",
+    doc: "Reads entities from a Sesam dataset.\n\nRequired: `dataset`",
+  },
+  {
+    label: "sql",
+    detail: "Read from a SQL table via a SQL system",
+    doc: "Reads rows from a SQL table via a SQL system.\n\nRequired: `system`, `table`",
+  },
+  {
+    label: "rest",
+    detail: "Read from a REST API via a REST system",
+    doc: "Reads entities from a REST API via a REST system.\n\nRequired: `system`, `operation`",
+  },
+  {
+    label: "json",
+    detail: "Read JSON from a URL via a URL/REST system",
+    doc: "Reads a JSON document from a URL.\n\nRequired: `system`, `url`",
+  },
+  {
+    label: "csv",
+    detail: "Read CSV via a URL/REST system",
+    doc: "Reads a CSV file and emits one entity per row.\n\nRequired: `system`, `url`",
+  },
+  {
+    label: "http_endpoint",
+    detail: "Receive data pushed to an HTTP endpoint",
+    doc: "Creates an HTTP inbound endpoint. Entities are pushed to it by an external system.",
+  },
+  {
+    label: "embedded",
+    detail: "Inline entities defined in the config",
+    doc: "Emits a static list of entities defined directly in the config.\n\nRequired: `entities` (array)",
+  },
+  {
+    label: "empty",
+    detail: "Emits no entities (placeholder / testing)",
+    doc: "Produces no entities — useful for placeholder pipes or testing transforms.",
+  },
+  {
+    label: "union_datasets",
+    detail: "Union multiple datasets into one stream",
+    doc: "Merges the entity streams of several datasets (set union).\n\nRequired: `datasets` (array of dataset IDs)",
+  },
+  {
+    label: "merge",
+    detail: "Merge entities from multiple sources",
+    doc: "Merges multiple source streams, grouping entities by `_id`.\n\nRequired: `sources` (array of source objects)",
+  },
+  {
+    label: "merge_datasets",
+    detail: "Keep latest version of each entity across datasets",
+    doc: "Merges datasets and retains the latest version of each entity.\n\nRequired: `datasets` (array of dataset IDs)",
+  },
+  {
+    label: "conditional",
+    detail: "Pick a source based on a runtime condition",
+    doc: "Selects from alternative source configs based on a runtime expression.\n\nRequired: `condition`, `alternatives`",
+  },
+  {
+    label: "kafka",
+    detail: "Read from Kafka via a Kafka system",
+    doc: "Reads messages from a Kafka topic.\n\nRequired: `system`",
+  },
+  {
+    label: "ldap",
+    detail: "Read from LDAP via an LDAP system",
+    doc: "Reads entries from an LDAP directory.\n\nRequired: `system`",
+  },
+  {
+    label: "binary",
+    detail: "Read binary data via a system",
+    doc: "Reads binary blobs via a system that supports binary operations.\n\nRequired: `system`, `operation`",
+  },
+  {
+    label: "sdshare",
+    detail: "Read from an SDShare feed",
+    doc: "Reads RDF fragments from an SDShare feed.\n\nRequired: `url`",
+  },
+  {
+    label: "sparql",
+    detail: "Read from a SPARQL endpoint",
+    doc: "Executes a SPARQL query against an endpoint.\n\nRequired: `url`",
+  },
+  {
+    label: "rdf",
+    detail: "Read RDF data from a URL",
+    doc: "Reads RDF data (Turtle, N-Triples, RDF/XML, …) from a URL.\n\nRequired: `url`",
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Completion
 // ---------------------------------------------------------------------------
 connection.onCompletion(
@@ -279,8 +381,13 @@ connection.onCompletion(
     const text = document.getText();
     const offset = document.offsetAt(params.position);
 
-    // Determine context by looking backwards from cursor
-    const prefix = text.slice(Math.max(0, offset - 100), offset);
+    // Use a wider window so we can detect "source": { "type": context
+    const prefix = text.slice(Math.max(0, offset - 300), offset);
+
+    // Source type completion: inside "source": { "type": "..."
+    if (isSourceTypeContext(prefix)) {
+      return buildSourceTypeCompletions();
+    }
 
     // Variable completion: triggered after "_" or inside a string starting with "_"
     if (isVariableContext(prefix)) {
@@ -296,6 +403,11 @@ connection.onCompletion(
   },
 );
 
+function isSourceTypeContext(prefix: string): boolean {
+  // Cursor is inside the value of "type" that lives inside a "source": { ... block
+  return /"source"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix);
+}
+
 function isVariableContext(prefix: string): boolean {
   // Cursor is inside a string that starts with _
   return /"\s*_[STPRB]?\.?[^"]*$/.test(prefix);
@@ -304,6 +416,20 @@ function isVariableContext(prefix: string): boolean {
 function isFunctionNameContext(prefix: string): boolean {
   // After [ optionally followed by whitespace and an opening quote
   return /\[\s*"[^"]*$/.test(prefix) || /\[\s*$/.test(prefix);
+}
+
+function buildSourceTypeCompletions(): CompletionItem[] {
+  return PIPE_SOURCE_TYPES.map(({ label, detail, doc }) => ({
+    label,
+    kind: CompletionItemKind.EnumMember,
+    detail,
+    documentation: {
+      kind: MarkupKind.Markdown,
+      value: `**\`${label}\`** — pipe source type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sources.html)`,
+    },
+    insertText: label,
+    sortText: label,
+  }));
 }
 
 function buildFunctionCompletions(): CompletionItem[] {

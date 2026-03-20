@@ -41,6 +41,7 @@ The long-term goal is to make this extension the single tool Sesam developers ne
 - Function name completions triggered after `["` inside any array context.
 - Variable completions (`_S`, `_T`, `_P`, `_R`, `_B`, `_`) triggered after `_`.
 - Reserved entity field completions for `_id`, `_deleted`, etc.
+- **Source type completions** inside `"source": { "type": "…" }` — all 18 Sesam source types with descriptions.
 
 ### Hover Documentation
 - Hover over any function name, variable, or reserved field to see its **signature**, description, parameter list, and a link to the official Sesam docs.
@@ -97,11 +98,13 @@ Create a new `*.conf.json` pipe or system config from a template — no copy-pas
 
    | Template | Generated file |
    |---|---|
-   | Simple pipe | `{ "_id": "…", "type": "pipe" }` |
-   | Pipe with DTL transform | Pipe + `transform.rules.default` block with a starter `copy` rule |
-   | System | `{ "_id": "…", "type": "system:<type>" }` — then choose the system type |
+   | Simple pipe | `{ "_id": "…", "type": "pipe", "source": { … } }` — then choose source type |
+   | Pipe with DTL transform | Pipe + source stub + `transform.rules.default` block with a starter `copy` rule |
+   | System | `{ "_id": "…", "type": "system:<type>" }` — then choose system type |
 
-2. **Choose system type** *(System only)* — pick from all supported types: `elasticsearch`, `kafka`, `ldap`, `microservice`, `mssql`, `mysql`, `oracle`, `postgresql`, `rest`, `smtp`, `solr`, `twilio`, `url`.
+2. **Choose source type** *(Pipe templates)* — pick from all 18 Sesam source types with descriptions: `binary`, `conditional`, `csv`, `dataset`, `embedded`, `empty`, `http_endpoint`, `json`, `kafka`, `ldap`, `merge`, `merge_datasets`, `rdf`, `rest`, `sdshare`, `sparql`, `sql`, `union_datasets`. Key fields are pre-populated as `"<placeholder>"` strings ready to fill in.
+
+   **Choose system type** *(System only)* — pick from all supported types: `elasticsearch`, `kafka`, `ldap`, `microservice`, `mssql`, `mysql`, `oracle`, `postgresql`, `rest`, `smtp`, `solr`, `twilio`, `url`.
 
 3. **Enter `_id`** — used as both the config `_id` and the filename (`<id>.conf.json`). Validated: non-empty, no `/`.
 
