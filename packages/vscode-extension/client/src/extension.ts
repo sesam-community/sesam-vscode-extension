@@ -50,8 +50,7 @@ export async function activate(
       },
       {
         scheme: "file",
-        language: "json",
-        pattern: "**/*.conf.json",
+        language: "sesam-config",
       },
     ],
     synchronize: {

@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "DTL injection into JSON",
   "scopeName": "source.dtl.injection",
-  "injectionSelector": "L:source.json",
+  "injectionSelector": "L:source.json, L:source.sesam-config",
   "patterns": [{ "include": "#dtl-context" }],
   "repository": {
     "dtl-context": {

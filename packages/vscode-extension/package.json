@@ -27,21 +27,44 @@
   },
   "main": "./dist/client/extension.js",
   "activationEvents": [
-    "onLanguage:json"
+    "onLanguage:json",
+    "onLanguage:sesam-config"
   ],
   "contributes": {
+    "languages": [
+      {
+        "id": "sesam-config",
+        "aliases": [
+          "Sesam Config"
+        ],
+        "filenamePatterns": [
+          "*.conf.json"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
     "grammars": [
+      {
+        "language": "sesam-config",
+        "scopeName": "source.sesam-config",
+        "path": "./syntaxes/sesam-config.tmLanguage.json"
+      },
       {
         "scopeName": "source.dtl.injection",
         "path": "./syntaxes/dtl-injection.tmLanguage.json",
         "injectTo": [
-          "source.json"
+          "source.json",
+          "source.sesam-config"
         ]
       }
     ],
     "snippets": [
       {
         "language": "json",
+        "path": "./snippets/dtl.code-snippets.json"
+      },
+      {
+        "language": "sesam-config",
         "path": "./snippets/dtl.code-snippets.json"
       }
     ],
@@ -70,7 +93,7 @@
       "editor/title": [
         {
           "command": "dtl.previewPipe",
-          "when": "resourceLangId == json",
+          "when": "resourceLangId == json || resourceLangId == sesam-config",
           "group": "navigation"
         }
       ],
