@@ -117,6 +117,17 @@
           "type": "number",
           "default": 3,
           "description": "Folder depth to scan for pipe config files in the workspace."
+        },
+        "sesam.nodeUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL of the Sesam node (e.g. https://abc123.sesam.cloud). Used to validate *.conf.json files against the node."
+        },
+        "sesam.jwt": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "markdownDescription": "JWT token for the Sesam node API. **Store this in user settings only — do NOT commit to `.vscode/settings.json`.**"
         }
       }
     }
