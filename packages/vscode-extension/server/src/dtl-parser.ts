@@ -63,9 +63,8 @@ export function parseDtlText(text: string, fileExtension: "dtl" | "json"): Parse
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(text);
-  } catch (e) {
+  } catch {
     // Document not valid JSON yet — skip validation quietly
-    errors.push(`Failed to parse JSON: ${(e as Error).message}`);
     return { calls, errors };
   }
 
