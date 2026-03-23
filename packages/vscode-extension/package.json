@@ -71,21 +71,21 @@
     "commands": [
       {
         "command": "dtl.previewPipe",
-        "title": "DTL: Preview Pipe Output",
+        "title": "Sesam: Preview Pipe Output",
         "icon": "$(play)"
       },
       {
         "command": "dtl.refreshGraph",
-        "title": "DTL: Refresh Graph",
+        "title": "Sesam: Refresh Graph",
         "icon": "$(refresh)"
       },
       {
         "command": "dtl.openDocs",
-        "title": "DTL: Open Function Documentation"
+        "title": "Sesam: Open Function Documentation"
       },
       {
         "command": "dtl.newConfFile",
-        "title": "DTL: New Sesam Config File",
+        "title": "Sesam: New Sesam Config File",
         "icon": "$(new-file)"
       }
     ],
