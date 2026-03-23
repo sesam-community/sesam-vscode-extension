@@ -27,15 +27,34 @@
   },
   "main": "./dist/client/extension.js",
   "activationEvents": [
-    "onLanguage:json"
+    "onLanguage:json",
+    "onLanguage:sesam-config"
   ],
   "contributes": {
+    "languages": [
+      {
+        "id": "sesam-config",
+        "aliases": [
+          "Sesam Config"
+        ],
+        "filenamePatterns": [
+          "*.conf.json"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
     "grammars": [
+      {
+        "language": "sesam-config",
+        "scopeName": "source.sesam-config",
+        "path": "./syntaxes/sesam-config.tmLanguage.json"
+      },
       {
         "scopeName": "source.dtl.injection",
         "path": "./syntaxes/dtl-injection.tmLanguage.json",
         "injectTo": [
-          "source.json"
+          "source.json",
+          "source.sesam-config"
         ]
       }
     ],
@@ -43,30 +62,52 @@
       {
         "language": "json",
         "path": "./snippets/dtl.code-snippets.json"
+      },
+      {
+        "language": "sesam-config",
+        "path": "./snippets/dtl.code-snippets.json"
       }
     ],
     "commands": [
       {
         "command": "dtl.previewPipe",
-        "title": "DTL: Preview Pipe Output",
+        "title": "Sesam: Preview Pipe Output",
         "icon": "$(play)"
       },
       {
         "command": "dtl.refreshGraph",
-        "title": "DTL: Refresh Graph",
+        "title": "Sesam: Refresh Graph",
         "icon": "$(refresh)"
       },
       {
         "command": "dtl.openDocs",
-        "title": "DTL: Open Function Documentation"
+        "title": "Sesam: Open Function Documentation"
+      },
+      {
+        "command": "dtl.newConfFile",
+        "title": "Sesam: New Sesam Config File",
+        "icon": "$(new-file)"
       }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "dtl.previewPipe",
-          "when": "resourceLangId == json",
+          "when": "resourceLangId == json || resourceLangId == sesam-config",
           "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "dtl.newConfFile",
+          "when": "workspaceFolderCount > 0",
+          "group": "2_workspace@99"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "dtl.newConfFile",
+          "when": "workspaceFolderCount > 0"
         }
       ]
     },
@@ -117,6 +158,17 @@
           "type": "number",
           "default": 3,
           "description": "Folder depth to scan for pipe config files in the workspace."
+        },
+        "sesam.nodeUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL of the Sesam node (e.g. https://abc123.sesam.cloud). Used to validate *.conf.json files against the node."
+        },
+        "sesam.jwt": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "markdownDescription": "JWT token for the Sesam node API. **Store this in user settings only — do NOT commit to `.vscode/settings.json`.**"
         }
       }
     }

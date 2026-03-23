@@ -20,6 +20,7 @@ import {
   Range,
   Position,
   Diagnostic,
+  DiagnosticSeverity,
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
@@ -32,6 +33,7 @@ import {
 } from "../../src/shared/dtl-registry";
 import { parseDtlText } from "./dtl-parser";
 import { validateCalls, ValidatorOptions } from "./dtl-validator";
+import { formatSesamJson } from "./dtl-formatter";
 
 // ---------------------------------------------------------------------------
 // Connection & document store
@@ -45,7 +47,11 @@ const documents = new TextDocuments(TextDocument);
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
   return {
     capabilities: {
-      textDocumentSync: TextDocumentSyncKind.Incremental,
+      textDocumentSync: {
+        openClose: true,
+        change: TextDocumentSyncKind.Incremental,
+        save: { includeText: false },
+      },
       completionProvider: {
         triggerCharacters: ['"', "[", "_", "."],
         resolveProvider: false,
@@ -75,7 +81,34 @@ const defaultSettings: DtlSettings = {
 
 const documentSettings = new Map<string, Promise<DtlSettings>>();
 
+// ---------------------------------------------------------------------------
+// Sesam node settings
+// ---------------------------------------------------------------------------
+interface SesamSettings {
+  nodeUrl: string;
+  jwt: string;
+}
+
+let sesamSettingsCache: SesamSettings | null = null;
+
+async function getSesamSettings(): Promise<SesamSettings> {
+  if (!sesamSettingsCache) {
+    const s = (await connection.workspace.getConfiguration({
+      section: "sesam",
+    })) as { nodeUrl?: string; jwt?: string } | null;
+    sesamSettingsCache = {
+      nodeUrl: (s?.nodeUrl ?? "").trim().replace(/\/$/, ""),
+      jwt: (s?.jwt ?? "").trim(),
+    };
+  }
+  return sesamSettingsCache;
+}
+
+// Cache for node-backed diagnostics, keyed by document URI
+const nodeValidationDiagnostics = new Map<string, Diagnostic[]>();
+
 connection.onDidChangeConfiguration(() => {
+  sesamSettingsCache = null;
   documentSettings.clear();
   documents.all().forEach(validateDocument);
 });
@@ -112,21 +145,230 @@ async function validateDocument(document: TextDocument): Promise<void> {
     validateArgCount: settings.validate?.argCount ?? true,
   };
 
-  const diagnostics: Diagnostic[] = validateCalls(
+  const localDiagnostics: Diagnostic[] = validateCalls(
     parseResult.calls,
     validatorOptions,
   );
-  connection.sendDiagnostics({ uri: document.uri, diagnostics });
+
+  const nodeDiags = nodeValidationDiagnostics.get(document.uri) ?? [];
+  connection.sendDiagnostics({
+    uri: document.uri,
+    diagnostics: [...localDiagnostics, ...nodeDiags],
+  });
 }
 
 documents.onDidChangeContent((change) => {
   validateDocument(change.document);
 });
 
+documents.onDidSave(async (event) => {
+  const document = event.document;
+  if (!document.uri.endsWith(".conf.json")) return;
+  const nodeDiags = await validateDocumentWithNode(document);
+  nodeValidationDiagnostics.set(document.uri, nodeDiags);
+  validateDocument(document);
+});
+
 documents.onDidClose((event) => {
   documentSettings.delete(event.document.uri);
+  nodeValidationDiagnostics.delete(event.document.uri);
   connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
 });
+
+// ---------------------------------------------------------------------------
+// Node-backed config validation
+// ---------------------------------------------------------------------------
+
+interface ConfigError {
+  msg: string;
+  elements: string; // JSONPath like "$" or "$['transform']"
+  level: string; // "error" | "critical" | "warning" | "info"
+}
+
+interface ValidateConfigResponse {
+  "is-valid-config": boolean;
+  "config-errors": ConfigError[];
+}
+
+function levelToSeverity(level: string): DiagnosticSeverity {
+  switch (level) {
+    case "warning":
+      return DiagnosticSeverity.Warning;
+    case "info":
+      return DiagnosticSeverity.Information;
+    default: // "error" or "critical"
+      return DiagnosticSeverity.Error;
+  }
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function elementsToRange(
+  document: TextDocument,
+  text: string,
+  elements: string,
+): Range {
+  const match = /\['([^']+)'\]/.exec(elements);
+  if (match) {
+    const key = match[1];
+    const keyPattern = new RegExp(`"${escapeRegex(key)}"\\s*:`);
+    const m = keyPattern.exec(text);
+    if (m) {
+      const start = document.positionAt(m.index);
+      const end = document.positionAt(m.index + m[0].length);
+      return Range.create(start, end);
+    }
+  }
+  return Range.create(
+    Position.create(0, 0),
+    Position.create(0, Number.MAX_SAFE_INTEGER),
+  );
+}
+
+async function validateDocumentWithNode(
+  document: TextDocument,
+): Promise<Diagnostic[]> {
+  const { nodeUrl, jwt } = await getSesamSettings();
+  if (!nodeUrl || !jwt) return [];
+
+  const text = document.getText();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`${nodeUrl}/api/utils/validate-config`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `bearer ${jwt}`,
+      },
+      body: JSON.stringify([parsed]),
+    });
+
+    if (!response.ok) return [];
+
+    const result = (await response.json()) as ValidateConfigResponse;
+    if (result["is-valid-config"]) return [];
+
+    return (result["config-errors"] ?? []).map((err) => ({
+      range: elementsToRange(document, text, err.elements),
+      message: `[Node] ${err.msg}`,
+      severity: levelToSeverity(err.level),
+      source: "sesam-node",
+    }));
+  } catch {
+    // Network errors, auth failures, etc. — degrade silently
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Source-type completions data
+// ---------------------------------------------------------------------------
+interface SourceTypeInfo {
+  label: string;
+  detail: string;
+  doc: string;
+}
+
+const PIPE_SOURCE_TYPES: SourceTypeInfo[] = [
+  {
+    label: "dataset",
+    detail: "Read from a Sesam dataset",
+    doc: "Reads entities from a Sesam dataset.\n\nRequired: `dataset`",
+  },
+  {
+    label: "sql",
+    detail: "Read from a SQL table via a SQL system",
+    doc: "Reads rows from a SQL table via a SQL system.\n\nRequired: `system`, `table`",
+  },
+  {
+    label: "rest",
+    detail: "Read from a REST API via a REST system",
+    doc: "Reads entities from a REST API via a REST system.\n\nRequired: `system`, `operation`",
+  },
+  {
+    label: "json",
+    detail: "Read JSON from a URL via a URL/REST system",
+    doc: "Reads a JSON document from a URL.\n\nRequired: `system`, `url`",
+  },
+  {
+    label: "csv",
+    detail: "Read CSV via a URL/REST system",
+    doc: "Reads a CSV file and emits one entity per row.\n\nRequired: `system`, `url`",
+  },
+  {
+    label: "http_endpoint",
+    detail: "Receive data pushed to an HTTP endpoint",
+    doc: "Creates an HTTP inbound endpoint. Entities are pushed to it by an external system.",
+  },
+  {
+    label: "embedded",
+    detail: "Inline entities defined in the config",
+    doc: "Emits a static list of entities defined directly in the config.\n\nRequired: `entities` (array)",
+  },
+  {
+    label: "empty",
+    detail: "Emits no entities (placeholder / testing)",
+    doc: "Produces no entities — useful for placeholder pipes or testing transforms.",
+  },
+  {
+    label: "union_datasets",
+    detail: "Union multiple datasets into one stream",
+    doc: "Merges the entity streams of several datasets (set union).\n\nRequired: `datasets` (array of dataset IDs)",
+  },
+  {
+    label: "merge",
+    detail: "Merge entities from multiple sources",
+    doc: "Merges multiple source streams, grouping entities by `_id`.\n\nRequired: `sources` (array of source objects)",
+  },
+  {
+    label: "merge_datasets",
+    detail: "Keep latest version of each entity across datasets",
+    doc: "Merges datasets and retains the latest version of each entity.\n\nRequired: `datasets` (array of dataset IDs)",
+  },
+  {
+    label: "conditional",
+    detail: "Pick a source based on a runtime condition",
+    doc: "Selects from alternative source configs based on a runtime expression.\n\nRequired: `condition`, `alternatives`",
+  },
+  {
+    label: "kafka",
+    detail: "Read from Kafka via a Kafka system",
+    doc: "Reads messages from a Kafka topic.\n\nRequired: `system`",
+  },
+  {
+    label: "ldap",
+    detail: "Read from LDAP via an LDAP system",
+    doc: "Reads entries from an LDAP directory.\n\nRequired: `system`",
+  },
+  {
+    label: "binary",
+    detail: "Read binary data via a system",
+    doc: "Reads binary blobs via a system that supports binary operations.\n\nRequired: `system`, `operation`",
+  },
+  {
+    label: "sdshare",
+    detail: "Read from an SDShare feed",
+    doc: "Reads RDF fragments from an SDShare feed.\n\nRequired: `url`",
+  },
+  {
+    label: "sparql",
+    detail: "Read from a SPARQL endpoint",
+    doc: "Executes a SPARQL query against an endpoint.\n\nRequired: `url`",
+  },
+  {
+    label: "rdf",
+    detail: "Read RDF data from a URL",
+    doc: "Reads RDF data (Turtle, N-Triples, RDF/XML, …) from a URL.\n\nRequired: `url`",
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Completion
@@ -139,8 +381,13 @@ connection.onCompletion(
     const text = document.getText();
     const offset = document.offsetAt(params.position);
 
-    // Determine context by looking backwards from cursor
-    const prefix = text.slice(Math.max(0, offset - 100), offset);
+    // Use a wider window so we can detect "source": { "type": context
+    const prefix = text.slice(Math.max(0, offset - 300), offset);
+
+    // Source type completion: inside "source": { "type": "..."
+    if (isSourceTypeContext(prefix)) {
+      return buildSourceTypeCompletions();
+    }
 
     // Variable completion: triggered after "_" or inside a string starting with "_"
     if (isVariableContext(prefix)) {
@@ -156,6 +403,11 @@ connection.onCompletion(
   },
 );
 
+function isSourceTypeContext(prefix: string): boolean {
+  // Cursor is inside the value of "type" that lives inside a "source": { ... block
+  return /"source"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix);
+}
+
 function isVariableContext(prefix: string): boolean {
   // Cursor is inside a string that starts with _
   return /"\s*_[STPRB]?\.?[^"]*$/.test(prefix);
@@ -166,6 +418,20 @@ function isFunctionNameContext(prefix: string): boolean {
   return /\[\s*"[^"]*$/.test(prefix) || /\[\s*$/.test(prefix);
 }
 
+function buildSourceTypeCompletions(): CompletionItem[] {
+  return PIPE_SOURCE_TYPES.map(({ label, detail, doc }) => ({
+    label,
+    kind: CompletionItemKind.EnumMember,
+    detail,
+    documentation: {
+      kind: MarkupKind.Markdown,
+      value: `**\`${label}\`** — pipe source type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sources.html)`,
+    },
+    insertText: label,
+    sortText: label,
+  }));
+}
+
 function buildFunctionCompletions(): CompletionItem[] {
   return getAllFunctions().map((fn: DtlFunction) => ({
     label: fn.name,
@@ -173,7 +439,8 @@ function buildFunctionCompletions(): CompletionItem[] {
       fn.kind === "transform"
         ? CompletionItemKind.Method
         : CompletionItemKind.Function,
-    detail: fn.signature,
+    detail: fn.description,
+    labelDetails: { description: fn.signature },
     documentation: {
       kind: MarkupKind.Markdown,
       value: buildFunctionMarkdown(fn),
@@ -188,10 +455,10 @@ function buildVariableCompletions(): CompletionItem[] {
     ([name, desc]) => ({
       label: name,
       kind: CompletionItemKind.Variable,
-      detail: "DTL built-in variable",
+      detail: desc,
       documentation: {
         kind: MarkupKind.Markdown,
-        value: desc,
+        value: `**${name}** — DTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/dtl-variables.html)`,
       },
       insertText: name,
       sortText: `0_${name}`,
@@ -321,68 +588,22 @@ connection.onDocumentFormatting(
     if (!document) return [];
 
     const text = document.getText();
-
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(text);
-      // JSON pipe config: format only transform.rules sub-arrays
-      return formatJsonPipeConfig(parsed, text, params.options.tabSize ?? 2);
+      parsed = JSON.parse(text);
     } catch {
-      // Not valid JSON — skip formatting
       return [];
     }
+
+    const formatted = formatSesamJson(parsed, params.options.tabSize ?? 2);
+    if (formatted === text) return [];
+
+    const endPos = document.positionAt(text.length);
+    return [
+      TextEdit.replace(Range.create(Position.create(0, 0), endPos), formatted),
+    ];
   },
 );
-
-function formatJsonPipeConfig(
-  parsed: unknown,
-  originalText: string,
-  tabSize: number,
-): TextEdit[] {
-  if (typeof parsed !== "object" || parsed === null) return [];
-
-  const obj = parsed as Record<string, unknown>;
-  const transform = obj["transform"];
-  if (!transform || typeof transform !== "object") return [];
-
-  const t = transform as Record<string, unknown>;
-  const rules = t["rules"];
-  if (!rules || typeof rules !== "object") return [];
-
-  // Replace only the "rules" value in the JSON text
-  const rulesSerialized = JSON.stringify(rules, null, tabSize);
-  const rulesRawMatch = /"rules"\s*:\s*(\[[\s\S]*?\]|\{[\s\S]*?\})/m.exec(
-    originalText,
-  );
-  if (!rulesRawMatch) return [];
-
-  const matchStart =
-    rulesRawMatch.index + rulesRawMatch[0].indexOf(rulesRawMatch[1]);
-  const matchEnd = matchStart + rulesRawMatch[1].length;
-
-  // Re-indent with the tab size
-  const indented = rulesSerialized.split("\n").join("\n" + " ".repeat(tabSize));
-
-  if (indented === rulesRawMatch[1]) return [];
-
-  const startPos = offsetToLspPosition(originalText, matchStart);
-  const endPos = offsetToLspPosition(originalText, matchEnd);
-
-  return [TextEdit.replace(Range.create(startPos, endPos), indented)];
-}
-
-function offsetToLspPosition(text: string, offset: number): Position {
-  let line = 0;
-  let character = 0;
-  for (let i = 0; i < offset && i < text.length; i++) {
-    if (text[i] === "\n") {
-      line++;
-      character = 0;
-    } else {
-      character++;
-    }
-  }
-  return Position.create(line, character);
-}
 
 // ---------------------------------------------------------------------------
 // Start

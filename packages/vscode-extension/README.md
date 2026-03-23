@@ -11,6 +11,7 @@
   - [Code Snippets](#code-snippets)
   - [Pipe Graph Explorer](#pipe-graph-explorer)
   - [Pipe Preview](#pipe-preview)
+  - [New Sesam Config File](#new-sesam-config-file)
 - [Getting Started](#getting-started)
 - [DTL Primer](#dtl-primer)
 - [Extension Settings](#extension-settings)
@@ -40,6 +41,7 @@ The long-term goal is to make this extension the single tool Sesam developers ne
 - Function name completions triggered after `["` inside any array context.
 - Variable completions (`_S`, `_T`, `_P`, `_R`, `_B`, `_`) triggered after `_`.
 - Reserved entity field completions for `_id`, `_deleted`, etc.
+- **Source type completions** inside `"source": { "type": "…" }` — all 18 Sesam source types with descriptions.
 
 ### Hover Documentation
 - Hover over any function name, variable, or reserved field to see its **signature**, description, parameter list, and a link to the official Sesam docs.
@@ -85,6 +87,31 @@ A sidebar panel (**DTL Graph**) that scans your workspace for pipe and system co
 - Named rules listed under each pipe.
 - **Refresh** button to rescan after adding files.
 
+### New Sesam Config File
+Create a new `*.conf.json` pipe or system config from a template — no copy-pasting boilerplate.
+
+**3 ways to invoke:** Explorer right-click → **DTL: New Sesam Config File** | Command Palette (`Ctrl+Shift+P`) → `DTL: New Sesam Config File` | assign a custom keybinding to `dtl.newConfFile`.
+
+**Wizard steps:**
+
+1. **Pick a template:**
+
+   | Template | Generated file |
+   |---|---|
+   | Simple pipe | `{ "_id": "…", "type": "pipe", "source": { … } }` — then choose source type |
+   | Pipe with DTL transform | Pipe + source stub + `transform.rules.default` block with a starter `copy` rule |
+   | System | `{ "_id": "…", "type": "system:<type>" }` — then choose system type |
+
+2. **Choose source type** *(Pipe templates)* — pick from all 18 Sesam source types with descriptions: `binary`, `conditional`, `csv`, `dataset`, `embedded`, `empty`, `http_endpoint`, `json`, `kafka`, `ldap`, `merge`, `merge_datasets`, `rdf`, `rest`, `sdshare`, `sparql`, `sql`, `union_datasets`. Key fields are pre-populated as `"<placeholder>"` strings ready to fill in.
+
+   **Choose system type** *(System only)* — pick from all supported types: `elasticsearch`, `kafka`, `ldap`, `microservice`, `mssql`, `mysql`, `oracle`, `postgresql`, `rest`, `smtp`, `solr`, `twilio`, `url`.
+
+3. **Enter `_id`** — used as both the config `_id` and the filename (`<id>.conf.json`). Validated: non-empty, no `/`.
+
+The file is written to the folder you right-clicked (or the active editor's folder, or workspace root) and opened immediately. Run **Format Document** (`Shift+Alt+F`) after creation to apply the Sesam formatter.
+
+---
+
 ### Pipe Preview
 A live preview panel that evaluates DTL transforms against a sample input entity — without needing a running Sesam node.
 
@@ -105,6 +132,7 @@ A live preview panel that evaluates DTL transforms against a sample input entity
 | File | How DTL is detected |
 |---|---|
 | `pipes/*.json`, `systems/*.json` | JSON injection + LSP activated on pipe/system paths |
+| `*.conf.json` | JSON injection + LSP activated on all `.conf.json` files (sesam-py downloaded configs) |
 
 ### Workspace Layout
 
@@ -126,6 +154,7 @@ my-sesam-project/
 | `DTL: Preview Pipe` | Open the preview panel for the active file |
 | `DTL: Refresh Graph` | Rescan workspace and refresh the Pipe Graph sidebar |
 | `DTL: Open Documentation` | Open the Sesam DTL docs in a browser |
+| `DTL: New Sesam Config File` | Create a new pipe or system `.conf.json` from a template |
 
 ---
 
@@ -170,6 +199,8 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 | `dtl.maxNumberOfProblems` | `100` | Cap on diagnostics per file |
 | `dtl.trace.server` | `off` | LSP communication trace (`off`/`messages`/`verbose`) |
 | `dtl.graph.scanDepth` | `5` | Directory depth to scan for pipe/system files |
+| `sesam.nodeUrl` | `""` | Base URL of your Sesam node (e.g. `https://abc123.sesam.cloud`) — enables node-backed validation on `.conf.json` save |
+| `sesam.jwt` | `""` | JWT token for the Sesam node API. Set in **user** settings only — do not commit to `.vscode/settings.json` |
 
 ---
 
