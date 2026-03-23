@@ -28,11 +28,7 @@ describe("parseDtlText — dtl extension", () => {
     expect(topLevel!.argCount).toBe(2);
   });
 
-  it("parses multiple top-level rules — first rule captured (best-effort scanner)", () => {
-    // The parser uses a linear scan-position tracker. After processing the first
-    // top-level rule the scan position advances past the outer closing ']', so
-    // subsequent sibling rules in the same file are not captured. This is a known
-    // best-effort limitation documented in dtl-parser.ts.
+  it("parses multiple top-level rules", () => {
     const text = `[
       ["add", "_T.a", 1],
       ["copy", "*"],
@@ -40,8 +36,10 @@ describe("parseDtlText — dtl extension", () => {
     ]`;
     const { calls } = parseDtlText(text, "dtl");
     const topLevel = calls.filter((c) => c.isTopLevel);
-    expect(topLevel.length).toBeGreaterThanOrEqual(1);
+    expect(topLevel).toHaveLength(3);
     expect(topLevel[0].functionName).toBe("add");
+    expect(topLevel[1].functionName).toBe("copy");
+    expect(topLevel[2].functionName).toBe("remove");
   });
 
   it("records arg count correctly", () => {
@@ -96,9 +94,7 @@ describe("parseDtlText — json extension", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("parses rules from a standard pipe config — first rule captured (best-effort scanner)", () => {
-    // Same best-effort limitation as the .dtl multi-rule test: only the first
-    // top-level rule in a rules list is reliably captured by the scanner.
+  it("parses all rules from a standard pipe config", () => {
     const text = JSON.stringify({
       _id: "my-pipe",
       transform: {
@@ -113,8 +109,9 @@ describe("parseDtlText — json extension", () => {
     });
     const { calls } = parseDtlText(text, "json");
     const topLevel = calls.filter((c) => c.isTopLevel);
-    expect(topLevel.length).toBeGreaterThanOrEqual(1);
+    expect(topLevel).toHaveLength(2);
     expect(topLevel[0].functionName).toBe("add");
+    expect(topLevel[1].functionName).toBe("copy");
   });
 
   it("parses rules from multiple named rules blocks", () => {
@@ -132,6 +129,29 @@ describe("parseDtlText — json extension", () => {
     const names = calls.filter((c) => c.isTopLevel).map((c) => c.functionName);
     expect(names).toContain("copy");
     expect(names).toContain("add");
+  });
+
+  it("parses rules when transform is an array of steps", () => {
+    // Bug: transform:[{type:"dtl",rules:{...}}] (array) returned no calls
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      transform: [
+        {
+          type: "dtl",
+          rules: {
+            default: [
+              ["add", "_deleted", false],
+              ["copy", "*"],
+            ],
+          },
+        },
+      ],
+    });
+    const { calls } = parseDtlText(text, "json");
+    const topLevel = calls.filter((c) => c.isTopLevel);
+    expect(topLevel).toHaveLength(2);
+    expect(topLevel[0].functionName).toBe("add");
+    expect(topLevel[1].functionName).toBe("copy");
   });
 
   it("returns empty calls for invalid JSON", () => {

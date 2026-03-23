@@ -120,6 +120,29 @@ function extractTransformCalls(
 ): void {
   if (!transform || typeof transform !== "object") return;
 
+  // Array of transform steps: [{ type: "dtl", rules: {...} }, ...]
+  // OR shorthand inline rules list: [["add", ...], ...]
+  if (Array.isArray(transform)) {
+    const steps = transform as unknown[];
+    if (
+      steps.length > 0 &&
+      typeof steps[0] === "object" &&
+      !Array.isArray(steps[0])
+    ) {
+      // Each element is a transform step object. Consume the outer "[" of the
+      // transform array so that inner rule-list scans don't misidentify it.
+      const exitArray = walker.enterArray();
+      for (const step of steps) {
+        extractTransformCalls(step, walker, calls, errors);
+      }
+      exitArray?.();
+    } else {
+      // Treat as a bare list of DTL call arrays
+      walker.walkRulesList(steps, true, calls, errors);
+    }
+    return;
+  }
+
   const t = transform as Record<string, unknown>;
 
   // Standard DTL transform: { "type": "dtl", "rules": { "default": [...] } }
@@ -130,11 +153,6 @@ function extractTransformCalls(
         walker.walkRulesList(rules[ruleName] as unknown[], true, calls, errors);
       }
     }
-  }
-
-  // Shorthand inline rules array
-  if (Array.isArray(transform)) {
-    walker.walkRulesList(transform as unknown[], true, calls, errors);
   }
 }
 
@@ -151,16 +169,41 @@ class DtlWalker {
     this.text = text;
   }
 
+  /**
+   * Advance the scanner past the next "[" without recording a DtlCall and
+   * return a callback that advances past the matching "]". Use this to bracket
+   * a traversal of a non-rule array (e.g. a transform step array `[{...}]`).
+   */
+  enterArray(): (() => void) | null {
+    const open = this.findNextArrayStart();
+    if (open === -1) return null;
+    const close = this.findMatchingClose(open);
+    this.scanPos = open + 1;
+    return () => {
+      this.scanPos = close + 1;
+    };
+  }
+
   walkRulesList(
     rules: unknown[],
     isTopLevel: boolean,
     calls: DtlCall[],
     errors: string[],
   ): void {
+    // Consume the outer "[" that wraps this rules list in the raw text so that
+    // each subsequent walkDtlArray call correctly locates its own "[" rather
+    // than mis-matching against the outer bracket.
+    const outerOpen = this.findNextArrayStart();
+    if (outerOpen === -1) return;
+    const outerClose = this.findMatchingClose(outerOpen);
+    this.scanPos = outerOpen + 1;
+
     for (const rule of rules) {
       if (!Array.isArray(rule)) continue;
       this.walkDtlArray(rule as unknown[], isTopLevel, calls, errors);
     }
+
+    this.scanPos = outerClose + 1;
   }
 
   walkDtlArray(

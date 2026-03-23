@@ -274,15 +274,18 @@ export function buildDocumentSymbols(
   }
 
   // ── transform.rules ───────────────────────────────────────────────────────
-  const transform = obj["transform"];
-  if (
-    transform == null ||
-    typeof transform !== "object" ||
-    Array.isArray(transform)
-  )
-    return symbols;
+  const rawTransform = obj["transform"];
+  // Transform can be a plain object or an array of transform steps; find the DTL step.
+  const transform: Record<string, unknown> | null = Array.isArray(rawTransform)
+    ? (((rawTransform as unknown[]).find(
+        (t) => typeof t === "object" && t !== null && !Array.isArray(t),
+      ) as Record<string, unknown> | undefined) ?? null)
+    : typeof rawTransform === "object" && rawTransform !== null
+      ? (rawTransform as Record<string, unknown>)
+      : null;
+  if (!transform) return symbols;
 
-  const rules = (transform as Record<string, unknown>)["rules"];
+  const rules = transform["rules"];
   if (rules == null || typeof rules !== "object" || Array.isArray(rules))
     return symbols;
 
