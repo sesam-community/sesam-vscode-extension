@@ -84,6 +84,7 @@ export function parseDtlText(text: string, fileExtension: "dtl" | "json"): Parse
       "transform" in (parsedJson as Record<string, unknown>)
     ) {
       // Full pipe config stored as .dtl — support both shapes
+      walker.seekToKey("transform");
       const transform = (parsedJson as Record<string, unknown>)["transform"];
       extractTransformCalls(transform, walker, calls, errors);
     }
@@ -91,11 +92,13 @@ export function parseDtlText(text: string, fileExtension: "dtl" | "json"): Parse
     // JSON file: look for transform rules
     if (typeof parsedJson === "object" && parsedJson !== null) {
       const obj = parsedJson as Record<string, unknown>;
+      walker.seekToKey("transform");
       extractTransformCalls(obj["transform"], walker, calls, errors);
     } else if (Array.isArray(parsedJson)) {
       // Array of pipe configs
       for (const item of parsedJson as unknown[]) {
         if (typeof item === "object" && item !== null) {
+          walker.seekToKey("transform");
           extractTransformCalls(
             (item as Record<string, unknown>)["transform"],
             walker,
@@ -143,9 +146,11 @@ function extractTransformCalls(
 
   // Standard DTL transform: { "type": "dtl", "rules": { "default": [...] } }
   if (t["rules"] && typeof t["rules"] === "object") {
+    walker.seekToKey("rules");
     const rules = t["rules"] as Record<string, unknown>;
     for (const ruleName of Object.keys(rules)) {
       if (Array.isArray(rules[ruleName])) {
+        walker.seekToKey(ruleName);
         walker.walkRulesList(rules[ruleName] as unknown[], true, calls, errors);
       }
     }
@@ -163,6 +168,22 @@ class DtlWalker {
 
   constructor(text: string) {
     this.text = text;
+  }
+
+  /**
+   * Seek scanPos to just after the `"key":` pattern in the text, starting from
+   * the current scanPos. Returns true if found, false if not found (scanPos
+   * unchanged). Use this to align the scanner before entering a known JSON key.
+   */
+  seekToKey(key: string): boolean {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`"${escaped}"\\s*:`);
+    const match = pattern.exec(this.text.slice(this.scanPos));
+    if (match) {
+      this.scanPos = this.scanPos + match.index + match[0].length;
+      return true;
+    }
+    return false;
   }
 
   /**

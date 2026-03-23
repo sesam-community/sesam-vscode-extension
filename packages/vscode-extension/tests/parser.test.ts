@@ -53,9 +53,7 @@ describe("parseDtlText — dtl extension", () => {
     const text = `[["add", "_T.x", 1]]`;
     const { calls } = parseDtlText(text, "dtl");
     const call = calls.find((c) => c.functionName === "add");
-    expect(call?.range.start.offset).toBeLessThan(
-      call!.nameRange!.start.offset,
-    );
+    expect(call?.range.start.offset).toBeLessThan(call!.nameRange!.start.offset);
   });
 
   it("marks top-level calls as isTopLevel = true", () => {
@@ -157,5 +155,34 @@ describe("parseDtlText — json extension", () => {
   it("returns empty calls for invalid JSON", () => {
     const { calls } = parseDtlText("{bad json", "json");
     expect(calls).toHaveLength(0);
+  });
+
+  it("finds all top-level calls when source section contains arrays before transform", () => {
+    // Bug: scanner starts at offset 0 and picks up '[' in source.datasets instead of
+    // the transform rules list, causing all but the first rule to be misidentified.
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      source: {
+        type: "merge",
+        datasets: ["dataset-a da", "dataset-b db"],
+        equality_sets: [["da.$ids", "db.$ids"]],
+      },
+      transform: {
+        type: "dtl",
+        rules: {
+          default: [
+            ["add", "_deleted", false],
+            ["add", "_ids", ["hops", { datasets: ["lookup t"], where: [], return: "t._id" }]],
+            ["add", "_url", ["concat", "http://", "_S._id"]],
+            ["add", "::url", ["url-quote", "_T._url"]],
+            ["add", "::operation", "sparql"],
+          ],
+        },
+      },
+    });
+    const { calls } = parseDtlText(text, "json");
+    const topLevel = calls.filter((c) => c.isTopLevel);
+    expect(topLevel).toHaveLength(5);
+    expect(topLevel.map((c) => c.functionName)).toEqual(["add", "add", "add", "add", "add"]);
   });
 });
