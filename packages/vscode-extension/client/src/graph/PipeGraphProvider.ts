@@ -18,8 +18,8 @@ export class PipeTreeItem extends vscode.TreeItem {
     public readonly label: string,
     public readonly kind: NodeKind,
     public readonly fileUri?: vscode.Uri,
-    public readonly collapsible: vscode.TreeItemCollapsibleState = vscode
-      .TreeItemCollapsibleState.None,
+    public readonly collapsible: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState
+      .None,
   ) {
     super(label, collapsible);
     this.contextValue = kind;
@@ -71,9 +71,7 @@ interface PipeInfo {
 // ---------------------------------------------------------------------------
 
 export class PipeGraphProvider implements vscode.TreeDataProvider<PipeTreeItem> {
-  private _onDidChangeTreeData = new vscode.EventEmitter<
-    PipeTreeItem | undefined | null | void
-  >();
+  private _onDidChangeTreeData = new vscode.EventEmitter<PipeTreeItem | undefined | null | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private pipes: PipeInfo[] = [];
@@ -162,19 +160,11 @@ export class PipeGraphProvider implements vscode.TreeDataProvider<PipeTreeItem> 
     const scanDepth: number = config.get("graph.scanDepth", 3);
 
     // Find all JSON files
-    const globDepth = Array.from({ length: scanDepth }, (_, i) => "*").join(
-      "/",
-    );
-    const files = await vscode.workspace.findFiles(
-      `**/*.json`,
-      `**/node_modules/**`,
-    );
+    const globDepth = Array.from({ length: scanDepth }, (_, i) => "*").join("/");
+    const files = await vscode.workspace.findFiles(`**/*.json`, `**/node_modules/**`);
 
     // Also find .dtl files
-    const dtlFiles = await vscode.workspace.findFiles(
-      "**/*.dtl",
-      "**/node_modules/**",
-    );
+    const dtlFiles = await vscode.workspace.findFiles("**/*.dtl", "**/node_modules/**");
 
     const allFiles = [...files, ...dtlFiles];
 
@@ -203,10 +193,7 @@ export class PipeGraphProvider implements vscode.TreeDataProvider<PipeTreeItem> 
 // Helpers
 // ---------------------------------------------------------------------------
 
-function extractPipeInfo(
-  parsed: unknown,
-  fileUri: vscode.Uri,
-): PipeInfo | null {
+function extractPipeInfo(parsed: unknown, fileUri: vscode.Uri): PipeInfo | null {
   if (typeof parsed !== "object" || parsed === null) return null;
   const obj = parsed as Record<string, unknown>;
 

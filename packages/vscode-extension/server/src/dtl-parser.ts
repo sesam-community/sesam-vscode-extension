@@ -56,10 +56,7 @@ function offsetToPosition(text: string, offset: number): DtlPosition {
  * We use a token-scanning approach rather than full JSON.parse so we can
  * retain character positions that JSON.parse drops.
  */
-export function parseDtlText(
-  text: string,
-  fileExtension: "dtl" | "json",
-): ParseResult {
+export function parseDtlText(text: string, fileExtension: "dtl" | "json"): ParseResult {
   const calls: DtlCall[] = [];
   const errors: string[] = [];
 
@@ -124,11 +121,7 @@ function extractTransformCalls(
   // OR shorthand inline rules list: [["add", ...], ...]
   if (Array.isArray(transform)) {
     const steps = transform as unknown[];
-    if (
-      steps.length > 0 &&
-      typeof steps[0] === "object" &&
-      !Array.isArray(steps[0])
-    ) {
+    if (steps.length > 0 && typeof steps[0] === "object" && !Array.isArray(steps[0])) {
       // Each element is a transform step object. Consume the outer "[" of the
       // transform array so that inner rule-list scans don't misidentify it.
       const exitArray = walker.enterArray();
@@ -184,12 +177,7 @@ class DtlWalker {
     };
   }
 
-  walkRulesList(
-    rules: unknown[],
-    isTopLevel: boolean,
-    calls: DtlCall[],
-    errors: string[],
-  ): void {
+  walkRulesList(rules: unknown[], isTopLevel: boolean, calls: DtlCall[], errors: string[]): void {
     // Consume the outer "[" that wraps this rules list in the raw text so that
     // each subsequent walkDtlArray call correctly locates its own "[" rather
     // than mis-matching against the outer bracket.
@@ -206,12 +194,7 @@ class DtlWalker {
     this.scanPos = outerClose + 1;
   }
 
-  walkDtlArray(
-    arr: unknown[],
-    isTopLevel: boolean,
-    calls: DtlCall[],
-    errors: string[],
-  ): void {
+  walkDtlArray(arr: unknown[], isTopLevel: boolean, calls: DtlCall[], errors: string[]): void {
     if (arr.length === 0) return;
 
     const firstName = typeof arr[0] === "string" ? (arr[0] as string) : null;

@@ -22,13 +22,9 @@ import { PreviewPanel } from "./preview/PreviewPanel";
 
 let client: LanguageClient;
 
-export async function activate(
-  context: vscode.ExtensionContext,
-): Promise<void> {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   // ── Language Server ───────────────────────────────────────────────────────
-  const serverModule = context.asAbsolutePath(
-    path.join("dist", "server", "server.js"),
-  );
+  const serverModule = context.asAbsolutePath(path.join("dist", "server", "server.js"));
 
   const serverOptions: ServerOptions = {
     run: {
@@ -58,17 +54,11 @@ export async function activate(
     ],
     synchronize: {
       fileEvents: [
-        vscode.workspace.createFileSystemWatcher(
-          "**/{pipes,systems}/**/*.json",
-        ),
-        vscode.workspace.createFileSystemWatcher(
-          "**/*.conf.{json,pipe,system}",
-        ),
+        vscode.workspace.createFileSystemWatcher("**/{pipes,systems}/**/*.json"),
+        vscode.workspace.createFileSystemWatcher("**/*.conf.{json,pipe,system}"),
       ],
     },
-    traceOutputChannel: vscode.window.createOutputChannel(
-      "DTL Language Server (Trace)",
-    ),
+    traceOutputChannel: vscode.window.createOutputChannel("DTL Language Server (Trace)"),
   };
 
   client = new LanguageClient(
@@ -91,17 +81,13 @@ export async function activate(
   context.subscriptions.push(treeView);
 
   // Watch for file changes to update the graph
-  const watcher = vscode.workspace.createFileSystemWatcher(
-    "**/{pipes,systems}/**/*.json",
-  );
+  const watcher = vscode.workspace.createFileSystemWatcher("**/{pipes,systems}/**/*.json");
   watcher.onDidCreate(() => graphProvider.refresh());
   watcher.onDidChange(() => graphProvider.refresh());
   watcher.onDidDelete(() => graphProvider.refresh());
   context.subscriptions.push(watcher);
 
-  const confWatcher = vscode.workspace.createFileSystemWatcher(
-    "**/*.conf.{json,pipe,system}",
-  );
+  const confWatcher = vscode.workspace.createFileSystemWatcher("**/*.conf.{json,pipe,system}");
   confWatcher.onDidCreate(() => graphProvider.refresh());
   confWatcher.onDidChange(() => graphProvider.refresh());
   confWatcher.onDidDelete(() => graphProvider.refresh());
@@ -125,18 +111,14 @@ export async function activate(
 
     vscode.commands.registerCommand("dtl.openDocs", () => {
       vscode.env.openExternal(
-        vscode.Uri.parse(
-          "https://docs.sesam.io/hub/data-transformation-language.html",
-        ),
+        vscode.Uri.parse("https://docs.sesam.io/hub/data-transformation-language.html"),
       );
     }),
 
     vscode.commands.registerCommand("sesam.formatDocument", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor || editor.document.languageId !== "sesam-config") {
-        vscode.window.showWarningMessage(
-          "Sesam: No active Sesam config file to format.",
-        );
+        vscode.window.showWarningMessage("Sesam: No active Sesam config file to format.");
         return;
       }
       const text = editor.document.getText();
@@ -147,8 +129,7 @@ export async function activate(
         vscode.window.showWarningMessage("Sesam: File is not valid JSON.");
         return;
       }
-      const tabSize =
-        typeof editor.options.tabSize === "number" ? editor.options.tabSize : 2;
+      const tabSize = typeof editor.options.tabSize === "number" ? editor.options.tabSize : 2;
       const formatted = formatSesamJson(parsed, tabSize);
       if (formatted === text) return;
       await editor.edit((editBuilder) => {
@@ -160,259 +141,247 @@ export async function activate(
       });
     }),
 
-    vscode.commands.registerCommand(
-      "dtl.newConfFile",
-      async (contextUri?: vscode.Uri) => {
-        // ── Step 1: choose template ──────────────────────────────────────
-        const TEMPLATES = [
-          {
-            label: "$(symbol-namespace) Simple pipe",
-            description: '{ "_id", "type": "pipe", "source": { ... } }',
-            id: "simple-pipe",
-          },
-          {
-            label: "$(symbol-namespace) Pipe with DTL transform",
-            description: "Pipe + source + DTL rules block",
-            id: "dtl-pipe",
-          },
-          {
-            label: "$(gear) System",
-            description: "system:<type>",
-            id: "system",
-          },
-        ];
+    vscode.commands.registerCommand("dtl.newConfFile", async (contextUri?: vscode.Uri) => {
+      // ── Step 1: choose template ──────────────────────────────────────
+      const TEMPLATES = [
+        {
+          label: "$(symbol-namespace) Simple pipe",
+          description: '{ "_id", "type": "pipe", "source": { ... } }',
+          id: "simple-pipe",
+        },
+        {
+          label: "$(symbol-namespace) Pipe with DTL transform",
+          description: "Pipe + source + DTL rules block",
+          id: "dtl-pipe",
+        },
+        {
+          label: "$(gear) System",
+          description: "system:<type>",
+          id: "system",
+        },
+      ];
 
-        const template = await vscode.window.showQuickPick(TEMPLATES, {
-          placeHolder: "Select config template",
-          title: "New Sesam Config File",
+      const template = await vscode.window.showQuickPick(TEMPLATES, {
+        placeHolder: "Select config template",
+        title: "New Sesam Config File",
+      });
+      if (!template) return;
+
+      // ── Step 2: choose source type (pipes) or system type ────────────
+      const SOURCE_TYPES: Array<{
+        label: string;
+        description: string;
+        source: object;
+      }> = [
+        {
+          label: "dataset",
+          description: "Read from a Sesam dataset",
+          source: { type: "dataset", dataset: "<dataset-id>" },
+        },
+        {
+          label: "sql",
+          description: "Read from a SQL table via a SQL system",
+          source: { type: "sql", system: "<system-id>", table: "<table>" },
+        },
+        {
+          label: "rest",
+          description: "Read from a REST API via a REST system",
+          source: {
+            type: "rest",
+            system: "<system-id>",
+            operation: "<operation>",
+          },
+        },
+        {
+          label: "json",
+          description: "Read JSON from a URL via a URL/REST system",
+          source: { type: "json", system: "<system-id>", url: "<url>" },
+        },
+        {
+          label: "csv",
+          description: "Read CSV via a URL/REST system",
+          source: { type: "csv", system: "<system-id>", url: "<url>" },
+        },
+        {
+          label: "http_endpoint",
+          description: "Receive data pushed to an HTTP endpoint",
+          source: { type: "http_endpoint" },
+        },
+        {
+          label: "embedded",
+          description: "Inline entities defined in the config",
+          source: { type: "embedded", entities: [] },
+        },
+        {
+          label: "empty",
+          description: "Emits no entities (placeholder / testing)",
+          source: { type: "empty" },
+        },
+        {
+          label: "union_datasets",
+          description: "Union multiple datasets into one stream",
+          source: { type: "union_datasets", datasets: ["<dataset-id>"] },
+        },
+        {
+          label: "merge",
+          description: "Merge entities from multiple sources",
+          source: { type: "merge", sources: [] },
+        },
+        {
+          label: "merge_datasets",
+          description: "Merge datasets, keeping latest version per entity",
+          source: { type: "merge_datasets", datasets: ["<dataset-id>"] },
+        },
+        {
+          label: "conditional",
+          description: "Pick a source based on a runtime condition",
+          source: {
+            type: "conditional",
+            condition: "<expr>",
+            alternatives: {},
+          },
+        },
+        {
+          label: "kafka",
+          description: "Read from Kafka via a Kafka system",
+          source: { type: "kafka", system: "<system-id>" },
+        },
+        {
+          label: "ldap",
+          description: "Read from LDAP via an LDAP system",
+          source: { type: "ldap", system: "<system-id>" },
+        },
+        {
+          label: "binary",
+          description: "Read binary data via a system",
+          source: {
+            type: "binary",
+            system: "<system-id>",
+            operation: "<operation>",
+          },
+        },
+        {
+          label: "sdshare",
+          description: "Read from an SDShare feed",
+          source: { type: "sdshare", url: "<url>" },
+        },
+        {
+          label: "sparql",
+          description: "Read from a SPARQL endpoint",
+          source: { type: "sparql", url: "<url>" },
+        },
+        {
+          label: "rdf",
+          description: "Read RDF data from a URL",
+          source: { type: "rdf", url: "<url>" },
+        },
+      ];
+
+      const SYSTEM_TYPES = [
+        "system:elasticsearch",
+        "system:kafka",
+        "system:ldap",
+        "system:microservice",
+        "system:mssql",
+        "system:mysql",
+        "system:oracle",
+        "system:postgresql",
+        "system:rest",
+        "system:smtp",
+        "system:solr",
+        "system:twilio",
+        "system:url",
+      ];
+
+      let sourceStub: object | null = null;
+      let systemType = "";
+
+      if (template.id === "simple-pipe" || template.id === "dtl-pipe") {
+        const picked = await vscode.window.showQuickPick(SOURCE_TYPES, {
+          placeHolder: "Select source type",
+          title: "New Sesam Config File — Source type",
+          matchOnDescription: true,
         });
-        if (!template) return;
-
-        // ── Step 2: choose source type (pipes) or system type ────────────
-        const SOURCE_TYPES: Array<{
-          label: string;
-          description: string;
-          source: object;
-        }> = [
-          {
-            label: "dataset",
-            description: "Read from a Sesam dataset",
-            source: { type: "dataset", dataset: "<dataset-id>" },
-          },
-          {
-            label: "sql",
-            description: "Read from a SQL table via a SQL system",
-            source: { type: "sql", system: "<system-id>", table: "<table>" },
-          },
-          {
-            label: "rest",
-            description: "Read from a REST API via a REST system",
-            source: {
-              type: "rest",
-              system: "<system-id>",
-              operation: "<operation>",
-            },
-          },
-          {
-            label: "json",
-            description: "Read JSON from a URL via a URL/REST system",
-            source: { type: "json", system: "<system-id>", url: "<url>" },
-          },
-          {
-            label: "csv",
-            description: "Read CSV via a URL/REST system",
-            source: { type: "csv", system: "<system-id>", url: "<url>" },
-          },
-          {
-            label: "http_endpoint",
-            description: "Receive data pushed to an HTTP endpoint",
-            source: { type: "http_endpoint" },
-          },
-          {
-            label: "embedded",
-            description: "Inline entities defined in the config",
-            source: { type: "embedded", entities: [] },
-          },
-          {
-            label: "empty",
-            description: "Emits no entities (placeholder / testing)",
-            source: { type: "empty" },
-          },
-          {
-            label: "union_datasets",
-            description: "Union multiple datasets into one stream",
-            source: { type: "union_datasets", datasets: ["<dataset-id>"] },
-          },
-          {
-            label: "merge",
-            description: "Merge entities from multiple sources",
-            source: { type: "merge", sources: [] },
-          },
-          {
-            label: "merge_datasets",
-            description: "Merge datasets, keeping latest version per entity",
-            source: { type: "merge_datasets", datasets: ["<dataset-id>"] },
-          },
-          {
-            label: "conditional",
-            description: "Pick a source based on a runtime condition",
-            source: {
-              type: "conditional",
-              condition: "<expr>",
-              alternatives: {},
-            },
-          },
-          {
-            label: "kafka",
-            description: "Read from Kafka via a Kafka system",
-            source: { type: "kafka", system: "<system-id>" },
-          },
-          {
-            label: "ldap",
-            description: "Read from LDAP via an LDAP system",
-            source: { type: "ldap", system: "<system-id>" },
-          },
-          {
-            label: "binary",
-            description: "Read binary data via a system",
-            source: {
-              type: "binary",
-              system: "<system-id>",
-              operation: "<operation>",
-            },
-          },
-          {
-            label: "sdshare",
-            description: "Read from an SDShare feed",
-            source: { type: "sdshare", url: "<url>" },
-          },
-          {
-            label: "sparql",
-            description: "Read from a SPARQL endpoint",
-            source: { type: "sparql", url: "<url>" },
-          },
-          {
-            label: "rdf",
-            description: "Read RDF data from a URL",
-            source: { type: "rdf", url: "<url>" },
-          },
-        ];
-
-        const SYSTEM_TYPES = [
-          "system:elasticsearch",
-          "system:kafka",
-          "system:ldap",
-          "system:microservice",
-          "system:mssql",
-          "system:mysql",
-          "system:oracle",
-          "system:postgresql",
-          "system:rest",
-          "system:smtp",
-          "system:solr",
-          "system:twilio",
-          "system:url",
-        ];
-
-        let sourceStub: object | null = null;
-        let systemType = "";
-
-        if (template.id === "simple-pipe" || template.id === "dtl-pipe") {
-          const picked = await vscode.window.showQuickPick(SOURCE_TYPES, {
-            placeHolder: "Select source type",
-            title: "New Sesam Config File — Source type",
-            matchOnDescription: true,
-          });
-          if (!picked) return;
-          sourceStub = picked.source;
-        } else {
-          const picked = await vscode.window.showQuickPick(SYSTEM_TYPES, {
-            placeHolder: "Select system type",
-            title: "New Sesam Config File — System type",
-          });
-          if (!picked) return;
-          systemType = picked;
-        }
-
-        // ── Step 3: ask for _id ──────────────────────────────────────────
-        const configId = await vscode.window.showInputBox({
-          prompt: `Enter the config _id (used as filename: <id>${template.id === "system" ? ".conf.system" : ".conf.pipe"})`,
-          placeHolder:
-            template.id === "system" ? "my-rest-system" : "my-pipe-id",
-          validateInput: (v) => {
-            if (!v.trim()) return "_id cannot be empty";
-            if (v.includes("/")) return 'Cannot contain "/"';
-            return null;
-          },
+        if (!picked) return;
+        sourceStub = picked.source;
+      } else {
+        const picked = await vscode.window.showQuickPick(SYSTEM_TYPES, {
+          placeHolder: "Select system type",
+          title: "New Sesam Config File — System type",
         });
-        if (!configId) return;
+        if (!picked) return;
+        systemType = picked;
+      }
 
-        // ── Step 4: build content ────────────────────────────────────────
-        let content: object;
-        if (template.id === "simple-pipe") {
-          content = { _id: configId, type: "pipe", source: sourceStub };
-        } else if (template.id === "dtl-pipe") {
-          content = {
-            _id: configId,
-            type: "pipe",
-            source: sourceStub,
-            transform: {
-              type: "dtl",
-              rules: {
-                default: [["copy", "_id"]],
-              },
+      // ── Step 3: ask for _id ──────────────────────────────────────────
+      const configId = await vscode.window.showInputBox({
+        prompt: `Enter the config _id (used as filename: <id>${template.id === "system" ? ".conf.system" : ".conf.pipe"})`,
+        placeHolder: template.id === "system" ? "my-rest-system" : "my-pipe-id",
+        validateInput: (v) => {
+          if (!v.trim()) return "_id cannot be empty";
+          if (v.includes("/")) return 'Cannot contain "/"';
+          return null;
+        },
+      });
+      if (!configId) return;
+
+      // ── Step 4: build content ────────────────────────────────────────
+      let content: object;
+      if (template.id === "simple-pipe") {
+        content = { _id: configId, type: "pipe", source: sourceStub };
+      } else if (template.id === "dtl-pipe") {
+        content = {
+          _id: configId,
+          type: "pipe",
+          source: sourceStub,
+          transform: {
+            type: "dtl",
+            rules: {
+              default: [["copy", "_id"]],
             },
-          };
-        } else {
-          content = { _id: configId, type: systemType };
-        }
+          },
+        };
+      } else {
+        content = { _id: configId, type: systemType };
+      }
 
-        // ── Step 5: resolve target folder ────────────────────────────────
-        // Always place pipes under <root>/pipes/ and systems under <root>/systems/
-        const subdir = template.id === "system" ? "systems" : "pipes";
+      // ── Step 5: resolve target folder ────────────────────────────────
+      // Always place pipes under <root>/pipes/ and systems under <root>/systems/
+      const subdir = template.id === "system" ? "systems" : "pipes";
 
-        let workspaceRoot: vscode.Uri;
-        if (contextUri) {
-          const stat = await vscode.workspace.fs.stat(contextUri);
-          const ctxDir =
-            stat.type === vscode.FileType.Directory
-              ? contextUri
-              : vscode.Uri.file(path.dirname(contextUri.fsPath));
-          // Walk up from the context dir to find (or use) a workspace folder root
-          workspaceRoot =
-            vscode.workspace.getWorkspaceFolder(ctxDir)?.uri ?? ctxDir;
-        } else {
-          workspaceRoot =
-            vscode.workspace.workspaceFolders?.[0]?.uri ??
-            (vscode.window.activeTextEditor
-              ? vscode.Uri.file(
-                  path.dirname(
-                    vscode.window.activeTextEditor.document.uri.fsPath,
-                  ),
-                )
-              : vscode.Uri.file("."));
-        }
+      let workspaceRoot: vscode.Uri;
+      if (contextUri) {
+        const stat = await vscode.workspace.fs.stat(contextUri);
+        const ctxDir =
+          stat.type === vscode.FileType.Directory
+            ? contextUri
+            : vscode.Uri.file(path.dirname(contextUri.fsPath));
+        // Walk up from the context dir to find (or use) a workspace folder root
+        workspaceRoot = vscode.workspace.getWorkspaceFolder(ctxDir)?.uri ?? ctxDir;
+      } else {
+        workspaceRoot =
+          vscode.workspace.workspaceFolders?.[0]?.uri ??
+          (vscode.window.activeTextEditor
+            ? vscode.Uri.file(path.dirname(vscode.window.activeTextEditor.document.uri.fsPath))
+            : vscode.Uri.file("."));
+      }
 
-        const folder = vscode.Uri.joinPath(workspaceRoot, subdir);
-        // Create the subdirectory if it doesn't exist
-        try {
-          await vscode.workspace.fs.createDirectory(folder);
-        } catch {
-          // already exists — ignore
-        }
+      const folder = vscode.Uri.joinPath(workspaceRoot, subdir);
+      // Create the subdirectory if it doesn't exist
+      try {
+        await vscode.workspace.fs.createDirectory(folder);
+      } catch {
+        // already exists — ignore
+      }
 
-        // ── Step 6: write and open ────────────────────────────────────────
-        const ext = template.id === "system" ? ".conf.system" : ".conf.pipe";
-        const fileUri = vscode.Uri.joinPath(folder, `${configId}${ext}`);
-        const text = JSON.stringify(content, null, 2) + "\n";
-        await vscode.workspace.fs.writeFile(
-          fileUri,
-          Buffer.from(text, "utf-8"),
-        );
-        const doc = await vscode.workspace.openTextDocument(fileUri);
-        await vscode.window.showTextDocument(doc);
-      },
-    ),
+      // ── Step 6: write and open ────────────────────────────────────────
+      const ext = template.id === "system" ? ".conf.system" : ".conf.pipe";
+      const fileUri = vscode.Uri.joinPath(folder, `${configId}${ext}`);
+      const text = JSON.stringify(content, null, 2) + "\n";
+      await vscode.workspace.fs.writeFile(fileUri, Buffer.from(text, "utf-8"));
+      const doc = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(doc);
+    }),
   );
 
   // Keep the PreviewPanel updated when the active document changes
@@ -436,22 +405,15 @@ export async function activate(
       } catch {
         return;
       }
-      const editor = vscode.window.visibleTextEditors.find(
-        (e) => e.document === event.document,
-      );
-      const tabSize =
-        typeof editor?.options.tabSize === "number"
-          ? editor.options.tabSize
-          : 2;
+      const editor = vscode.window.visibleTextEditors.find((e) => e.document === event.document);
+      const tabSize = typeof editor?.options.tabSize === "number" ? editor.options.tabSize : 2;
       const formatted = formatSesamJson(parsed, tabSize);
       if (formatted === text) return;
       const fullRange = new vscode.Range(
         event.document.positionAt(0),
         event.document.positionAt(text.length),
       );
-      event.waitUntil(
-        Promise.resolve([vscode.TextEdit.replace(fullRange, formatted)]),
-      );
+      event.waitUntil(Promise.resolve([vscode.TextEdit.replace(fullRange, formatted)]));
     }),
   );
 }

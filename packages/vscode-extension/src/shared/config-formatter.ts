@@ -24,9 +24,7 @@ export function sortObjectKeysRecursively(obj: unknown): unknown {
   if (Array.isArray(obj)) return obj.map(sortObjectKeysRecursively);
   const sorted: Record<string, unknown> = {};
   for (const key of Object.keys(obj as Record<string, unknown>).sort()) {
-    sorted[key] = sortObjectKeysRecursively(
-      (obj as Record<string, unknown>)[key],
-    );
+    sorted[key] = sortObjectKeysRecursively((obj as Record<string, unknown>)[key]);
   }
   return sorted;
 }
@@ -43,8 +41,7 @@ export function formatSesamJson(value: unknown, tabSize: number): string {
   for (let i = 0; i < compact.length; i++) {
     const c = compact[i];
 
-    const peek = (): string | undefined =>
-      i < compact.length - 1 ? compact[i + 1] : undefined;
+    const peek = (): string | undefined => (i < compact.length - 1 ? compact[i + 1] : undefined);
     const peekStack = (): FmtContext => stack[stack.length - 1];
 
     // ── Context tracking ──────────────────────────────────────────────────
@@ -87,11 +84,7 @@ export function formatSesamJson(value: unknown, tabSize: number): string {
       }
 
       // Newline before `[` when it opens an array inside another array
-      if (
-        c === "[" &&
-        stack.length > 1 &&
-        stack[stack.length - 2] === FmtContext.Array
-      ) {
+      if (c === "[" && stack.length > 1 && stack[stack.length - 2] === FmtContext.Array) {
         output += "\n";
         output += indentation.repeat(Math.max(0, indent - 1));
       }

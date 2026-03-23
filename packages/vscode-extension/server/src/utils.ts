@@ -39,11 +39,7 @@ export function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function elementsToRange(
-  document: TextDocument,
-  text: string,
-  elements: string,
-): Range {
+export function elementsToRange(document: TextDocument, text: string, elements: string): Range {
   const match = /\['([^']+)'\]/.exec(elements);
   if (match) {
     const key = match[1];
@@ -55,10 +51,7 @@ export function elementsToRange(
       return Range.create(start, end);
     }
   }
-  return Range.create(
-    Position.create(0, 0),
-    Position.create(0, Number.MAX_SAFE_INTEGER),
-  );
+  return Range.create(Position.create(0, 0), Position.create(0, Number.MAX_SAFE_INTEGER));
 }
 
 // ---------------------------------------------------------------------------
@@ -136,10 +129,7 @@ export function buildSourceTypeCompletions(): CompletionItem[] {
 export function buildFunctionCompletions(): CompletionItem[] {
   return getAllFunctions().map((fn: DtlFunction) => ({
     label: fn.name,
-    kind:
-      fn.kind === "transform"
-        ? CompletionItemKind.Method
-        : CompletionItemKind.Function,
+    kind: fn.kind === "transform" ? CompletionItemKind.Method : CompletionItemKind.Function,
     detail: fn.description,
     labelDetails: { description: fn.signature },
     documentation: {
@@ -152,19 +142,17 @@ export function buildFunctionCompletions(): CompletionItem[] {
 }
 
 export function buildVariableCompletions(): CompletionItem[] {
-  const items: CompletionItem[] = Object.entries(DTL_VARIABLES).map(
-    ([name, desc]) => ({
-      label: name,
-      kind: CompletionItemKind.Variable,
-      detail: desc,
-      documentation: {
-        kind: MarkupKind.Markdown,
-        value: `**${name}** — DTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/dtl-variables.html)`,
-      },
-      insertText: name,
-      sortText: `0_${name}`,
-    }),
-  );
+  const items: CompletionItem[] = Object.entries(DTL_VARIABLES).map(([name, desc]) => ({
+    label: name,
+    kind: CompletionItemKind.Variable,
+    detail: desc,
+    documentation: {
+      kind: MarkupKind.Markdown,
+      value: `**${name}** — DTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/dtl-variables.html)`,
+    },
+    insertText: name,
+    sortText: `0_${name}`,
+  }));
   ENTITY_RESERVED_FIELDS.forEach((field) => {
     items.push({
       label: field,
@@ -180,10 +168,7 @@ export function buildVariableCompletions(): CompletionItem[] {
 // ---------------------------------------------------------------------------
 // Hover helpers
 // ---------------------------------------------------------------------------
-export function getWordAtPosition(
-  document: TextDocument,
-  position: Position,
-): string | null {
+export function getWordAtPosition(document: TextDocument, position: Position): string | null {
   const text = document.getText();
   const offset = document.offsetAt(position);
   let start = offset;
@@ -201,10 +186,7 @@ export function isWordChar(ch: string): boolean {
 export function buildFunctionMarkdown(fn: DtlFunction): string {
   const kindLabel = fn.kind === "transform" ? "🔧 Transform" : "📦 Expression";
   const params = fn.params
-    .map(
-      (p) =>
-        `- \`${p.name}\`${p.optional ? " *(optional)*" : ""} — ${p.description}`,
-    )
+    .map((p) => `- \`${p.name}\`${p.optional ? " *(optional)*" : ""} — ${p.description}`)
     .join("\n");
   const argInfo =
     fn.maxArgs === null
@@ -235,11 +217,7 @@ export function lspRange(r: DtlRange): Range {
   );
 }
 
-export function findKeyOffset(
-  text: string,
-  key: string,
-  fromOffset = 0,
-): number {
+export function findKeyOffset(text: string, key: string, fromOffset = 0): number {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(`"${escaped}"\\s*:`);
   const m = pattern.exec(text.slice(fromOffset));
@@ -261,14 +239,7 @@ export function buildDocumentSymbols(
       const pos = document.positionAt(off);
       const range = Range.create(pos, document.positionAt(off + 5));
       symbols.push(
-        DocumentSymbol.create(
-          `_id: ${configId}`,
-          undefined,
-          SymbolKind.Key,
-          range,
-          range,
-          [],
-        ),
+        DocumentSymbol.create(`_id: ${configId}`, undefined, SymbolKind.Key, range, range, []),
       );
     }
   }
@@ -286,8 +257,7 @@ export function buildDocumentSymbols(
   if (!transform) return symbols;
 
   const rules = transform["rules"];
-  if (rules == null || typeof rules !== "object" || Array.isArray(rules))
-    return symbols;
+  if (rules == null || typeof rules !== "object" || Array.isArray(rules)) return symbols;
 
   const rulesObj = rules as Record<string, unknown>;
   const ruleNames = Object.keys(rulesObj);
@@ -315,14 +285,7 @@ export function buildDocumentSymbols(
     );
     const callSymbols: DocumentSymbol[] = callsInRule.map((c) => {
       const r = lspRange(c.range);
-      return DocumentSymbol.create(
-        c.functionName!,
-        undefined,
-        SymbolKind.Function,
-        r,
-        r,
-        [],
-      );
+      return DocumentSymbol.create(c.functionName!, undefined, SymbolKind.Function, r, r, []);
     });
 
     const namePos = document.positionAt(start);

@@ -135,16 +135,12 @@ async function validateDocument(document: TextDocument): Promise<void> {
   const parseResult = parseDtlText(document.getText(), ext);
 
   const validatorOptions: ValidatorOptions = {
-    maxProblems:
-      settings.maxNumberOfProblems ?? defaultSettings.maxNumberOfProblems,
+    maxProblems: settings.maxNumberOfProblems ?? defaultSettings.maxNumberOfProblems,
     validateUnknownFunctions: settings.validate?.unknownFunctions ?? true,
     validateArgCount: settings.validate?.argCount ?? true,
   };
 
-  const localDiagnostics: Diagnostic[] = validateCalls(
-    parseResult.calls,
-    validatorOptions,
-  );
+  const localDiagnostics: Diagnostic[] = validateCalls(parseResult.calls, validatorOptions);
 
   const nodeDiags = nodeValidationDiagnostics.get(document.uri) ?? [];
   connection.sendDiagnostics({
@@ -166,40 +162,38 @@ documents.onDidClose((event) => {
 // ---------------------------------------------------------------------------
 // Completion
 // ---------------------------------------------------------------------------
-connection.onCompletion(
-  (params: TextDocumentPositionParams): CompletionItem[] => {
-    const document = documents.get(params.textDocument.uri);
-    if (!document) return [];
+connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) return [];
 
-    const text = document.getText();
-    const offset = document.offsetAt(params.position);
+  const text = document.getText();
+  const offset = document.offsetAt(params.position);
 
-    // Use a wider window so we can detect "source": { "type": context
-    const prefix = text.slice(Math.max(0, offset - 2000), offset);
+  // Use a wider window so we can detect "source": { "type": context
+  const prefix = text.slice(Math.max(0, offset - 2000), offset);
 
-    // Source type completion: inside "source": { "type": "..."
-    if (isSourceTypeContext(prefix)) {
-      return buildSourceTypeCompletions();
-    }
+  // Source type completion: inside "source": { "type": "..."
+  if (isSourceTypeContext(prefix)) {
+    return buildSourceTypeCompletions();
+  }
 
-    // System type completion: root-level "type": "system:..."
-    if (isSystemTypeContext(prefix)) {
-      return buildSystemTypeCompletions();
-    }
+  // System type completion: root-level "type": "system:..."
+  if (isSystemTypeContext(prefix)) {
+    return buildSystemTypeCompletions();
+  }
 
-    // Variable completion: triggered after "_" or inside a string starting with "_"
-    if (isVariableContext(prefix)) {
-      return buildVariableCompletions();
-    }
+  // Variable completion: triggered after "_" or inside a string starting with "_"
+  if (isVariableContext(prefix)) {
+    return buildVariableCompletions();
+  }
 
-    // Function name completion: cursor is after an opening "[" (possibly with a quote)
-    if (isFunctionNameContext(prefix)) {
-      return buildFunctionCompletions();
-    }
+  // Function name completion: cursor is after an opening "[" (possibly with a quote)
+  if (isFunctionNameContext(prefix)) {
+    return buildFunctionCompletions();
+  }
 
-    return [];
-  },
-);
+  return [];
+});
 
 // ---------------------------------------------------------------------------
 // Hover
@@ -252,52 +246,41 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
 // ---------------------------------------------------------------------------
 // Document Symbols (Outline)
 // ---------------------------------------------------------------------------
-connection.onDocumentSymbol(
-  (params: DocumentSymbolParams): DocumentSymbol[] => {
-    const document = documents.get(params.textDocument.uri);
-    if (!document) return [];
-    const text = document.getText();
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return [];
-    }
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
-      return [];
-    return buildDocumentSymbols(
-      document,
-      text,
-      parsed as Record<string, unknown>,
-    );
-  },
-);
+connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) return [];
+  const text = document.getText();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return [];
+  return buildDocumentSymbols(document, text, parsed as Record<string, unknown>);
+});
 
 // ---------------------------------------------------------------------------
 // Document Formatting
 // ---------------------------------------------------------------------------
-connection.onDocumentFormatting(
-  (params: DocumentFormattingParams): TextEdit[] => {
-    const document = documents.get(params.textDocument.uri);
-    if (!document) return [];
+connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) return [];
 
-    const text = document.getText();
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return [];
-    }
+  const text = document.getText();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return [];
+  }
 
-    const formatted = formatSesamJson(parsed, params.options.tabSize ?? 2);
-    if (formatted === text) return [];
+  const formatted = formatSesamJson(parsed, params.options.tabSize ?? 2);
+  if (formatted === text) return [];
 
-    const endPos = document.positionAt(text.length);
-    return [
-      TextEdit.replace(Range.create(Position.create(0, 0), endPos), formatted),
-    ];
-  },
-);
+  const endPos = document.positionAt(text.length);
+  return [TextEdit.replace(Range.create(Position.create(0, 0), endPos), formatted)];
+});
 
 // ---------------------------------------------------------------------------
 // Start

@@ -3,18 +3,9 @@
  * Runs diagnostics on a parsed set of DtlCalls and emits LSP Diagnostic objects.
  */
 
-import {
-  Diagnostic,
-  DiagnosticSeverity,
-  Range,
-  Position,
-} from "vscode-languageserver/node";
+import { Diagnostic, DiagnosticSeverity, Range, Position } from "vscode-languageserver/node";
 import { DtlCall } from "./dtl-parser";
-import {
-  getDtlFunction,
-  isKnownFunction,
-  DTL_VARIABLES,
-} from "../../src/shared/dtl-registry";
+import { getDtlFunction, isKnownFunction, DTL_VARIABLES } from "../../src/shared/dtl-registry";
 
 export interface ValidatorOptions {
   maxProblems: number;
@@ -34,10 +25,7 @@ function toRange(
   };
 }
 
-export function validateCalls(
-  calls: DtlCall[],
-  options: ValidatorOptions,
-): Diagnostic[] {
+export function validateCalls(calls: DtlCall[], options: ValidatorOptions): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const call of calls) {

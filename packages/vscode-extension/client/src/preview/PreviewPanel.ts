@@ -9,9 +9,7 @@
 import * as vscode from "vscode";
 import { evaluate, EvalEntity } from "../../../src/shared/dtl-evaluator";
 
-type MessageFromWebview =
-  | { type: "evaluate"; inputJson: string }
-  | { type: "ready" };
+type MessageFromWebview = { type: "evaluate"; inputJson: string } | { type: "ready" };
 
 export class PreviewPanel {
   static currentPanel: PreviewPanel | undefined;
@@ -22,18 +20,13 @@ export class PreviewPanel {
   private _document: vscode.TextDocument;
   private _disposables: vscode.Disposable[] = [];
 
-  static createOrShow(
-    extensionUri: vscode.Uri,
-    document: vscode.TextDocument,
-  ): void {
+  static createOrShow(extensionUri: vscode.Uri, document: vscode.TextDocument): void {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
     if (PreviewPanel.currentPanel) {
-      PreviewPanel.currentPanel._panel.reveal(
-        column ? column + 1 : vscode.ViewColumn.Two,
-      );
+      PreviewPanel.currentPanel._panel.reveal(column ? column + 1 : vscode.ViewColumn.Two);
       PreviewPanel.currentPanel.updateDocument(document);
       return;
     }
