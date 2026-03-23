@@ -31,6 +31,13 @@
     "onLanguage:sesam-config"
   ],
   "contributes": {
+    "iconThemes": [
+      {
+        "id": "sesam-icons",
+        "label": "Sesam Icons",
+        "path": "./fileicons/sesam-icon-theme.json"
+      }
+    ],
     "languages": [
       {
         "id": "sesam-config",
@@ -126,7 +133,7 @@
       "explorer": [
         {
           "id": "dtlGraphExplorer",
-          "name": "DTL Pipe Graph",
+          "name": "Pipe Graph",
           "when": "workspaceFolderCount > 0"
         }
       ]
