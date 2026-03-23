@@ -38,7 +38,9 @@
           "Sesam Config"
         ],
         "filenamePatterns": [
-          "*.conf.json"
+          "*.conf.json",
+          "*.conf.pipe",
+          "*.conf.system"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -116,7 +118,7 @@
         },
         {
           "command": "sesam.formatDocument",
-          "when": "editorLangId == sesam-config || editorLangId == json"
+          "when": "editorLangId == sesam-config"
         }
       ]
     },

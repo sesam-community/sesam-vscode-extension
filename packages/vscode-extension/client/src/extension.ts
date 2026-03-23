@@ -58,7 +58,9 @@ export async function activate(
         vscode.workspace.createFileSystemWatcher(
           "**/{pipes,systems}/**/*.json",
         ),
-        vscode.workspace.createFileSystemWatcher("**/*.conf.json"),
+        vscode.workspace.createFileSystemWatcher(
+          "**/*.conf.{json,pipe,system}",
+        ),
       ],
     },
     traceOutputChannel: vscode.window.createOutputChannel(
@@ -94,8 +96,9 @@ export async function activate(
   watcher.onDidDelete(() => graphProvider.refresh());
   context.subscriptions.push(watcher);
 
-  const confWatcher =
-    vscode.workspace.createFileSystemWatcher("**/*.conf.json");
+  const confWatcher = vscode.workspace.createFileSystemWatcher(
+    "**/*.conf.{json,pipe,system}",
+  );
   confWatcher.onDidCreate(() => graphProvider.refresh());
   confWatcher.onDidChange(() => graphProvider.refresh());
   confWatcher.onDidDelete(() => graphProvider.refresh());
@@ -127,11 +130,7 @@ export async function activate(
 
     vscode.commands.registerCommand("sesam.formatDocument", () => {
       const editor = vscode.window.activeTextEditor;
-      if (
-        !editor ||
-        (editor.document.languageId !== "sesam-config" &&
-          editor.document.languageId !== "json")
-      ) {
+      if (!editor || editor.document.languageId !== "sesam-config") {
         vscode.window.showWarningMessage(
           "Sesam: No active Sesam config file to format.",
         );
@@ -316,7 +315,7 @@ export async function activate(
 
         // ── Step 3: ask for _id ──────────────────────────────────────────
         const configId = await vscode.window.showInputBox({
-          prompt: "Enter the config _id (used as filename: <id>.conf.json)",
+          prompt: `Enter the config _id (used as filename: <id>${template.id === "system" ? ".conf.system" : ".conf.pipe"})`,
           placeHolder:
             template.id === "system" ? "my-rest-system" : "my-pipe-id",
           validateInput: (v) => {
@@ -365,7 +364,8 @@ export async function activate(
         }
 
         // ── Step 6: write and open ────────────────────────────────────────
-        const fileUri = vscode.Uri.joinPath(folder, `${configId}.conf.json`);
+        const ext = template.id === "system" ? ".conf.system" : ".conf.pipe";
+        const fileUri = vscode.Uri.joinPath(folder, `${configId}${ext}`);
         const text = JSON.stringify(content, null, 2) + "\n";
         await vscode.workspace.fs.writeFile(
           fileUri,
