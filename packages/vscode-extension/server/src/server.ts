@@ -53,7 +53,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
         save: { includeText: false },
       },
       completionProvider: {
-        triggerCharacters: ['"', "[", "_", "."],
+        triggerCharacters: ['"', "[", "_", ".", ":"],
         resolveProvider: false,
       },
       hoverProvider: true,
@@ -269,6 +269,93 @@ async function validateDocumentWithNode(
 }
 
 // ---------------------------------------------------------------------------
+// System-type completions data
+// ---------------------------------------------------------------------------
+interface SystemTypeInfo {
+  label: string; // full "system:xxx" value
+  detail: string;
+  doc: string;
+}
+
+const SYSTEM_TYPES: SystemTypeInfo[] = [
+  {
+    label: "system:elasticsearch",
+    detail: "Elasticsearch system",
+    doc: "Connect to an Elasticsearch cluster for indexing and querying.",
+  },
+  {
+    label: "system:kafka",
+    detail: "Kafka system",
+    doc: "Connect to an Apache Kafka broker for producing/consuming messages.",
+  },
+  {
+    label: "system:ldap",
+    detail: "LDAP system",
+    doc: "Connect to an LDAP/Active Directory server.",
+  },
+  {
+    label: "system:microservice",
+    detail: "Microservice system",
+    doc: "Manages a Docker-based microservice running inside the Sesam node.",
+  },
+  {
+    label: "system:mssql",
+    detail: "Microsoft SQL Server system",
+    doc: "Connect to a Microsoft SQL Server database.",
+  },
+  {
+    label: "system:mssql-legacy",
+    detail: "Legacy Microsoft SQL Server system",
+    doc: "Legacy connector for Microsoft SQL Server (older driver).",
+  },
+  {
+    label: "system:mysql",
+    detail: "MySQL / MariaDB system",
+    doc: "Connect to a MySQL or MariaDB database.",
+  },
+  {
+    label: "system:oracle",
+    detail: "Oracle Database system (JDBC)",
+    doc: "Connect to an Oracle Database using JDBC.",
+  },
+  {
+    label: "system:oracle_tns",
+    detail: "Oracle Database system (TNS)",
+    doc: "Connect to an Oracle Database via a TNS alias.",
+  },
+  {
+    label: "system:postgresql",
+    detail: "PostgreSQL system",
+    doc: "Connect to a PostgreSQL database.",
+  },
+  {
+    label: "system:rest",
+    detail: "REST system",
+    doc: "Generic REST/HTTP system with OAuth2, headers, operations, and retry config.",
+  },
+  {
+    label: "system:smtp",
+    detail: "SMTP system",
+    doc: "Send email via an SMTP server.",
+  },
+  {
+    label: "system:solr",
+    detail: "Apache Solr system",
+    doc: "Connect to an Apache Solr search platform.",
+  },
+  {
+    label: "system:twilio",
+    detail: "Twilio system",
+    doc: "Send SMS/voice messages via Twilio.",
+  },
+  {
+    label: "system:url",
+    detail: "URL system",
+    doc: "Simple HTTP/HTTPS system — the lightweight alternative to `system:rest`.",
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Source-type completions data
 // ---------------------------------------------------------------------------
 interface SourceTypeInfo {
@@ -382,11 +469,16 @@ connection.onCompletion(
     const offset = document.offsetAt(params.position);
 
     // Use a wider window so we can detect "source": { "type": context
-    const prefix = text.slice(Math.max(0, offset - 300), offset);
+    const prefix = text.slice(Math.max(0, offset - 2000), offset);
 
     // Source type completion: inside "source": { "type": "..."
     if (isSourceTypeContext(prefix)) {
       return buildSourceTypeCompletions();
+    }
+
+    // System type completion: root-level "type": "system:..."
+    if (isSystemTypeContext(prefix)) {
+      return buildSystemTypeCompletions();
     }
 
     // Variable completion: triggered after "_" or inside a string starting with "_"
@@ -408,6 +500,38 @@ function isSourceTypeContext(prefix: string): boolean {
   return /"source"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix);
 }
 
+function isSystemTypeContext(prefix: string): boolean {
+  // Root-level "type" field — cursor is inside the value and it starts with
+  // "system:" OR we just triggered after the opening quote / colon.
+  // The root object has brace-depth 1 (only the outermost { is open).
+  // We check: not inside a nested object (no unclosed { after the outermost one)
+  // AND cursor is typing the value of a top-level "type" key.
+  if (!/"type"\s*:\s*"[^"]*$/.test(prefix)) return false;
+  // Count net open braces — at root level this should be exactly 1
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (const c of prefix) {
+    if (esc) {
+      esc = false;
+      continue;
+    }
+    if (c === "\\" && inStr) {
+      esc = true;
+      continue;
+    }
+    if (c === '"') {
+      inStr = !inStr;
+      continue;
+    }
+    if (!inStr) {
+      if (c === "{") depth++;
+      else if (c === "}") depth--;
+    }
+  }
+  return depth === 1;
+}
+
 function isVariableContext(prefix: string): boolean {
   // Cursor is inside a string that starts with _
   return /"\s*_[STPRB]?\.?[^"]*$/.test(prefix);
@@ -416,6 +540,20 @@ function isVariableContext(prefix: string): boolean {
 function isFunctionNameContext(prefix: string): boolean {
   // After [ optionally followed by whitespace and an opening quote
   return /\[\s*"[^"]*$/.test(prefix) || /\[\s*$/.test(prefix);
+}
+
+function buildSystemTypeCompletions(): CompletionItem[] {
+  return SYSTEM_TYPES.map(({ label, detail, doc }) => ({
+    label,
+    kind: CompletionItemKind.EnumMember,
+    detail,
+    documentation: {
+      kind: MarkupKind.Markdown,
+      value: `**\`${label}\`** — ${detail}\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/systems/configuration-systems.html)`,
+    },
+    insertText: label,
+    sortText: label,
+  }));
 }
 
 function buildSourceTypeCompletions(): CompletionItem[] {
