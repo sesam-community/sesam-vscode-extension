@@ -20,13 +20,15 @@ const enum FmtContext {
 }
 
 export function sortObjectKeysRecursively(obj: unknown): unknown {
-  if (typeof obj !== "object" || obj === null) return obj;
-  if (Array.isArray(obj)) return obj.map(sortObjectKeysRecursively);
+  if (typeof obj !== "object" || obj === null) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sortObjectKeysRecursively);
+  }
   const sorted: Record<string, unknown> = {};
   for (const key of Object.keys(obj as Record<string, unknown>).sort()) {
-    sorted[key] = sortObjectKeysRecursively(
-      (obj as Record<string, unknown>)[key],
-    );
+    sorted[key] = sortObjectKeysRecursively((obj as Record<string, unknown>)[key]);
   }
   return sorted;
 }
@@ -43,8 +45,7 @@ export function formatSesamJson(value: unknown, tabSize: number): string {
   for (let i = 0; i < compact.length; i++) {
     const c = compact[i];
 
-    const peek = (): string | undefined =>
-      i < compact.length - 1 ? compact[i + 1] : undefined;
+    const peek = (): string | undefined => (i < compact.length - 1 ? compact[i + 1] : undefined);
     const peekStack = (): FmtContext => stack[stack.length - 1];
 
     // ── Context tracking ──────────────────────────────────────────────────
@@ -53,17 +54,24 @@ export function formatSesamJson(value: unknown, tabSize: number): string {
     }
 
     if (peekStack() === FmtContext.String) {
-      if (c === '"') stack.pop();
-      else if (c === "\\") stack.push(FmtContext.Escape);
+      if (c === '"') {
+        stack.pop();
+      } else if (c === "\\") {
+        stack.push(FmtContext.Escape);
+      }
     } else {
       if (c === '"') {
         stack.push(FmtContext.String);
       } else if (c === "{") {
-        if (peekStack() === FmtContext.Object) indent++;
+        if (peekStack() === FmtContext.Object) {
+          indent++;
+        }
         stack.push(FmtContext.Object);
       } else if (c === "}") {
         stack.pop();
-        if (peekStack() === FmtContext.Object) indent--;
+        if (peekStack() === FmtContext.Object) {
+          indent--;
+        }
       } else if (c === "[") {
         stack.push(FmtContext.Array);
         indent++;
@@ -87,11 +95,7 @@ export function formatSesamJson(value: unknown, tabSize: number): string {
       }
 
       // Newline before `[` when it opens an array inside another array
-      if (
-        c === "[" &&
-        stack.length > 1 &&
-        stack[stack.length - 2] === FmtContext.Array
-      ) {
+      if (c === "[" && stack.length > 1 && stack[stack.length - 2] === FmtContext.Array) {
         output += "\n";
         output += indentation.repeat(Math.max(0, indent - 1));
       }

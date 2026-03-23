@@ -82,8 +82,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "add-if(property, value)",
-    description:
-      "Adds a property to the target entity only if the value is truthy.",
+    description: "Adds a property to the target entity only if the value is truthy.",
     params: [
       {
         name: "property",
@@ -91,8 +90,7 @@ const FUNCTIONS: DtlFunction[] = [
       },
       {
         name: "value",
-        description:
-          "The value to assign. Property is not set if value is null/false.",
+        description: "The value to assign. Property is not set if value is null/false.",
       },
     ],
     minArgs: 2,
@@ -104,8 +102,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "copy(property-or-wildcard)",
-    description:
-      "Copies one or more properties from the source entity to the target entity.",
+    description: "Copies one or more properties from the source entity to the target entity.",
     params: [
       {
         name: "property-or-wildcard",
@@ -121,8 +118,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "default(property, value)",
-    description:
-      "Sets a property on the target entity only if it is not already set.",
+    description: "Sets a property on the target entity only if it is not already set.",
     params: [
       { name: "property", description: "The property name." },
       { name: "value", description: "The default value." },
@@ -136,8 +132,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "make-ni(property, namespace, value)",
-    description:
-      "Creates a namespaced identifier and adds it to the target entity.",
+    description: "Creates a namespaced identifier and adds it to the target entity.",
     params: [
       { name: "property", description: "Target property name." },
       { name: "namespace", description: "Namespace string." },
@@ -152,8 +147,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "merge(source)",
-    description:
-      "Merges all properties from the given dict/entity into the target entity.",
+    description: "Merges all properties from the given dict/entity into the target entity.",
     params: [
       {
         name: "source",
@@ -169,8 +163,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "merge-union(source)",
-    description:
-      "Merges properties using union semantics — existing list values are unioned.",
+    description: "Merges properties using union semantics — existing list values are unioned.",
     params: [{ name: "source", description: "A dict or entity." }],
     minArgs: 1,
     maxArgs: 1,
@@ -197,8 +190,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "rename(new-name, old-name)",
-    description:
-      "Copies a property from old-name to new-name on the target entity.",
+    description: "Copies a property from old-name to new-name on the target entity.",
     params: [
       { name: "new-name", description: "New property name." },
       { name: "old-name", description: "Source property path." },
@@ -213,9 +205,7 @@ const FUNCTIONS: DtlFunction[] = [
     kind: "transform",
     signature: "create(entity, ...)",
     description: "Creates one or more new root entities in the output stream.",
-    params: [
-      { name: "entity", description: "Entity or list of entities to emit." },
-    ],
+    params: [{ name: "entity", description: "Entity or list of entities to emit." }],
     minArgs: 1,
     maxArgs: null,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
@@ -225,8 +215,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "create-child(entity, ...)",
-    description:
-      "Creates child entities added to the $children field of the target entity.",
+    description: "Creates child entities added to the $children field of the target entity.",
     params: [
       {
         name: "entity",
@@ -258,8 +247,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "discard()",
-    description:
-      "Unconditionally discards the current entity from the output stream.",
+    description: "Unconditionally discards the current entity from the output stream.",
     params: [],
     minArgs: 0,
     maxArgs: 0,
@@ -293,13 +281,11 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "case([condition, transform, ...] [, default-transform])",
-    description:
-      "Evaluates each condition in order and applies the first matching transform.",
+    description: "Evaluates each condition in order and applies the first matching transform.",
     params: [
       {
         name: "...pairs",
-        description:
-          "Alternating condition/transform pairs, optional default at end.",
+        description: "Alternating condition/transform pairs, optional default at end.",
       },
     ],
     minArgs: 1,
@@ -311,14 +297,12 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "case-eq(value, [match, transform, ...] [, default-transform])",
-    description:
-      "Compares value against each match and applies the first matching transform.",
+    description: "Compares value against each match and applies the first matching transform.",
     params: [
       { name: "value", description: "The value to compare." },
       {
         name: "...pairs",
-        description:
-          "Alternating match/transform pairs, optional default at end.",
+        description: "Alternating match/transform pairs, optional default at end.",
       },
     ],
     minArgs: 2,
@@ -331,9 +315,7 @@ const FUNCTIONS: DtlFunction[] = [
     kind: "transform",
     signature: "comment(text)",
     description: "A no-op transform used for inline documentation.",
-    params: [
-      { name: "text", description: "Comment text (ignored at runtime)." },
-    ],
+    params: [{ name: "text", description: "Comment text (ignored at runtime)." }],
     minArgs: 1,
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
@@ -365,8 +347,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     kind: "transform",
     signature: "trip!(message)",
-    description:
-      "Marks the pump as failed with the given message without discarding the entity.",
+    description: "Marks the pump as failed with the given message without discarding the entity.",
     params: [{ name: "message", description: "Error message string." }],
     minArgs: 0,
     maxArgs: 1,
@@ -426,8 +407,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Boolean logic",
     kind: "expression",
     signature: "any(list, condition)",
-    description:
-      "Returns true if any item in the list satisfies the condition.",
+    description: "Returns true if any item in the list satisfies the condition.",
     params: [
       { name: "list", description: "A list to iterate over." },
       { name: "condition", description: "A boolean expression using _." },
@@ -599,11 +579,8 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Conditionals",
     kind: "expression",
     signature: "coalesce(expr, ...)",
-    description:
-      "Returns the first non-null, non-empty value from the arguments.",
-    params: [
-      { name: "expr", description: "One or more expressions to evaluate." },
-    ],
+    description: "Returns the first non-null, non-empty value from the arguments.",
+    params: [{ name: "expr", description: "One or more expressions to evaluate." }],
     minArgs: 1,
     maxArgs: null,
     docUrl: `${BASE_DOC_URL}/dtl-functions-conditionals.html`,
@@ -613,8 +590,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Conditionals",
     kind: "expression",
     signature: "coalesce-args(expr, ...)",
-    description:
-      "Returns the first non-null argument (does not flatten lists).",
+    description: "Returns the first non-null argument (does not flatten lists).",
     params: [{ name: "expr", description: "One or more expressions." }],
     minArgs: 1,
     maxArgs: null,
@@ -639,9 +615,7 @@ const FUNCTIONS: DtlFunction[] = [
     kind: "expression",
     signature: "datetime(value)",
     description: "Parses or converts value to a datetime object.",
-    params: [
-      { name: "value", description: "ISO 8601 string or transit datetime." },
-    ],
+    params: [{ name: "value", description: "ISO 8601 string or transit datetime." }],
     minArgs: 1,
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-date-and-time.html`,
@@ -684,8 +658,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Date and time",
     kind: "expression",
     signature: "datetime-diff(unit, datetime1, datetime2)",
-    description:
-      "Returns the difference between two datetimes in the given unit.",
+    description: "Returns the difference between two datetimes in the given unit.",
     params: [
       {
         name: "unit",
@@ -750,9 +723,7 @@ const FUNCTIONS: DtlFunction[] = [
     kind: "expression",
     signature: "dict(key, value, ...)",
     description: "Creates a dictionary from alternating key-value arguments.",
-    params: [
-      { name: "key-value-pairs", description: "Alternating keys and values." },
-    ],
+    params: [{ name: "key-value-pairs", description: "Alternating keys and values." }],
     minArgs: 0,
     maxArgs: null,
     docUrl: `${BASE_DOC_URL}/dtl-functions-dictionaries.html`,
@@ -784,8 +755,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Dictionaries",
     kind: "expression",
     signature: "items(dict)",
-    description:
-      "Returns key-value pairs of a dictionary as a list of [key, value] lists.",
+    description: "Returns key-value pairs of a dictionary as a list of [key, value] lists.",
     params: [{ name: "dict", description: "A dictionary value." }],
     minArgs: 1,
     maxArgs: 1,
@@ -796,8 +766,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Dictionaries",
     kind: "expression",
     signature: "key-values(dict)",
-    description:
-      'Returns key-value pairs as a list of {"key":k,"value":v} dicts.',
+    description: 'Returns key-value pairs as a list of {"key":k,"value":v} dicts.',
     params: [{ name: "dict", description: "A dictionary value." }],
     minArgs: 1,
     maxArgs: 1,
@@ -847,8 +816,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Dictionaries",
     kind: "expression",
     signature: "apply(rule-id, entity)",
-    description:
-      "Applies a named DTL rule (defined in the same pipe) to an entity.",
+    description: "Applies a named DTL rule (defined in the same pipe) to an entity.",
     params: [
       { name: "rule-id", description: "The rule identifier string." },
       { name: "entity", description: "The entity to transform." },
@@ -894,9 +862,7 @@ const FUNCTIONS: DtlFunction[] = [
     kind: "expression",
     signature: "strip-ns(dict)",
     description: "Removes namespace prefixes from all keys in a dictionary.",
-    params: [
-      { name: "dict", description: "A dictionary with namespaced keys." },
-    ],
+    params: [{ name: "dict", description: "A dictionary with namespaced keys." }],
     minArgs: 1,
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-dictionaries.html`,
@@ -988,13 +954,11 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Hops",
     kind: "expression",
     signature: "hops(hops-spec)",
-    description:
-      "Performs a hop to retrieve related entities from another dataset.",
+    description: "Performs a hop to retrieve related entities from another dataset.",
     params: [
       {
         name: "hops-spec",
-        description:
-          'Object with "datasets", "where", and optionally "return" and "max-depth".',
+        description: 'Object with "datasets", "where", and optionally "return" and "max-depth".',
       },
     ],
     minArgs: 1,
@@ -1085,8 +1049,7 @@ const FUNCTIONS: DtlFunction[] = [
       { name: "list", description: "A list to iterate over." },
       {
         name: "expr",
-        description:
-          "Expression evaluated for each element (use _ for current).",
+        description: "Expression evaluated for each element (use _ for current).",
       },
     ],
     minArgs: 2,
@@ -1098,8 +1061,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Lists",
     kind: "expression",
     signature: "map-dict(key-fn, value-fn, list)",
-    description:
-      "Builds a dictionary by applying key-fn and value-fn to each list element.",
+    description: "Builds a dictionary by applying key-fn and value-fn to each list element.",
     params: [
       {
         name: "key-fn",
@@ -1193,9 +1155,7 @@ const FUNCTIONS: DtlFunction[] = [
     kind: "expression",
     signature: "flatten(list)",
     description: "Flattens one level of nested lists into a single list.",
-    params: [
-      { name: "list", description: "A list that may contain nested lists." },
-    ],
+    params: [{ name: "list", description: "A list that may contain nested lists." }],
     minArgs: 1,
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-lists.html`,
@@ -1216,8 +1176,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Lists",
     kind: "expression",
     signature: "group(list)",
-    description:
-      "Groups a list of [key, value] pairs into a dict of key → [values].",
+    description: "Groups a list of [key, value] pairs into a dict of key → [values].",
     params: [{ name: "list", description: "A list of [key, value] pairs." }],
     minArgs: 1,
     maxArgs: 1,
@@ -1638,8 +1597,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Misc",
     kind: "expression",
     signature: "completeness(value)",
-    description:
-      "Returns a completeness score for value (fraction of non-null leaf values).",
+    description: "Returns a completeness score for value (fraction of non-null leaf values).",
     params: [{ name: "value", description: "A dict or entity." }],
     minArgs: 1,
     maxArgs: 1,
@@ -1650,8 +1608,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Misc",
     kind: "expression",
     signature: "is-changed(property)",
-    description:
-      "Returns true if the source property value differs from the previous version.",
+    description: "Returns true if the source property value differs from the previous version.",
     params: [{ name: "property", description: "A property path expression." }],
     minArgs: 1,
     maxArgs: 1,
@@ -1678,8 +1635,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Namespaced identifiers",
     kind: "expression",
     signature: "ni-id(ni)",
-    description:
-      "Extracts the local identifier part from a namespaced identifier.",
+    description: "Extracts the local identifier part from a namespaced identifier.",
     params: [{ name: "ni", description: "A namespaced identifier." }],
     minArgs: 1,
     maxArgs: 1,
@@ -1923,9 +1879,7 @@ const FUNCTIONS: DtlFunction[] = [
     kind: "expression",
     signature: "concat(value, ...)",
     description: "Concatenates values into a single string.",
-    params: [
-      { name: "value", description: "One or more values to concatenate." },
-    ],
+    params: [{ name: "value", description: "One or more values to concatenate." }],
     minArgs: 1,
     maxArgs: null,
     docUrl: `${BASE_DOC_URL}/dtl-functions-strings.html`,
@@ -2018,8 +1972,7 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Strings",
     kind: "expression",
     signature: "replace(search, replacement, string)",
-    description:
-      "Replaces all occurrences of search with replacement in string.",
+    description: "Replaces all occurrences of search with replacement in string.",
     params: [
       { name: "search", description: "String to find." },
       { name: "replacement", description: "Replacement string." },

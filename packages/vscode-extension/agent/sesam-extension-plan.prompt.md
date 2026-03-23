@@ -18,9 +18,10 @@
   - [8. Connector Development Tools](#8-connector-development-tools)
   - [9. Copilot Agent Participant](#9-copilot-agent-participant-sesam)
   - [10. Inline Output & Diagnostics](#10-inline-output--diagnostics-from-node)
+- [Code Style](#code-style)
 - [Key Files to Modify/Add](#key-files-to-modifyadd)
 - [Phased Rollout](#phased-rollout)
-  - [Phase 1: MVP](#phase-1--mvp-the-daily-command-loop)
+  - [Phase 1: MVP](#phase-1--mvp-editor-intelligence--navigation)
   - [Phase 2: Testing & Diff](#phase-2--close-the-testing--diff-loop)
   - [Phase 3: Node Connectivity](#phase-3--node-connectivity)
   - [Phase 4: AI & Visual Polish](#phase-4--ai--visual-polish)
@@ -134,6 +135,12 @@ All three sesam-py config files below are created manually by developers in thei
 - After `sesam download`, show diff notification with one-click open
 - Surface node-side errors as diagnostics in the editor
 
+## Code Style
+
+- **Array functions over loops** — prefer `map`, `filter`, `reduce`, `flatMap`, `find`, `every`, `some` over `for`/`while` loops
+- **Parentheses in conditions** — always wrap `if` / `else if` conditions in parentheses; also wrap ternary conditions when they contain operators
+- **Functional Programming** — favour pure functions (no side-effects, same input → same output), immutability (`const`, spread instead of mutation), and function composition over classes with mutable state where practical
+
 ## Key Files to Modify/Add
 
 - `client/src/extension.ts` : register all new commands, status bar, task provider
@@ -149,16 +156,18 @@ All three sesam-py config files below are created manually by developers in thei
 
 ## Phased Rollout
 
-### Phase 1 : MVP: The Daily Command Loop
-> Goal: ship a zero-install experience and eliminate the terminal context-switch for the core sesam-py workflow.
+### Phase 1 : MVP: Editor Intelligence & Navigation
+> Goal: make the editor the best place to read, write, and navigate Sesam pipe configs — no node connection required.
 
-- **0. Bundle sesam-py** : reimplement sesam-py as `@sesam/cli` (TypeScript/Node.js npm package) and bundle it inside the extension; `dtl.sesampy.executablePath` setting lets advanced users override with a custom binary
-- **1. sesam-py Command Integration** : upload, download, run, test, verify, validate, status, format, wipe, stop from Command Palette + status bar
-- **2. Config File Intelligence** : schema + IntelliSense for `.syncconfig`, `.sesamconfig.json`, `.authconfig`, `.jinja_vars` (quick wins, zero setup required)
-- **3. Secure Credential Management** : move JWTs out of plaintext files into SecretStorage; warn on committed credentials
+- **Pipe Graph** *(rename from "DTL Pipe Graph")*: rename sidebar view to "Pipe Graph"; remove the "DTL" prefix everywhere in the UI
+- **Config file format**: drop `.conf.pipe` / `.conf.system` suffixes — use `.conf.json` for all config files; update language association, icon theme, and `newConfFile` command accordingly
+- **Pipe Graph — cross-pipe navigation**: clicking a dataset name in a pipe's `source` or a `hops` entry navigates to the referenced pipe's config file; requires resolving dataset → pipe mapping from the local `pipes/` folder
+- **Outline — DTL rules**: document symbol provider shows each named rule-set as a collapsible node in the Outline panel, with individual DTL transform calls as children; allows keyboard navigation between rules without scrolling
+- **Preview**: drop the inline DTL rules panel from the preview webview — users read transforms directly in the source file; keep entity-flow visualisation
+- **Copilot tools**: expose extension capabilities as VS Code Language Model Tools (the `lm.registerTool` API) so that Copilot agents and `@sesam` participants can call them — e.g. `sesam.validatePipe`, `sesam.resolvePipeGraph`, `sesam.evaluateDtl`
 
-**New files:** `SesamRunner.ts`, `CredentialManager.ts`
-**Build change:** add platform binary download step to `vite.config.client.ts` / CI pipeline
+**Changed files:** `PipeGraphProvider.ts`, `PreviewPanel.ts`, `extension.ts`, `package.json`, language config + icon theme
+**New file:** `client/src/tools/SesamLmTools.ts`
 
 ### Phase 2 : Close the Testing & Diff Loop
 > Goal: surface test results and config drift directly in the editor.

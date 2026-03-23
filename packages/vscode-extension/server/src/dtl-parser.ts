@@ -56,18 +56,15 @@ function offsetToPosition(text: string, offset: number): DtlPosition {
  * We use a token-scanning approach rather than full JSON.parse so we can
  * retain character positions that JSON.parse drops.
  */
-export function parseDtlText(
-  text: string,
-  fileExtension: "dtl" | "json",
-): ParseResult {
+export function parseDtlText(text: string, fileExtension: "dtl" | "json"): ParseResult {
   const calls: DtlCall[] = [];
   const errors: string[] = [];
 
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(text);
-  } catch (e) {
-    // Document not valid JSON yet — skip validation
+  } catch {
+    // Document not valid JSON yet — skip validation quietly
     return { calls, errors };
   }
 
@@ -86,6 +83,7 @@ export function parseDtlText(
       "transform" in (parsedJson as Record<string, unknown>)
     ) {
       // Full pipe config stored as .dtl — support both shapes
+      walker.seekToKey("transform");
       const transform = (parsedJson as Record<string, unknown>)["transform"];
       extractTransformCalls(transform, walker, calls, errors);
     }
@@ -93,11 +91,13 @@ export function parseDtlText(
     // JSON file: look for transform rules
     if (typeof parsedJson === "object" && parsedJson !== null) {
       const obj = parsedJson as Record<string, unknown>;
+      walker.seekToKey("transform");
       extractTransformCalls(obj["transform"], walker, calls, errors);
     } else if (Array.isArray(parsedJson)) {
       // Array of pipe configs
       for (const item of parsedJson as unknown[]) {
         if (typeof item === "object" && item !== null) {
+          walker.seekToKey("transform");
           extractTransformCalls(
             (item as Record<string, unknown>)["transform"],
             walker,
@@ -118,23 +118,41 @@ function extractTransformCalls(
   calls: DtlCall[],
   errors: string[],
 ): void {
-  if (!transform || typeof transform !== "object") return;
+  if (!transform || typeof transform !== "object") {
+    return;
+  }
+
+  // Array of transform steps: [{ type: "dtl", rules: {...} }, ...]
+  // OR shorthand inline rules list: [["add", ...], ...]
+  if (Array.isArray(transform)) {
+    const steps = transform as unknown[];
+    if (steps.length > 0 && typeof steps[0] === "object" && !Array.isArray(steps[0])) {
+      // Each element is a transform step object. Consume the outer "[" of the
+      // transform array so that inner rule-list scans don't misidentify it.
+      const exitArray = walker.enterArray();
+      for (const step of steps) {
+        extractTransformCalls(step, walker, calls, errors);
+      }
+      exitArray?.();
+    } else {
+      // Treat as a bare list of DTL call arrays
+      walker.walkRulesList(steps, true, calls, errors);
+    }
+    return;
+  }
 
   const t = transform as Record<string, unknown>;
 
   // Standard DTL transform: { "type": "dtl", "rules": { "default": [...] } }
   if (t["rules"] && typeof t["rules"] === "object") {
+    walker.seekToKey("rules");
     const rules = t["rules"] as Record<string, unknown>;
     for (const ruleName of Object.keys(rules)) {
       if (Array.isArray(rules[ruleName])) {
+        walker.seekToKey(ruleName);
         walker.walkRulesList(rules[ruleName] as unknown[], true, calls, errors);
       }
     }
-  }
-
-  // Shorthand inline rules array
-  if (Array.isArray(transform)) {
-    walker.walkRulesList(transform as unknown[], true, calls, errors);
   }
 }
 
@@ -151,32 +169,73 @@ class DtlWalker {
     this.text = text;
   }
 
-  walkRulesList(
-    rules: unknown[],
-    isTopLevel: boolean,
-    calls: DtlCall[],
-    errors: string[],
-  ): void {
-    for (const rule of rules) {
-      if (!Array.isArray(rule)) continue;
-      this.walkDtlArray(rule as unknown[], isTopLevel, calls, errors);
+  /**
+   * Seek scanPos to just after the `"key":` pattern in the text, starting from
+   * the current scanPos. Returns true if found, false if not found (scanPos
+   * unchanged). Use this to align the scanner before entering a known JSON key.
+   */
+  seekToKey(key: string): boolean {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`"${escaped}"\\s*:`);
+    const match = pattern.exec(this.text.slice(this.scanPos));
+    if (match) {
+      this.scanPos = this.scanPos + match.index + match[0].length;
+      return true;
     }
+    return false;
   }
 
-  walkDtlArray(
-    arr: unknown[],
-    isTopLevel: boolean,
-    calls: DtlCall[],
-    errors: string[],
-  ): void {
-    if (arr.length === 0) return;
+  /**
+   * Advance the scanner past the next "[" without recording a DtlCall and
+   * return a callback that advances past the matching "]". Use this to bracket
+   * a traversal of a non-rule array (e.g. a transform step array `[{...}]`).
+   */
+  enterArray(): (() => void) | null {
+    const open = this.findNextArrayStart();
+    if (open === -1) {
+      return null;
+    }
+    const close = this.findMatchingClose(open);
+    this.scanPos = open + 1;
+    return () => {
+      this.scanPos = close + 1;
+    };
+  }
+
+  walkRulesList(rules: unknown[], isTopLevel: boolean, calls: DtlCall[], errors: string[]): void {
+    // Consume the outer "[" that wraps this rules list in the raw text so that
+    // each subsequent walkDtlArray call correctly locates its own "[" rather
+    // than mis-matching against the outer bracket.
+    const outerOpen = this.findNextArrayStart();
+    if (outerOpen === -1) {
+      return;
+    }
+    const outerClose = this.findMatchingClose(outerOpen);
+    this.scanPos = outerOpen + 1;
+
+    for (const rule of rules) {
+      if (!Array.isArray(rule)) {
+        continue;
+      }
+      this.walkDtlArray(rule as unknown[], isTopLevel, calls, errors);
+    }
+
+    this.scanPos = outerClose + 1;
+  }
+
+  walkDtlArray(arr: unknown[], isTopLevel: boolean, calls: DtlCall[], errors: string[]): void {
+    if (arr.length === 0) {
+      return;
+    }
 
     const firstName = typeof arr[0] === "string" ? (arr[0] as string) : null;
     const argCount = arr.length - 1;
 
     // Find the position of this array in the raw text
     const arrayStart = this.findNextArrayStart();
-    if (arrayStart === -1) return;
+    if (arrayStart === -1) {
+      return;
+    }
 
     const arrayEnd = this.findMatchingClose(arrayStart);
 
@@ -222,7 +281,9 @@ class DtlWalker {
 
   private findNextArrayStart(): number {
     for (let i = this.scanPos; i < this.text.length; i++) {
-      if (this.text[i] === "[") return i;
+      if (this.text[i] === "[") {
+        return i;
+      }
     }
     return -1;
   }
@@ -245,11 +306,17 @@ class DtlWalker {
         inString = !inString;
         continue;
       }
-      if (inString) continue;
-      if (ch === "[" || ch === "{") depth++;
+      if (inString) {
+        continue;
+      }
+      if (ch === "[" || ch === "{") {
+        depth++;
+      }
       if (ch === "]" || ch === "}") {
         depth--;
-        if (depth === 0) return i;
+        if (depth === 0) {
+          return i;
+        }
       }
     }
     return this.text.length - 1;
@@ -260,7 +327,9 @@ class DtlWalker {
     const searchFrom = arrayStart + 1;
     const idx = this.text.indexOf(target, searchFrom);
     // Make sure it's close enough to the array start (within a few tokens)
-    if (idx !== -1 && idx < arrayStart + target.length + 5) return idx;
+    if (idx !== -1 && idx < arrayStart + target.length + 5) {
+      return idx;
+    }
     return idx;
   }
 }

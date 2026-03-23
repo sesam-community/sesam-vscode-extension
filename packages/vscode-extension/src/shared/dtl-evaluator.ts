@@ -13,15 +13,9 @@
 export interface DtlObject {
   [key: string]: DtlValue;
 }
-export type DtlValue =
-  | string
-  | number
-  | boolean
-  | null
-  | DtlValue[]
-  | DtlObject;
+export type DtlValue = string | number | boolean | null | DtlValue[] | DtlObject;
 
-export interface EvalEntity extends DtlObject {}
+export type EvalEntity = DtlObject;
 
 export type EvalStatus = "ok" | "discarded" | "error";
 
@@ -32,10 +26,10 @@ export interface EvalResult {
 }
 
 interface EvalContext {
-  source: EvalEntity;
-  target: EvalEntity;
+  source: DtlObject;
+  target: DtlObject;
   current?: DtlValue; // _
-  parent?: EvalEntity; // _P
+  parent?: DtlObject; // _P
   warnings: string[];
 }
 
@@ -43,10 +37,7 @@ interface EvalContext {
 // Public API
 // ---------------------------------------------------------------------------
 
-export function evaluate(
-  rules: unknown[],
-  inputEntity: EvalEntity,
-): EvalResult {
+export function evaluate(rules: unknown[], inputEntity: EvalEntity): EvalResult {
   const ctx: EvalContext = {
     source: inputEntity,
     target: {},
@@ -76,10 +67,14 @@ export function evaluate(
 // ---------------------------------------------------------------------------
 
 function applyTransform(rule: unknown, ctx: EvalContext): "discard" | void {
-  if (!Array.isArray(rule) || rule.length === 0) return;
+  if (!Array.isArray(rule) || rule.length === 0) {
+    return;
+  }
 
   const name = rule[0];
-  if (typeof name !== "string") return;
+  if (typeof name !== "string") {
+    return;
+  }
 
   const args = rule.slice(1);
 
@@ -121,7 +116,9 @@ function applyTransform(rule: unknown, ctx: EvalContext): "discard" | void {
     case "remove": {
       const [pattern] = args;
       if (pattern === "*") {
-        for (const k of Object.keys(ctx.target)) delete ctx.target[k];
+        for (const k of Object.keys(ctx.target)) {
+          delete ctx.target[k];
+        }
       } else if (typeof pattern === "string") {
         delete ctx.target[pattern];
       }
@@ -146,7 +143,9 @@ function applyTransform(rule: unknown, ctx: EvalContext): "discard" | void {
 
     case "filter": {
       const condition = evalExpr(args[0], ctx);
-      if (!condition) return "discard";
+      if (!condition) {
+        return "discard";
+      }
       return;
     }
 
@@ -207,14 +206,8 @@ function applyTransform(rule: unknown, ctx: EvalContext): "discard" | void {
       const dict = evalExpr(args[0], ctx);
       if (dict && typeof dict === "object" && !Array.isArray(dict)) {
         for (const [k, v] of Object.entries(dict)) {
-          if (
-            k in ctx.target &&
-            Array.isArray(ctx.target[k]) &&
-            Array.isArray(v)
-          ) {
-            ctx.target[k] = [
-              ...new Set([...(ctx.target[k] as DtlValue[]), ...v]),
-            ];
+          if (k in ctx.target && Array.isArray(ctx.target[k]) && Array.isArray(v)) {
+            ctx.target[k] = [...new Set([...(ctx.target[k] as DtlValue[]), ...v])];
           } else {
             ctx.target[k] = v as DtlValue;
           }
@@ -224,9 +217,7 @@ function applyTransform(rule: unknown, ctx: EvalContext): "discard" | void {
     }
 
     default: {
-      ctx.warnings.push(
-        `Unsupported transform "${name}" — skipped (may require live node).`,
-      );
+      ctx.warnings.push(`Unsupported transform "${name}" — skipped (may require live node).`);
       return;
     }
   }
@@ -266,51 +257,52 @@ function evalExpr(expr: unknown, ctx: EvalContext): DtlValue {
 
 function evalStringExpr(str: string, ctx: EvalContext): DtlValue {
   // _S.property or _S (whole source entity)
-  if (str === "_S") return ctx.source as unknown as DtlValue;
+  if (str === "_S") {
+    return ctx.source as unknown as DtlValue;
+  }
   if (str.startsWith("_S.")) {
     return getProp(ctx.source, str.slice(3));
   }
   // _T.property
-  if (str === "_T") return ctx.target as unknown as DtlValue;
+  if (str === "_T") {
+    return ctx.target as unknown as DtlValue;
+  }
   if (str.startsWith("_T.")) {
     return getProp(ctx.target, str.slice(3));
   }
   // _P — parent (not supported in preview)
   if (str === "_P" || str.startsWith("_P.")) {
-    return getProp(
-      ctx.parent ?? ({} as EvalEntity),
-      str.startsWith("_P.") ? str.slice(3) : "",
-    );
+    return getProp(ctx.parent ?? ({} as DtlObject), str.startsWith("_P.") ? str.slice(3) : "");
   }
   // _ — current value
-  if (str === "_") return ctx.current ?? null;
+  if (str === "_") {
+    return ctx.current ?? null;
+  }
 
   // Literal string
   return str;
 }
 
-function getProp(
-  entity: EvalEntity | Record<string, DtlValue>,
-  path: string,
-): DtlValue {
+function getProp(entity: DtlObject | Record<string, DtlValue>, path: string): DtlValue {
   const parts = path.split(".");
   let current: DtlValue = entity as unknown as DtlValue;
   for (const part of parts) {
-    if (
-      current === null ||
-      typeof current !== "object" ||
-      Array.isArray(current)
-    )
+    if (current === null || typeof current !== "object" || Array.isArray(current)) {
       return null;
+    }
     current = (current as Record<string, DtlValue>)[part] ?? null;
   }
   return current;
 }
 
 function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
-  if (arr.length === 0) return null;
+  if (arr.length === 0) {
+    return null;
+  }
   const name = arr[0];
-  if (typeof name !== "string") return null;
+  if (typeof name !== "string") {
+    return null;
+  }
   const args = arr.slice(1);
 
   switch (name) {
@@ -329,11 +321,7 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
       return String(evalExpr(args[0], ctx) ?? "").trimEnd();
     case "length": {
       const v = evalExpr(args[0], ctx);
-      return typeof v === "string"
-        ? v.length
-        : Array.isArray(v)
-          ? v.length
-          : null;
+      return typeof v === "string" ? v.length : Array.isArray(v) ? v.length : null;
     }
     case "replace": {
       const [s, r, str] = args.map((a) => String(evalExpr(a, ctx) ?? ""));
@@ -342,8 +330,7 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     case "substring": {
       const s = String(evalExpr(args[0], ctx) ?? "");
       const start = Number(evalExpr(args[1], ctx) ?? 0);
-      const end =
-        args[2] !== undefined ? Number(evalExpr(args[2], ctx)) : undefined;
+      const end = args[2] !== undefined ? Number(evalExpr(args[2], ctx)) : undefined;
       return s.slice(start, end);
     }
     case "split": {
@@ -353,7 +340,9 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     case "join": {
       const sep = String(evalExpr(args[0], ctx) ?? "");
       const list = evalExpr(args[1], ctx);
-      if (!Array.isArray(list)) return null;
+      if (!Array.isArray(list)) {
+        return null;
+      }
       return list.map((v) => String(v ?? "")).join(sep);
     }
     case "string":
@@ -388,21 +377,13 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     case "neq":
       return evalExpr(args[0], ctx) !== evalExpr(args[1], ctx);
     case "gt":
-      return (
-        (evalExpr(args[0], ctx) as number) > (evalExpr(args[1], ctx) as number)
-      );
+      return (evalExpr(args[0], ctx) as number) > (evalExpr(args[1], ctx) as number);
     case "gte":
-      return (
-        (evalExpr(args[0], ctx) as number) >= (evalExpr(args[1], ctx) as number)
-      );
+      return (evalExpr(args[0], ctx) as number) >= (evalExpr(args[1], ctx) as number);
     case "lt":
-      return (
-        (evalExpr(args[0], ctx) as number) < (evalExpr(args[1], ctx) as number)
-      );
+      return (evalExpr(args[0], ctx) as number) < (evalExpr(args[1], ctx) as number);
     case "lte":
-      return (
-        (evalExpr(args[0], ctx) as number) <= (evalExpr(args[1], ctx) as number)
-      );
+      return (evalExpr(args[0], ctx) as number) <= (evalExpr(args[1], ctx) as number);
 
     // ── Boolean logic
     case "and":
@@ -413,27 +394,25 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
       return !evalExpr(args[0], ctx);
     case "all": {
       const list = evalExpr(args[0], ctx);
-      if (!Array.isArray(list)) return false;
+      if (!Array.isArray(list)) {
+        return false;
+      }
       return list.every((item) =>
         Boolean(evalExpr(args[1], { ...ctx, current: item as DtlValue })),
       );
     }
     case "any": {
       const list = evalExpr(args[0], ctx);
-      if (!Array.isArray(list)) return false;
-      return list.some((item) =>
-        Boolean(evalExpr(args[1], { ...ctx, current: item as DtlValue })),
-      );
+      if (!Array.isArray(list)) {
+        return false;
+      }
+      return list.some((item) => Boolean(evalExpr(args[1], { ...ctx, current: item as DtlValue })));
     }
 
     // ── Conditionals / Nulls
     case "if": {
       const cond = evalExpr(args[0], ctx);
-      return cond
-        ? evalExpr(args[1], ctx)
-        : args[2] !== undefined
-          ? evalExpr(args[2], ctx)
-          : null;
+      return cond ? evalExpr(args[1], ctx) : args[2] !== undefined ? evalExpr(args[2], ctx) : null;
     }
     case "if-null": {
       const v = evalExpr(args[0], ctx);
@@ -443,7 +422,9 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     case "coalesce-args": {
       for (const a of args) {
         const v = evalExpr(a, ctx);
-        if (v !== null && v !== undefined) return v;
+        if (v !== null && v !== undefined) {
+          return v;
+        }
       }
       return null;
     }
@@ -462,8 +443,7 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
       return Number.isInteger(evalExpr(args[0], ctx));
     case "is-float":
       return (
-        typeof evalExpr(args[0], ctx) === "number" &&
-        !Number.isInteger(evalExpr(args[0], ctx))
+        typeof evalExpr(args[0], ctx) === "number" && !Number.isInteger(evalExpr(args[0], ctx))
       );
     case "is-boolean":
       return typeof evalExpr(args[0], ctx) === "boolean";
@@ -472,42 +452,26 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
 
     // ── Math
     case "+":
-      return args.reduce(
-        (acc, a) => (acc as number) + (evalExpr(a, ctx) as number),
-        0,
-      ) as number;
+      return args.reduce((acc, a) => (acc as number) + (evalExpr(a, ctx) as number), 0) as number;
     case "plus":
-      return (
-        (evalExpr(args[0], ctx) as number) + (evalExpr(args[1], ctx) as number)
-      );
+      return (evalExpr(args[0], ctx) as number) + (evalExpr(args[1], ctx) as number);
     case "-":
     case "minus":
       return args.length === 1
         ? -(evalExpr(args[0], ctx) as number)
-        : (evalExpr(args[0], ctx) as number) -
-            (evalExpr(args[1], ctx) as number);
+        : (evalExpr(args[0], ctx) as number) - (evalExpr(args[1], ctx) as number);
     case "*":
     case "multiply":
-      return args.reduce(
-        (acc, a) => (acc as number) * (evalExpr(a, ctx) as number),
-        1,
-      ) as number;
+      return args.reduce((acc, a) => (acc as number) * (evalExpr(a, ctx) as number), 1) as number;
     case "/":
     case "divide":
-      return (
-        (evalExpr(args[0], ctx) as number) / (evalExpr(args[1], ctx) as number)
-      );
+      return (evalExpr(args[0], ctx) as number) / (evalExpr(args[1], ctx) as number);
     case "%":
     case "mod":
-      return (
-        (evalExpr(args[0], ctx) as number) % (evalExpr(args[1], ctx) as number)
-      );
+      return (evalExpr(args[0], ctx) as number) % (evalExpr(args[1], ctx) as number);
     case "^":
     case "pow":
-      return Math.pow(
-        evalExpr(args[0], ctx) as number,
-        evalExpr(args[1], ctx) as number,
-      );
+      return Math.pow(evalExpr(args[0], ctx) as number, evalExpr(args[1], ctx) as number);
     case "abs":
       return Math.abs(evalExpr(args[0], ctx) as number);
     case "ceil":
@@ -516,8 +480,7 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
       return Math.floor(evalExpr(args[0], ctx) as number);
     case "round": {
       const v = evalExpr(args[0], ctx) as number;
-      const digits =
-        args[1] !== undefined ? (evalExpr(args[1], ctx) as number) : 0;
+      const digits = args[1] !== undefined ? (evalExpr(args[1], ctx) as number) : 0;
       const factor = Math.pow(10, digits);
       return Math.round(v * factor) / factor;
     }
@@ -535,14 +498,16 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
       return args.map((a) => evalExpr(a, ctx));
     case "map": {
       const list = evalExpr(args[0], ctx);
-      if (!Array.isArray(list)) return [];
-      return list.map((item) =>
-        evalExpr(args[1], { ...ctx, current: item as DtlValue }),
-      );
+      if (!Array.isArray(list)) {
+        return [];
+      }
+      return list.map((item) => evalExpr(args[1], { ...ctx, current: item as DtlValue }));
     }
     case "filter": {
       const list = evalExpr(args[0], ctx);
-      if (!Array.isArray(list)) return [];
+      if (!Array.isArray(list)) {
+        return [];
+      }
       return list.filter((item) =>
         Boolean(evalExpr(args[1], { ...ctx, current: item as DtlValue })),
       );
@@ -561,14 +526,16 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     }
     case "distinct": {
       const v = evalExpr(args[0], ctx);
-      if (!Array.isArray(v)) return v;
-      return [...new Set(v.map((x) => JSON.stringify(x)))].map((x) =>
-        JSON.parse(x),
-      );
+      if (!Array.isArray(v)) {
+        return v;
+      }
+      return [...new Set(v.map((x) => JSON.stringify(x)))].map((x) => JSON.parse(x));
     }
     case "flatten": {
       const v = evalExpr(args[0], ctx);
-      if (!Array.isArray(v)) return v;
+      if (!Array.isArray(v)) {
+        return v;
+      }
       return v.flat(1);
     }
     case "combine": {
@@ -577,12 +544,16 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     }
     case "sorted": {
       const v = evalExpr(args[0], ctx);
-      if (!Array.isArray(v)) return v;
+      if (!Array.isArray(v)) {
+        return v;
+      }
       return [...v].sort((a, b) => ((a as string) > (b as string) ? 1 : -1));
     }
     case "sorted-descending": {
       const v = evalExpr(args[0], ctx);
-      if (!Array.isArray(v)) return v;
+      if (!Array.isArray(v)) {
+        return v;
+      }
       return [...v].sort((a, b) => ((a as string) < (b as string) ? 1 : -1));
     }
     case "reversed": {
@@ -591,21 +562,15 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     }
     case "sum": {
       const v = evalExpr(args[0], ctx);
-      return Array.isArray(v)
-        ? v.reduce((acc, x) => (acc as number) + (x as number), 0)
-        : null;
+      return Array.isArray(v) ? v.reduce((acc, x) => (acc as number) + (x as number), 0) : null;
     }
     case "min": {
       const v = evalExpr(args[0], ctx);
-      return Array.isArray(v)
-        ? v.reduce((a, b) => ((a as number) < (b as number) ? a : b))
-        : null;
+      return Array.isArray(v) ? v.reduce((a, b) => ((a as number) < (b as number) ? a : b)) : null;
     }
     case "max": {
       const v = evalExpr(args[0], ctx);
-      return Array.isArray(v)
-        ? v.reduce((a, b) => ((a as number) > (b as number) ? a : b))
-        : null;
+      return Array.isArray(v) ? v.reduce((a, b) => ((a as number) > (b as number) ? a : b)) : null;
     }
     case "in": {
       const val = evalExpr(args[0], ctx);
@@ -619,14 +584,14 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     }
     case "range": {
       const a = evalExpr(args[0], ctx) as number;
-      const b =
-        args[1] !== undefined ? (evalExpr(args[1], ctx) as number) : null;
-      const step =
-        args[2] !== undefined ? (evalExpr(args[2], ctx) as number) : 1;
+      const b = args[1] !== undefined ? (evalExpr(args[1], ctx) as number) : null;
+      const step = args[2] !== undefined ? (evalExpr(args[2], ctx) as number) : 1;
       const start = b === null ? 0 : a;
       const end = b === null ? a : b;
       const result: number[] = [];
-      for (let i = start; i < end; i += step) result.push(i);
+      for (let i = start; i < end; i += step) {
+        result.push(i);
+      }
       return result;
     }
     case "is-empty": {
@@ -641,7 +606,9 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
       return Array.isArray(evalExpr(args[0], ctx));
     case "enumerate": {
       const v = evalExpr(args[0], ctx);
-      if (!Array.isArray(v)) return [];
+      if (!Array.isArray(v)) {
+        return [];
+      }
       return v.map((item, i) => [i, item]);
     }
 
@@ -656,15 +623,11 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     }
     case "keys": {
       const d = evalExpr(args[0], ctx);
-      return d && typeof d === "object" && !Array.isArray(d)
-        ? Object.keys(d)
-        : null;
+      return d && typeof d === "object" && !Array.isArray(d) ? Object.keys(d) : null;
     }
     case "values": {
       const d = evalExpr(args[0], ctx);
-      return d && typeof d === "object" && !Array.isArray(d)
-        ? Object.values(d)
-        : null;
+      return d && typeof d === "object" && !Array.isArray(d) ? Object.values(d) : null;
     }
     case "has-key": {
       const d = evalExpr(args[0], ctx);
@@ -678,8 +641,9 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     case "path": {
       const pathStr = String(evalExpr(args[0], ctx) ?? "");
       const entity = evalExpr(args[1], ctx);
-      if (!entity || typeof entity !== "object" || Array.isArray(entity))
+      if (!entity || typeof entity !== "object" || Array.isArray(entity)) {
         return null;
+      }
       return getProp(entity as EvalEntity, pathStr);
     }
 
@@ -693,29 +657,35 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     case "union": {
       const a = evalExpr(args[0], ctx);
       const b = evalExpr(args[1], ctx);
-      if (!Array.isArray(a) || !Array.isArray(b)) return null;
-      return [...new Set([...a, ...b].map((x) => JSON.stringify(x)))].map((x) =>
-        JSON.parse(x),
-      );
+      if (!Array.isArray(a) || !Array.isArray(b)) {
+        return null;
+      }
+      return [...new Set([...a, ...b].map((x) => JSON.stringify(x)))].map((x) => JSON.parse(x));
     }
     case "intersection": {
       const a = evalExpr(args[0], ctx);
       const b = evalExpr(args[1], ctx);
-      if (!Array.isArray(a) || !Array.isArray(b)) return null;
+      if (!Array.isArray(a) || !Array.isArray(b)) {
+        return null;
+      }
       const setB = new Set(b.map((x) => JSON.stringify(x)));
       return a.filter((x) => setB.has(JSON.stringify(x)));
     }
     case "difference": {
       const a = evalExpr(args[0], ctx);
       const b = evalExpr(args[1], ctx);
-      if (!Array.isArray(a) || !Array.isArray(b)) return null;
+      if (!Array.isArray(a) || !Array.isArray(b)) {
+        return null;
+      }
       const setB = new Set(b.map((x) => JSON.stringify(x)));
       return a.filter((x) => !setB.has(JSON.stringify(x)));
     }
     case "intersects": {
       const a = evalExpr(args[0], ctx);
       const b = evalExpr(args[1], ctx);
-      if (!Array.isArray(a) || !Array.isArray(b)) return false;
+      if (!Array.isArray(a) || !Array.isArray(b)) {
+        return false;
+      }
       const setB = new Set(b.map((x) => JSON.stringify(x)));
       return a.some((x) => setB.has(JSON.stringify(x)));
     }
@@ -758,9 +728,7 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
     case "base64-decode":
     case "completeness":
     case "is-changed": {
-      ctx.warnings.push(
-        `⚠ "${name}" requires a live Sesam node — returning null in preview.`,
-      );
+      ctx.warnings.push(`⚠ "${name}" requires a live Sesam node — returning null in preview.`);
       return null;
     }
 

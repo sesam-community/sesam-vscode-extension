@@ -28,11 +28,7 @@ describe("parseDtlText — dtl extension", () => {
     expect(topLevel!.argCount).toBe(2);
   });
 
-  it("parses multiple top-level rules — first rule captured (best-effort scanner)", () => {
-    // The parser uses a linear scan-position tracker. After processing the first
-    // top-level rule the scan position advances past the outer closing ']', so
-    // subsequent sibling rules in the same file are not captured. This is a known
-    // best-effort limitation documented in dtl-parser.ts.
+  it("parses multiple top-level rules", () => {
     const text = `[
       ["add", "_T.a", 1],
       ["copy", "*"],
@@ -40,8 +36,10 @@ describe("parseDtlText — dtl extension", () => {
     ]`;
     const { calls } = parseDtlText(text, "dtl");
     const topLevel = calls.filter((c) => c.isTopLevel);
-    expect(topLevel.length).toBeGreaterThanOrEqual(1);
+    expect(topLevel).toHaveLength(3);
     expect(topLevel[0].functionName).toBe("add");
+    expect(topLevel[1].functionName).toBe("copy");
+    expect(topLevel[2].functionName).toBe("remove");
   });
 
   it("records arg count correctly", () => {
@@ -55,9 +53,7 @@ describe("parseDtlText — dtl extension", () => {
     const text = `[["add", "_T.x", 1]]`;
     const { calls } = parseDtlText(text, "dtl");
     const call = calls.find((c) => c.functionName === "add");
-    expect(call?.range.start.offset).toBeLessThan(
-      call!.nameRange!.start.offset,
-    );
+    expect(call?.range.start.offset).toBeLessThan(call!.nameRange!.start.offset);
   });
 
   it("marks top-level calls as isTopLevel = true", () => {
@@ -96,9 +92,7 @@ describe("parseDtlText — json extension", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("parses rules from a standard pipe config — first rule captured (best-effort scanner)", () => {
-    // Same best-effort limitation as the .dtl multi-rule test: only the first
-    // top-level rule in a rules list is reliably captured by the scanner.
+  it("parses all rules from a standard pipe config", () => {
     const text = JSON.stringify({
       _id: "my-pipe",
       transform: {
@@ -113,8 +107,9 @@ describe("parseDtlText — json extension", () => {
     });
     const { calls } = parseDtlText(text, "json");
     const topLevel = calls.filter((c) => c.isTopLevel);
-    expect(topLevel.length).toBeGreaterThanOrEqual(1);
+    expect(topLevel).toHaveLength(2);
     expect(topLevel[0].functionName).toBe("add");
+    expect(topLevel[1].functionName).toBe("copy");
   });
 
   it("parses rules from multiple named rules blocks", () => {
@@ -134,8 +129,60 @@ describe("parseDtlText — json extension", () => {
     expect(names).toContain("add");
   });
 
+  it("parses rules when transform is an array of steps", () => {
+    // Bug: transform:[{type:"dtl",rules:{...}}] (array) returned no calls
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      transform: [
+        {
+          type: "dtl",
+          rules: {
+            default: [
+              ["add", "_deleted", false],
+              ["copy", "*"],
+            ],
+          },
+        },
+      ],
+    });
+    const { calls } = parseDtlText(text, "json");
+    const topLevel = calls.filter((c) => c.isTopLevel);
+    expect(topLevel).toHaveLength(2);
+    expect(topLevel[0].functionName).toBe("add");
+    expect(topLevel[1].functionName).toBe("copy");
+  });
+
   it("returns empty calls for invalid JSON", () => {
     const { calls } = parseDtlText("{bad json", "json");
     expect(calls).toHaveLength(0);
+  });
+
+  it("finds all top-level calls when source section contains arrays before transform", () => {
+    // Bug: scanner starts at offset 0 and picks up '[' in source.datasets instead of
+    // the transform rules list, causing all but the first rule to be misidentified.
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      source: {
+        type: "merge",
+        datasets: ["dataset-a da", "dataset-b db"],
+        equality_sets: [["da.$ids", "db.$ids"]],
+      },
+      transform: {
+        type: "dtl",
+        rules: {
+          default: [
+            ["add", "_deleted", false],
+            ["add", "_ids", ["hops", { datasets: ["lookup t"], where: [], return: "t._id" }]],
+            ["add", "_url", ["concat", "http://", "_S._id"]],
+            ["add", "::url", ["url-quote", "_T._url"]],
+            ["add", "::operation", "sparql"],
+          ],
+        },
+      },
+    });
+    const { calls } = parseDtlText(text, "json");
+    const topLevel = calls.filter((c) => c.isTopLevel);
+    expect(topLevel).toHaveLength(5);
+    expect(topLevel.map((c) => c.functionName)).toEqual(["add", "add", "add", "add", "add"]);
   });
 });
