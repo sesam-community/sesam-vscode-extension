@@ -39,6 +39,13 @@
 
 **VS Code Extension** (current): DTL language support : syntax highlighting, autocompletion, hover docs, linting, formatter, Pipe Graph sidebar, offline Pipe Preview.
 
+**Implemented beyond initial scope (F12)**:
+- Sesam config files use dedicated extensions: `.conf.pipe` (pipes) and `.conf.system` (systems), both mapped to `sesam-config` language ID (`.conf.json` still supported for backwards compatibility)
+- `Sesam: New Sesam Config File` command creates files under `pipes/` or `systems/` subdirectory with the type-specific extension
+- `Sesam: Format Document` command applies Sesam formatting directly via `editor.edit()` (bypasses VS Code formatter dispatch / Prettier conflict)
+- On-save auto-formatting for all `sesam-config` files via `onWillSaveTextDocument`
+- Formatter (`src/shared/config-formatter.ts`) preserves original key order; shared between client and server
+
 **Gap**: The extension is isolated from the actual sesam-py CLI and Sesam node. Developers constantly context-switch to terminal and have no IDE-level integration with their node or tests.
 
 ## Overarching Goals

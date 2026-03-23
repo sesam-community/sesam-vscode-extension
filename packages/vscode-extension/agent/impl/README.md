@@ -23,7 +23,7 @@
 | F01 | sesam-py Command Integration | Phase 1 | `planned` | [impl-f01-sesam-commands.prompt.md](impl-f01-sesam-commands.prompt.md) |
 | F02 | Config File Intelligence | Phase 1 | `planned` | [impl-f02-config-file-intelligence.prompt.md](impl-f02-config-file-intelligence.prompt.md) |
 | F03 | Secure Credential Management | Phase 1 | `planned` | [impl-f03-credential-management.prompt.md](impl-f03-credential-management.prompt.md) |
-| F12 | conf.json Pipe Config Support & Full-File Sesam Formatter | Phase 1 | `planned` | [impl-f12-conf-json-formatter.prompt.md](impl-f12-conf-json-formatter.prompt.md) |
+| F12 | Sesam Config File Extensions & Formatter | Phase 1 | `implemented` | [impl-f12-conf-json-formatter.prompt.md](impl-f12-conf-json-formatter.prompt.md) |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
 | F04 | Node-Connected Live Preview | Phase 3 | `planned` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
@@ -51,7 +51,7 @@
 | F01: sesam-py Command Integration | `planned` |
 | F02: Config File Intelligence | `planned` |
 | F03: Secure Credential Management | `planned` |
-| F12: conf.json Support & Full-File Sesam Formatter | `planned` |
+| F12: conf.json Support & Full-File Sesam Formatter | `implemented` |
 
 ### Phase 2: Testing & Diff Loop
 

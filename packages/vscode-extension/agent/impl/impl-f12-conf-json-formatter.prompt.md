@@ -1,9 +1,69 @@
-# F12: conf.json Pipe Config Support & Full-File Sesam Formatter
+# F12: Sesam Config File Extensions & Formatter
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 1 - MVP (core DTL editing improvement)
 > **Depends on**: none (standalone enhancement to existing DTL LSP)
 > **Tracking**: [README.md](README.md)
+
+---
+
+## Summary
+
+Sesam pipe/system config files now use dedicated file extensions (`.conf.pipe`, `.conf.system`) instead of
+plain `.json`. Both are assigned the `sesam-config` language ID, which means the LSP formatter is the only
+formatter — no conflict with VS Code's built-in JSON formatter or Prettier.
+
+A shared `formatSesamJson` function in `src/shared/config-formatter.ts` is used by both the LSP server
+(`onDocumentFormatting`) and the client command handler (`sesam.formatDocument`). On-save formatting is
+applied automatically via `onWillSaveTextDocument`.
+
+---
+
+## What Changed vs. Original Plan
+
+| Original plan | Actual implementation |
+|---|---|
+| Keep `*.conf.json`, fix formatter conflict | New extensions: `.conf.pipe` / `.conf.system` |
+| Sort keys alphabetically | **Preserve original key order** (user feedback) |
+| Formatter lives in `server/src/server.ts` | Shared: `src/shared/config-formatter.ts` |
+| Format via LSP `onDocumentFormatting` only | Also: direct `editor.edit()` in command + on-save |
+| `*.conf.json` registered as `json` language | All three extensions → `sesam-config` language ID |
+
+---
+
+## Implemented Files
+
+| File | Change |
+|---|---|
+| `package.json` | `sesam-config` `filenamePatterns` includes `*.conf.pipe`, `*.conf.system`, `*.conf.json` |
+| `package.json` | `sesam.formatDocument` command; `commandPalette` when-clause restricted to `sesam-config` |
+| `src/shared/config-formatter.ts` | `formatSesamJson(value, tabSize)` — preserves key order, compact arrays, multi-line objects |
+| `server/src/server.ts` | `onDocumentFormatting` → imports from `src/shared/config-formatter` |
+| `client/src/extension.ts` | `sesam.formatDocument` applies `formatSesamJson` via `editor.edit()` directly |
+| `client/src/extension.ts` | `onWillSaveTextDocument` auto-formats all `sesam-config` files on save |
+| `client/src/extension.ts` | `dtl.newConfFile` creates `.conf.pipe` under `pipes/`, `.conf.system` under `systems/` |
+| `client/src/extension.ts` | File watchers cover `**/*.conf.{json,pipe,system}` |
+
+---
+
+## Formatter Behaviour
+
+- **Key order**: preserved (not sorted) — matches user expectation for config files
+- **Objects**: each key on its own line with indentation
+- **DTL arrays**: compact inline — `["add", "foo", ["ni", "ns", "bar"]]`
+- **Nested arrays**: each top-level rule on its own line; inner expressions inline
+- **Idempotent**: formatting an already-formatted file produces no changes
+
+---
+
+## Verification Checklist
+
+- [x] Open a `*.conf.pipe` or `*.conf.system` file → `sesam-config` language mode activates
+- [x] `Sesam: Format Document` on a `sesam-config` file → formatted with Sesam style, no Prettier dialog
+- [x] Save a `sesam-config` file → auto-formatted on save
+- [x] `Sesam: New Sesam Config File` → pipe lands in `pipes/`, system lands in `systems/`
+- [x] All 118 unit tests pass
+- [x] Idempotent: second format is a no-op
 
 ---
 
