@@ -18,6 +18,7 @@
   - [8. Connector Development Tools](#8-connector-development-tools)
   - [9. Copilot Agent Participant](#9-copilot-agent-participant-sesam)
   - [10. Inline Output & Diagnostics](#10-inline-output--diagnostics-from-node)
+- [Code Style](#code-style)
 - [Key Files to Modify/Add](#key-files-to-modifyadd)
 - [Phased Rollout](#phased-rollout)
   - [Phase 1: MVP](#phase-1--mvp-the-daily-command-loop)
@@ -133,6 +134,12 @@ All three sesam-py config files below are created manually by developers in thei
 - After `sesam run`, show per-pipe statistics inline (entities processed, errors)
 - After `sesam download`, show diff notification with one-click open
 - Surface node-side errors as diagnostics in the editor
+
+## Code Style
+
+- **Array functions over loops** — prefer `map`, `filter`, `reduce`, `flatMap`, `find`, `every`, `some` over `for`/`while` loops
+- **Parentheses in conditions** — always wrap `if` / `else if` conditions in parentheses; also wrap ternary conditions when they contain operators
+- **Functional Programming** — favour pure functions (no side-effects, same input → same output), immutability (`const`, spread instead of mutation), and function composition over classes with mutable state where practical
 
 ## Key Files to Modify/Add
 
