@@ -16,6 +16,7 @@ import {
 } from "vscode-languageclient/node";
 import { PipeGraphProvider } from "./graph/PipeGraphProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
+import { formatSesamJson } from "../../src/shared/config-formatter";
 
 let client: LanguageClient;
 
@@ -58,7 +59,9 @@ export async function activate(
         vscode.workspace.createFileSystemWatcher(
           "**/{pipes,systems}/**/*.json",
         ),
-        vscode.workspace.createFileSystemWatcher("**/*.conf.json"),
+        vscode.workspace.createFileSystemWatcher(
+          "**/*.conf.{json,pipe,system}",
+        ),
       ],
     },
     traceOutputChannel: vscode.window.createOutputChannel(
@@ -94,8 +97,9 @@ export async function activate(
   watcher.onDidDelete(() => graphProvider.refresh());
   context.subscriptions.push(watcher);
 
-  const confWatcher =
-    vscode.workspace.createFileSystemWatcher("**/*.conf.json");
+  const confWatcher = vscode.workspace.createFileSystemWatcher(
+    "**/*.conf.{json,pipe,system}",
+  );
   confWatcher.onDidCreate(() => graphProvider.refresh());
   confWatcher.onDidChange(() => graphProvider.refresh());
   confWatcher.onDidDelete(() => graphProvider.refresh());
@@ -123,6 +127,35 @@ export async function activate(
           "https://docs.sesam.io/hub/data-transformation-language.html",
         ),
       );
+    }),
+
+    vscode.commands.registerCommand("sesam.formatDocument", async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document.languageId !== "sesam-config") {
+        vscode.window.showWarningMessage(
+          "Sesam: No active Sesam config file to format.",
+        );
+        return;
+      }
+      const text = editor.document.getText();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        vscode.window.showWarningMessage("Sesam: File is not valid JSON.");
+        return;
+      }
+      const tabSize =
+        typeof editor.options.tabSize === "number" ? editor.options.tabSize : 2;
+      const formatted = formatSesamJson(parsed, tabSize);
+      if (formatted === text) return;
+      await editor.edit((editBuilder) => {
+        const fullRange = new vscode.Range(
+          editor.document.positionAt(0),
+          editor.document.positionAt(text.length),
+        );
+        editBuilder.replace(fullRange, formatted);
+      });
     }),
 
     vscode.commands.registerCommand(
@@ -301,7 +334,7 @@ export async function activate(
 
         // ── Step 3: ask for _id ──────────────────────────────────────────
         const configId = await vscode.window.showInputBox({
-          prompt: "Enter the config _id (used as filename: <id>.conf.json)",
+          prompt: `Enter the config _id (used as filename: <id>${template.id === "system" ? ".conf.system" : ".conf.pipe"})`,
           placeHolder:
             template.id === "system" ? "my-rest-system" : "my-pipe-id",
           validateInput: (v) => {
@@ -333,24 +366,42 @@ export async function activate(
         }
 
         // ── Step 5: resolve target folder ────────────────────────────────
-        let folder: vscode.Uri;
+        // Always place pipes under <root>/pipes/ and systems under <root>/systems/
+        const subdir = template.id === "system" ? "systems" : "pipes";
+
+        let workspaceRoot: vscode.Uri;
         if (contextUri) {
           const stat = await vscode.workspace.fs.stat(contextUri);
-          folder =
+          const ctxDir =
             stat.type === vscode.FileType.Directory
               ? contextUri
               : vscode.Uri.file(path.dirname(contextUri.fsPath));
-        } else if (vscode.window.activeTextEditor) {
-          folder = vscode.Uri.file(
-            path.dirname(vscode.window.activeTextEditor.document.uri.fsPath),
-          );
+          // Walk up from the context dir to find (or use) a workspace folder root
+          workspaceRoot =
+            vscode.workspace.getWorkspaceFolder(ctxDir)?.uri ?? ctxDir;
         } else {
-          folder =
-            vscode.workspace.workspaceFolders?.[0]?.uri ?? vscode.Uri.file(".");
+          workspaceRoot =
+            vscode.workspace.workspaceFolders?.[0]?.uri ??
+            (vscode.window.activeTextEditor
+              ? vscode.Uri.file(
+                  path.dirname(
+                    vscode.window.activeTextEditor.document.uri.fsPath,
+                  ),
+                )
+              : vscode.Uri.file("."));
+        }
+
+        const folder = vscode.Uri.joinPath(workspaceRoot, subdir);
+        // Create the subdirectory if it doesn't exist
+        try {
+          await vscode.workspace.fs.createDirectory(folder);
+        } catch {
+          // already exists — ignore
         }
 
         // ── Step 6: write and open ────────────────────────────────────────
-        const fileUri = vscode.Uri.joinPath(folder, `${configId}.conf.json`);
+        const ext = template.id === "system" ? ".conf.system" : ".conf.pipe";
+        const fileUri = vscode.Uri.joinPath(folder, `${configId}${ext}`);
         const text = JSON.stringify(content, null, 2) + "\n";
         await vscode.workspace.fs.writeFile(
           fileUri,
@@ -373,6 +424,32 @@ export async function activate(
       if (PreviewPanel.currentPanel) {
         PreviewPanel.currentPanel.updateDocument(event.document);
       }
+    }),
+    vscode.workspace.onWillSaveTextDocument((event) => {
+      if (event.document.languageId !== "sesam-config") return;
+      const text = event.document.getText();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        return;
+      }
+      const editor = vscode.window.visibleTextEditors.find(
+        (e) => e.document === event.document,
+      );
+      const tabSize =
+        typeof editor?.options.tabSize === "number"
+          ? editor.options.tabSize
+          : 2;
+      const formatted = formatSesamJson(parsed, tabSize);
+      if (formatted === text) return;
+      const fullRange = new vscode.Range(
+        event.document.positionAt(0),
+        event.document.positionAt(text.length),
+      );
+      event.waitUntil(
+        Promise.resolve([vscode.TextEdit.replace(fullRange, formatted)]),
+      );
     }),
   );
 }

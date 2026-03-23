@@ -33,7 +33,7 @@ export function sortObjectKeysRecursively(obj: unknown): unknown {
 
 export function formatSesamJson(value: unknown, tabSize: number): string {
   const indentation = " ".repeat(tabSize);
-  const compact = JSON.stringify(sortObjectKeysRecursively(value), null, 0);
+  const compact = JSON.stringify(value, null, 0);
 
   let output = "";
   let indent = 0;
