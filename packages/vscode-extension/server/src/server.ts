@@ -161,14 +161,6 @@ documents.onDidChangeContent((change) => {
   validateDocument(change.document);
 });
 
-documents.onDidSave(async (event) => {
-  const document = event.document;
-  if (!document.uri.endsWith(".conf.json")) return;
-  const nodeDiags = await validateDocumentWithNode(document);
-  nodeValidationDiagnostics.set(document.uri, nodeDiags);
-  validateDocument(document);
-});
-
 documents.onDidClose((event) => {
   documentSettings.delete(event.document.uri);
   nodeValidationDiagnostics.delete(event.document.uri);
@@ -225,47 +217,6 @@ function elementsToRange(
     Position.create(0, 0),
     Position.create(0, Number.MAX_SAFE_INTEGER),
   );
-}
-
-async function validateDocumentWithNode(
-  document: TextDocument,
-): Promise<Diagnostic[]> {
-  const { nodeUrl, jwt } = await getSesamSettings();
-  if (!nodeUrl || !jwt) return [];
-
-  const text = document.getText();
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return [];
-  }
-
-  try {
-    const response = await fetch(`${nodeUrl}/api/utils/validate-config`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `bearer ${jwt}`,
-      },
-      body: JSON.stringify([parsed]),
-    });
-
-    if (!response.ok) return [];
-
-    const result = (await response.json()) as ValidateConfigResponse;
-    if (result["is-valid-config"]) return [];
-
-    return (result["config-errors"] ?? []).map((err) => ({
-      range: elementsToRange(document, text, err.elements),
-      message: `[Node] ${err.msg}`,
-      severity: levelToSeverity(err.level),
-      source: "sesam-node",
-    }));
-  } catch {
-    // Network errors, auth failures, etc. — degrade silently
-    return [];
-  }
 }
 
 // ---------------------------------------------------------------------------

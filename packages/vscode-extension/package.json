@@ -87,6 +87,11 @@
         "command": "dtl.newConfFile",
         "title": "Sesam: New Sesam Config File",
         "icon": "$(new-file)"
+      },
+      {
+        "command": "sesam.formatDocument",
+        "title": "Sesam: Format Document",
+        "icon": "$(symbol-misc)"
       }
     ],
     "menus": {
@@ -108,6 +113,10 @@
         {
           "command": "dtl.newConfFile",
           "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "sesam.formatDocument",
+          "when": "editorLangId == sesam-config || editorLangId == json"
         }
       ]
     },

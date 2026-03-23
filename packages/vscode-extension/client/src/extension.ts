@@ -125,6 +125,21 @@ export async function activate(
       );
     }),
 
+    vscode.commands.registerCommand("sesam.formatDocument", () => {
+      const editor = vscode.window.activeTextEditor;
+      if (
+        !editor ||
+        (editor.document.languageId !== "sesam-config" &&
+          editor.document.languageId !== "json")
+      ) {
+        vscode.window.showWarningMessage(
+          "Sesam: No active Sesam config file to format.",
+        );
+        return;
+      }
+      vscode.commands.executeCommand("editor.action.formatDocument");
+    }),
+
     vscode.commands.registerCommand(
       "dtl.newConfFile",
       async (contextUri?: vscode.Uri) => {
