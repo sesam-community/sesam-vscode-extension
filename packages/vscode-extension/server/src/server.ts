@@ -21,6 +21,9 @@ import {
   Position,
   Diagnostic,
   DiagnosticSeverity,
+  DocumentSymbol,
+  SymbolKind,
+  DocumentSymbolParams,
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
@@ -31,7 +34,7 @@ import {
   ENTITY_RESERVED_FIELDS,
   DtlFunction,
 } from "../../src/shared/dtl-registry";
-import { parseDtlText } from "./dtl-parser";
+import { parseDtlText, DtlRange } from "./dtl-parser";
 import { validateCalls, ValidatorOptions } from "./dtl-validator";
 import { formatSesamJson } from "../../src/shared/config-formatter";
 
@@ -58,6 +61,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
       },
       hoverProvider: true,
       documentFormattingProvider: true,
+      documentSymbolProvider: true,
     },
   };
 });
@@ -666,6 +670,179 @@ function buildFunctionMarkdown(fn: DtlFunction): string {
     "",
     `[📖 Documentation](${fn.docUrl})`,
   ].join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Document Symbols (Outline)
+// ---------------------------------------------------------------------------
+connection.onDocumentSymbol(
+  (params: DocumentSymbolParams): DocumentSymbol[] => {
+    const document = documents.get(params.textDocument.uri);
+    if (!document) return [];
+    const text = document.getText();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return [];
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+      return [];
+    return buildDocumentSymbols(
+      document,
+      text,
+      parsed as Record<string, unknown>,
+    );
+  },
+);
+
+function lspRange(r: DtlRange): Range {
+  return Range.create(
+    Position.create(r.start.line, r.start.character),
+    Position.create(r.end.line, r.end.character),
+  );
+}
+
+function findKeyOffset(text: string, key: string, fromOffset = 0): number {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`"${escaped}"\\s*:`);
+  const m = pattern.exec(text.slice(fromOffset));
+  return m ? fromOffset + m.index : -1;
+}
+
+function buildDocumentSymbols(
+  document: TextDocument,
+  text: string,
+  obj: Record<string, unknown>,
+): DocumentSymbol[] {
+  const symbols: DocumentSymbol[] = [];
+
+  // ── _id symbol ────────────────────────────────────────────────────────────
+  const configId = obj["_id"];
+  if (typeof configId === "string") {
+    const off = findKeyOffset(text, "_id");
+    if (off >= 0) {
+      const pos = document.positionAt(off);
+      const range = Range.create(pos, document.positionAt(off + 5)); // `"_id"`
+      symbols.push(
+        DocumentSymbol.create(
+          `_id: ${configId}`,
+          undefined,
+          SymbolKind.Key,
+          range,
+          range,
+          [],
+        ),
+      );
+    }
+  }
+
+  // ── transform.rules ───────────────────────────────────────────────────────
+  const transform = obj["transform"];
+  if (
+    transform == null ||
+    typeof transform !== "object" ||
+    Array.isArray(transform)
+  )
+    return symbols;
+
+  const rules = (transform as Record<string, unknown>)["rules"];
+  if (rules == null || typeof rules !== "object" || Array.isArray(rules))
+    return symbols;
+
+  const rulesObj = rules as Record<string, unknown>;
+  const ruleNames = Object.keys(rulesObj);
+  if (ruleNames.length === 0) return symbols;
+
+  // All top-level DTL calls with positions
+  const topCalls = parseDtlText(text, "json").calls.filter(
+    (c) => c.isTopLevel && c.functionName !== null,
+  );
+
+  // Locate each rule-set key in the raw text (in document order)
+  const rulesKeyOff = findKeyOffset(text, "rules");
+  const ruleOffsets: Array<{
+    name: string;
+    start: number;
+    end: number;
+  }> = [];
+  for (const name of ruleNames) {
+    const off = findKeyOffset(text, name, rulesKeyOff);
+    if (off >= 0) ruleOffsets.push({ name, start: off, end: Infinity });
+  }
+  ruleOffsets.sort((a, b) => a.start - b.start);
+  for (let i = 0; i < ruleOffsets.length - 1; i++) {
+    ruleOffsets[i].end = ruleOffsets[i + 1].start;
+  }
+
+  // Build a DocumentSymbol per rule set, with each DTL call as a child
+  const ruleSymbols: DocumentSymbol[] = [];
+  for (const { name, start, end } of ruleOffsets) {
+    const callsInRule = topCalls.filter(
+      (c) => c.range.start.offset >= start && c.range.start.offset < end,
+    );
+
+    const callSymbols: DocumentSymbol[] = callsInRule.map((c) => {
+      const r = lspRange(c.range);
+      return DocumentSymbol.create(
+        c.functionName!,
+        undefined,
+        SymbolKind.Function,
+        r,
+        r,
+        [],
+      );
+    });
+
+    const namePos = document.positionAt(start);
+    const bodyRange =
+      callSymbols.length > 0
+        ? Range.create(namePos, callSymbols[callSymbols.length - 1].range.end)
+        : Range.create(namePos, document.positionAt(start + name.length + 2));
+
+    ruleSymbols.push(
+      DocumentSymbol.create(
+        name,
+        `${callSymbols.length} rule${callSymbols.length !== 1 ? "s" : ""}`,
+        SymbolKind.Module,
+        bodyRange,
+        bodyRange,
+        callSymbols,
+      ),
+    );
+  }
+
+  if (ruleSymbols.length === 0) return symbols;
+
+  const rulesPos = document.positionAt(Math.max(0, rulesKeyOff));
+  const lastRule = ruleSymbols[ruleSymbols.length - 1];
+  const rulesRange = Range.create(rulesPos, lastRule.range.end);
+
+  const transformOff = findKeyOffset(text, "transform");
+  const transformPos = document.positionAt(Math.max(0, transformOff));
+  const transformRange = Range.create(transformPos, lastRule.range.end);
+
+  symbols.push(
+    DocumentSymbol.create(
+      "transform",
+      undefined,
+      SymbolKind.Namespace,
+      transformRange,
+      transformRange,
+      [
+        DocumentSymbol.create(
+          "rules",
+          undefined,
+          SymbolKind.Namespace,
+          rulesRange,
+          rulesRange,
+          ruleSymbols,
+        ),
+      ],
+    ),
+  );
+
+  return symbols;
 }
 
 // ---------------------------------------------------------------------------
