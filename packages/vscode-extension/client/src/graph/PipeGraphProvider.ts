@@ -4,7 +4,6 @@
  * and system config files and shows their DTL hop relationships in the sidebar.
  */
 
-import * as path from "path";
 import * as vscode from "vscode";
 
 // ---------------------------------------------------------------------------
@@ -160,11 +159,11 @@ export class PipeGraphProvider implements vscode.TreeDataProvider<PipeTreeItem> 
       return;
     }
 
-    const config = vscode.workspace.getConfiguration("dtl");
-    const scanDepth: number = config.get("graph.scanDepth", 3);
+    // const config = vscode.workspace.getConfiguration("dtl");
+    // const scanDepth: number = config.get("graph.scanDepth", 3);
 
     // Find all JSON files
-    const globDepth = Array.from({ length: scanDepth }, (_, i) => "*").join("/");
+    // const globDepth = Array.from({ length: scanDepth }, (_, i) => "*").join("/");
     const files = await vscode.workspace.findFiles(`**/*.json`, `**/node_modules/**`);
 
     // Also find .dtl files

@@ -87,18 +87,18 @@ const documentSettings = new Map<string, Promise<DtlSettings>>();
 // ---------------------------------------------------------------------------
 let sesamSettingsCache: SesamSettings | null = null;
 
-async function getSesamSettings(): Promise<SesamSettings> {
-  if (!sesamSettingsCache) {
-    const s = (await connection.workspace.getConfiguration({
-      section: "sesam",
-    })) as { nodeUrl?: string; jwt?: string } | null;
-    sesamSettingsCache = {
-      nodeUrl: (s?.nodeUrl ?? "").trim().replace(/\/$/, ""),
-      jwt: (s?.jwt ?? "").trim(),
-    };
-  }
-  return sesamSettingsCache;
-}
+// async function getSesamSettings(): Promise<SesamSettings> {
+//   if (!sesamSettingsCache) {
+//     const s = (await connection.workspace.getConfiguration({
+//       section: "sesam",
+//     })) as { nodeUrl?: string; jwt?: string } | null;
+//     sesamSettingsCache = {
+//       nodeUrl: (s?.nodeUrl ?? "").trim().replace(/\/$/, ""),
+//       jwt: (s?.jwt ?? "").trim(),
+//     };
+//   }
+//   return sesamSettingsCache;
+// }
 
 // Cache for node-backed diagnostics, keyed by document URI
 const nodeValidationDiagnostics = new Map<string, Diagnostic[]>();
