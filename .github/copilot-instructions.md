@@ -60,6 +60,28 @@ Press **F5** in VS Code to launch the extension in a new Extension Development H
 - Do not sort JSON keys in the formatter — preserve insertion order
 - `selectionRange` in `DocumentSymbol` must always be contained within `range`
 
+### Import Order
+
+Imports must be grouped with a blank line between each group, in this order:
+
+1. **Node built-ins** (`node:path`, `node:fs`, …)
+2. **Third-party packages** (`vscode`, `vscode-languageserver/node`, `vscode-languageserver-textdocument`, …)
+3. **Internal / workspace modules** (relative paths: `../../src/shared/…`, `./utils`, `./constants`, …)
+4. **Type-only imports** (`import type { … }`) — always last
+
+Example:
+```ts
+import * as path from "node:path";
+
+import { window, commands } from "vscode";
+import { CompletionItem } from "vscode-languageserver/node";
+
+import { formatSesamJson } from "../../src/shared/config-formatter";
+import { buildDocumentSymbols } from "./utils";
+
+import type { DtlSettings, SesamSettings } from "./types";
+```
+
 ## Feature Planning
 
 Before implementing a new feature, check `agent/impl/README.md` for its status and read the corresponding
