@@ -16,7 +16,7 @@ import {
 } from "vscode-languageclient/node";
 import { PipeGraphProvider } from "./graph/PipeGraphProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
-import { formatSesamJson } from "../../src/shared/dtl-formatter";
+import { formatSesamJson } from "../../src/shared/config-formatter";
 
 let client: LanguageClient;
 
