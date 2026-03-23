@@ -22,17 +22,16 @@ import {
   DocumentSymbol,
   DocumentSymbolParams,
 } from "vscode-languageserver/node";
-
 import { TextDocument } from "vscode-languageserver-textdocument";
+
 import {
   getDtlFunction,
   DTL_VARIABLES,
   ENTITY_RESERVED_FIELDS,
 } from "../../src/shared/dtl-registry";
+import { formatSesamJson } from "../../src/shared/config-formatter";
 import { parseDtlText } from "./dtl-parser";
 import { validateCalls, ValidatorOptions } from "./dtl-validator";
-import { formatSesamJson } from "../../src/shared/config-formatter";
-import type { DtlSettings, SesamSettings } from "./types";
 import { defaultSettings } from "./constants";
 import {
   isSourceTypeContext,
@@ -47,6 +46,8 @@ import {
   buildFunctionMarkdown,
   buildDocumentSymbols,
 } from "./utils";
+
+import type { DtlSettings, SesamSettings } from "./types";
 
 // ---------------------------------------------------------------------------
 // Connection & document store

@@ -6,7 +6,8 @@
  *   - Pipe preview webview command
  */
 
-import * as path from "path";
+import * as path from "node:path";
+
 import * as vscode from "vscode";
 import {
   LanguageClient,
@@ -14,9 +15,10 @@ import {
   ServerOptions,
   TransportKind,
 } from "vscode-languageclient/node";
+
+import { formatSesamJson } from "../../src/shared/config-formatter";
 import { PipeGraphProvider } from "./graph/PipeGraphProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
-import { formatSesamJson } from "../../src/shared/config-formatter";
 
 let client: LanguageClient;
 

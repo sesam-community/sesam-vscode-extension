@@ -9,14 +9,17 @@ import {
   Position,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
+
 import {
   getAllFunctions,
   DTL_VARIABLES,
   ENTITY_RESERVED_FIELDS,
-  DtlFunction,
 } from "../../src/shared/dtl-registry";
-import { parseDtlText, DtlRange } from "./dtl-parser";
+import { parseDtlText } from "./dtl-parser";
 import { SYSTEM_TYPES, PIPE_SOURCE_TYPES } from "./constants";
+
+import type { DtlFunction } from "../../src/shared/dtl-registry";
+import type { DtlRange } from "./dtl-parser";
 
 // ---------------------------------------------------------------------------
 // Node-backed validation helpers (retained for future use)
