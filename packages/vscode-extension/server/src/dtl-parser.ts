@@ -65,6 +65,7 @@ export function parseDtlText(text: string, fileExtension: "dtl" | "json"): Parse
     parsedJson = JSON.parse(text);
   } catch (e) {
     // Document not valid JSON yet — skip validation
+    errors.push(`Failed to parse JSON: ${(e as Error).message}`);
     return { calls, errors };
   }
 

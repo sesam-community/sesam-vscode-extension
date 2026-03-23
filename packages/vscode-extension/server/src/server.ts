@@ -7,7 +7,6 @@ import {
   createConnection,
   TextDocuments,
   ProposedFeatures,
-  InitializeParams,
   InitializeResult,
   TextDocumentSyncKind,
   CompletionItem,
@@ -47,7 +46,7 @@ import {
   buildDocumentSymbols,
 } from "./utils";
 
-import type { DtlSettings, SesamSettings } from "./types";
+import type { DtlSettings } from "./types";
 
 // ---------------------------------------------------------------------------
 // Connection & document store
@@ -58,7 +57,7 @@ const documents = new TextDocuments(TextDocument);
 // ---------------------------------------------------------------------------
 // Initialization
 // ---------------------------------------------------------------------------
-connection.onInitialize((_params: InitializeParams): InitializeResult => {
+connection.onInitialize((): InitializeResult => {
   return {
     capabilities: {
       textDocumentSync: {
@@ -85,7 +84,7 @@ const documentSettings = new Map<string, Promise<DtlSettings>>();
 // ---------------------------------------------------------------------------
 // Sesam node settings
 // ---------------------------------------------------------------------------
-let sesamSettingsCache: SesamSettings | null = null;
+// let sesamSettingsCache: SesamSettings | null = null;
 
 // async function getSesamSettings(): Promise<SesamSettings> {
 //   if (!sesamSettingsCache) {
@@ -104,7 +103,7 @@ let sesamSettingsCache: SesamSettings | null = null;
 const nodeValidationDiagnostics = new Map<string, Diagnostic[]>();
 
 connection.onDidChangeConfiguration(() => {
-  sesamSettingsCache = null;
+  // sesamSettingsCache = null;
   documentSettings.clear();
   documents.all().forEach(validateDocument);
 });
