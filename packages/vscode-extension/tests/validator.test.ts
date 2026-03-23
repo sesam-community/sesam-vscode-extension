@@ -158,3 +158,164 @@ describe("null function name", () => {
     expect(diags).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// transform-as-expression
+// ---------------------------------------------------------------------------
+
+describe("transform-as-expression diagnostics", () => {
+  it("emits a warning when a transform function is used nested (non-top-level)", () => {
+    // "add" is a transform; nesting it inside an expression is invalid
+    const diags = validateCalls(
+      [makeCall({ functionName: "add", argCount: 2, isTopLevel: false })],
+      defaultOptions,
+    );
+    const warning = diags.find((d) => d.code === "transform-as-expression");
+    expect(warning).toBeDefined();
+    expect(warning!.severity).toBe(DiagnosticSeverity.Warning);
+    expect(warning!.message).toContain("add");
+  });
+
+  it("does not warn when a transform function is used at the top level", () => {
+    const diags = validateCalls(
+      [makeCall({ functionName: "add", argCount: 2, isTopLevel: true })],
+      defaultOptions,
+    );
+    expect(
+      diags.find((d) => d.code === "transform-as-expression"),
+    ).toBeUndefined();
+  });
+
+  it("does not warn when an expression function is used nested", () => {
+    // "and" is an expression, nesting is fine
+    const diags = validateCalls(
+      [makeCall({ functionName: "and", argCount: 2, isTopLevel: false })],
+      defaultOptions,
+    );
+    expect(
+      diags.find((d) => d.code === "transform-as-expression"),
+    ).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Diagnostic source and structure
+// ---------------------------------------------------------------------------
+
+describe("diagnostic source field", () => {
+  it("sets source to 'dtl' on unknown-function diagnostics", () => {
+    const diags = validateCalls(
+      [makeCall({ functionName: "no-such-fn" })],
+      defaultOptions,
+    );
+    expect(diags[0].source).toBe("dtl");
+  });
+
+  it("sets source to 'dtl' on too-few-args diagnostics", () => {
+    const diags = validateCalls(
+      [makeCall({ functionName: "add", argCount: 0 })],
+      defaultOptions,
+    );
+    const diag = diags.find((d) => d.code === "too-few-args");
+    expect(diag!.source).toBe("dtl");
+  });
+
+  it("sets source to 'dtl' on transform-as-expression diagnostics", () => {
+    const diags = validateCalls(
+      [makeCall({ functionName: "add", argCount: 2, isTopLevel: false })],
+      defaultOptions,
+    );
+    const diag = diags.find((d) => d.code === "transform-as-expression");
+    expect(diag!.source).toBe("dtl");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// nameRange vs range fallback
+// ---------------------------------------------------------------------------
+
+describe("diagnostic range — nameRange fallback", () => {
+  it("uses nameRange when available for unknown-function diagnostic", () => {
+    const nameRange = {
+      start: { offset: 5, line: 0, character: 5 },
+      end: { offset: 20, line: 0, character: 20 },
+    };
+    const diags = validateCalls(
+      [makeCall({ functionName: "no-such-fn", nameRange })],
+      defaultOptions,
+    );
+    expect(diags[0].range.start.character).toBe(5);
+    expect(diags[0].range.end.character).toBe(20);
+  });
+
+  it("falls back to full range when nameRange is null", () => {
+    const range = {
+      start: { offset: 0, line: 1, character: 2 },
+      end: { offset: 30, line: 1, character: 32 },
+    };
+    const diags = validateCalls(
+      [makeCall({ functionName: "no-such-fn", nameRange: null, range })],
+      defaultOptions,
+    );
+    expect(diags[0].range.start.line).toBe(1);
+    expect(diags[0].range.start.character).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Unlimited-args (maxArgs === null) expression functions
+// ---------------------------------------------------------------------------
+
+describe("unlimited-args expression functions", () => {
+  it("does not emit too-many-args for 'and' with many arguments", () => {
+    // "and" has maxArgs: null — any number of args is valid
+    const diags = validateCalls(
+      [makeCall({ functionName: "and", argCount: 100, isTopLevel: false })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "too-many-args")).toBeUndefined();
+  });
+
+  it("still emits too-few-args for 'and' with zero arguments", () => {
+    // "and" has minArgs: 1
+    const diags = validateCalls(
+      [makeCall({ functionName: "and", argCount: 0, isTopLevel: false })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "too-few-args")).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Multiple calls
+// ---------------------------------------------------------------------------
+
+describe("multiple calls", () => {
+  it("returns a diagnostic for each invalid call", () => {
+    const calls = [
+      makeCall({ functionName: "no-such-fn-1" }),
+      makeCall({ functionName: "no-such-fn-2" }),
+      makeCall({ functionName: "no-such-fn-3" }),
+    ];
+    const diags = validateCalls(calls, defaultOptions);
+    expect(diags).toHaveLength(3);
+    expect(diags.map((d) => d.message)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("no-such-fn-1"),
+        expect.stringContaining("no-such-fn-2"),
+        expect.stringContaining("no-such-fn-3"),
+      ]),
+    );
+  });
+
+  it("mixes different diagnostic codes from different calls", () => {
+    const calls = [
+      makeCall({ functionName: "no-such-fn" }), // unknown-function
+      makeCall({ functionName: "add", argCount: 0 }), // too-few-args
+    ];
+    const diags = validateCalls(calls, defaultOptions);
+    expect(diags.map((d) => d.code)).toEqual(
+      expect.arrayContaining(["unknown-function", "too-few-args"]),
+    );
+  });
+});
