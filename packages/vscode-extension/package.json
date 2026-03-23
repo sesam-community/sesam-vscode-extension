@@ -197,7 +197,7 @@
     "build:dev": "vite build --config vite.config.client.ts --mode development && vite build --config vite.config.server.ts --mode development",
     "watch": "vite build --config vite.config.client.ts --watch & vite build --config vite.config.server.ts --watch",
     "compile": "tsc -p client/tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit",
-    "lint": "eslint src client/src server/src --ext .ts",
+    "lint": "eslint src client/src server/src",
     "test": "vitest run",
     "test:watch": "vitest",
     "package": "vsce package"

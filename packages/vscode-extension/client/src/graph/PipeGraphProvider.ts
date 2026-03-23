@@ -110,7 +110,9 @@ export class PipeGraphProvider implements vscode.TreeDataProvider<PipeTreeItem> 
 
     // Children of a pipe: hop targets + defined rules
     const pipe = this.pipes.find((p) => p.id === element.label);
-    if (!pipe) return [];
+    if (!pipe) {
+      return [];
+    }
 
     const children: PipeTreeItem[] = [];
 
@@ -154,7 +156,9 @@ export class PipeGraphProvider implements vscode.TreeDataProvider<PipeTreeItem> 
     this.datasetIndex = new Map();
 
     const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) return;
+    if (!workspaceFolders) {
+      return;
+    }
 
     const config = vscode.workspace.getConfiguration("dtl");
     const scanDepth: number = config.get("graph.scanDepth", 3);
@@ -194,11 +198,15 @@ export class PipeGraphProvider implements vscode.TreeDataProvider<PipeTreeItem> 
 // ---------------------------------------------------------------------------
 
 function extractPipeInfo(parsed: unknown, fileUri: vscode.Uri): PipeInfo | null {
-  if (typeof parsed !== "object" || parsed === null) return null;
+  if (typeof parsed !== "object" || parsed === null) {
+    return null;
+  }
   const obj = parsed as Record<string, unknown>;
 
   const id = typeof obj["_id"] === "string" ? obj["_id"] : null;
-  if (!id) return null;
+  if (!id) {
+    return null;
+  }
 
   const type = typeof obj["type"] === "string" ? obj["type"] : "pipe";
   const kind: "pipe" | "system" = type === "system" ? "system" : "pipe";
@@ -234,7 +242,9 @@ function extractPipeInfo(parsed: unknown, fileUri: vscode.Uri): PipeInfo | null 
 /** Recursively walk a DTL rules array and collect dataset names mentioned in hops. */
 function collectHopDatasets(arr: unknown[], out: Set<string>): void {
   for (const item of arr) {
-    if (!Array.isArray(item)) continue;
+    if (!Array.isArray(item)) {
+      continue;
+    }
 
     const head = item[0];
     if (head === "hops" || head === "apply-hops") {
@@ -248,7 +258,9 @@ function collectHopDatasets(arr: unknown[], out: Set<string>): void {
             if (typeof ds === "string") {
               // Dataset entry can be "datasetName ALIAS" — extract the name part
               const parts = ds.trim().split(/\s+/);
-              if (parts.length > 0) out.add(parts[0]);
+              if (parts.length > 0) {
+                out.add(parts[0]);
+              }
             }
           }
         }

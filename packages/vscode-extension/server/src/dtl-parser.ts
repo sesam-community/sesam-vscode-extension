@@ -115,7 +115,9 @@ function extractTransformCalls(
   calls: DtlCall[],
   errors: string[],
 ): void {
-  if (!transform || typeof transform !== "object") return;
+  if (!transform || typeof transform !== "object") {
+    return;
+  }
 
   // Array of transform steps: [{ type: "dtl", rules: {...} }, ...]
   // OR shorthand inline rules list: [["add", ...], ...]
@@ -169,7 +171,9 @@ class DtlWalker {
    */
   enterArray(): (() => void) | null {
     const open = this.findNextArrayStart();
-    if (open === -1) return null;
+    if (open === -1) {
+      return null;
+    }
     const close = this.findMatchingClose(open);
     this.scanPos = open + 1;
     return () => {
@@ -182,12 +186,16 @@ class DtlWalker {
     // each subsequent walkDtlArray call correctly locates its own "[" rather
     // than mis-matching against the outer bracket.
     const outerOpen = this.findNextArrayStart();
-    if (outerOpen === -1) return;
+    if (outerOpen === -1) {
+      return;
+    }
     const outerClose = this.findMatchingClose(outerOpen);
     this.scanPos = outerOpen + 1;
 
     for (const rule of rules) {
-      if (!Array.isArray(rule)) continue;
+      if (!Array.isArray(rule)) {
+        continue;
+      }
       this.walkDtlArray(rule as unknown[], isTopLevel, calls, errors);
     }
 
@@ -195,14 +203,18 @@ class DtlWalker {
   }
 
   walkDtlArray(arr: unknown[], isTopLevel: boolean, calls: DtlCall[], errors: string[]): void {
-    if (arr.length === 0) return;
+    if (arr.length === 0) {
+      return;
+    }
 
     const firstName = typeof arr[0] === "string" ? (arr[0] as string) : null;
     const argCount = arr.length - 1;
 
     // Find the position of this array in the raw text
     const arrayStart = this.findNextArrayStart();
-    if (arrayStart === -1) return;
+    if (arrayStart === -1) {
+      return;
+    }
 
     const arrayEnd = this.findMatchingClose(arrayStart);
 
@@ -248,7 +260,9 @@ class DtlWalker {
 
   private findNextArrayStart(): number {
     for (let i = this.scanPos; i < this.text.length; i++) {
-      if (this.text[i] === "[") return i;
+      if (this.text[i] === "[") {
+        return i;
+      }
     }
     return -1;
   }
@@ -271,11 +285,17 @@ class DtlWalker {
         inString = !inString;
         continue;
       }
-      if (inString) continue;
-      if (ch === "[" || ch === "{") depth++;
+      if (inString) {
+        continue;
+      }
+      if (ch === "[" || ch === "{") {
+        depth++;
+      }
       if (ch === "]" || ch === "}") {
         depth--;
-        if (depth === 0) return i;
+        if (depth === 0) {
+          return i;
+        }
       }
     }
     return this.text.length - 1;
@@ -286,7 +306,9 @@ class DtlWalker {
     const searchFrom = arrayStart + 1;
     const idx = this.text.indexOf(target, searchFrom);
     // Make sure it's close enough to the array start (within a few tokens)
-    if (idx !== -1 && idx < arrayStart + target.length + 5) return idx;
+    if (idx !== -1 && idx < arrayStart + target.length + 5) {
+      return idx;
+    }
     return idx;
   }
 }

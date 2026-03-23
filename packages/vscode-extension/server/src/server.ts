@@ -164,7 +164,9 @@ documents.onDidClose((event) => {
 // ---------------------------------------------------------------------------
 connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] => {
   const document = documents.get(params.textDocument.uri);
-  if (!document) return [];
+  if (!document) {
+    return [];
+  }
 
   const text = document.getText();
   const offset = document.offsetAt(params.position);
@@ -200,10 +202,14 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
 // ---------------------------------------------------------------------------
 connection.onHover((params: TextDocumentPositionParams): Hover | null => {
   const document = documents.get(params.textDocument.uri);
-  if (!document) return null;
+  if (!document) {
+    return null;
+  }
 
   const word = getWordAtPosition(document, params.position);
-  if (!word) return null;
+  if (!word) {
+    return null;
+  }
 
   // Check built-in variables first
   if (word.startsWith("_")) {
@@ -248,7 +254,9 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
 // ---------------------------------------------------------------------------
 connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => {
   const document = documents.get(params.textDocument.uri);
-  if (!document) return [];
+  if (!document) {
+    return [];
+  }
   const text = document.getText();
   let parsed: unknown;
   try {
@@ -256,7 +264,9 @@ connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => 
   } catch {
     return [];
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return [];
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return [];
+  }
   return buildDocumentSymbols(document, text, parsed as Record<string, unknown>);
 });
 
@@ -265,7 +275,9 @@ connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => 
 // ---------------------------------------------------------------------------
 connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] => {
   const document = documents.get(params.textDocument.uri);
-  if (!document) return [];
+  if (!document) {
+    return [];
+  }
 
   const text = document.getText();
   let parsed: unknown;
@@ -276,7 +288,9 @@ connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] =
   }
 
   const formatted = formatSesamJson(parsed, params.options.tabSize ?? 2);
-  if (formatted === text) return [];
+  if (formatted === text) {
+    return [];
+  }
 
   const endPos = document.positionAt(text.length);
   return [TextEdit.replace(Range.create(Position.create(0, 0), endPos), formatted)];

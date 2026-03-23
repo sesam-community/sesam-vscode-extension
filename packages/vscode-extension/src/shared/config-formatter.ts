@@ -20,8 +20,12 @@ const enum FmtContext {
 }
 
 export function sortObjectKeysRecursively(obj: unknown): unknown {
-  if (typeof obj !== "object" || obj === null) return obj;
-  if (Array.isArray(obj)) return obj.map(sortObjectKeysRecursively);
+  if (typeof obj !== "object" || obj === null) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sortObjectKeysRecursively);
+  }
   const sorted: Record<string, unknown> = {};
   for (const key of Object.keys(obj as Record<string, unknown>).sort()) {
     sorted[key] = sortObjectKeysRecursively((obj as Record<string, unknown>)[key]);
@@ -50,17 +54,24 @@ export function formatSesamJson(value: unknown, tabSize: number): string {
     }
 
     if (peekStack() === FmtContext.String) {
-      if (c === '"') stack.pop();
-      else if (c === "\\") stack.push(FmtContext.Escape);
+      if (c === '"') {
+        stack.pop();
+      } else if (c === "\\") {
+        stack.push(FmtContext.Escape);
+      }
     } else {
       if (c === '"') {
         stack.push(FmtContext.String);
       } else if (c === "{") {
-        if (peekStack() === FmtContext.Object) indent++;
+        if (peekStack() === FmtContext.Object) {
+          indent++;
+        }
         stack.push(FmtContext.Object);
       } else if (c === "}") {
         stack.pop();
-        if (peekStack() === FmtContext.Object) indent--;
+        if (peekStack() === FmtContext.Object) {
+          indent--;
+        }
       } else if (c === "[") {
         stack.push(FmtContext.Array);
         indent++;

@@ -62,7 +62,9 @@ export function isSourceTypeContext(prefix: string): boolean {
 }
 
 export function isSystemTypeContext(prefix: string): boolean {
-  if (!/"type"\s*:\s*"[^"]*$/.test(prefix)) return false;
+  if (!/"type"\s*:\s*"[^"]*$/.test(prefix)) {
+    return false;
+  }
   let depth = 0;
   let inStr = false;
   let esc = false;
@@ -80,8 +82,11 @@ export function isSystemTypeContext(prefix: string): boolean {
       continue;
     }
     if (!inStr) {
-      if (c === "{") depth++;
-      else if (c === "}") depth--;
+      if (c === "{") {
+        depth++;
+      } else if (c === "}") {
+        depth--;
+      }
     }
   }
   return depth === 1;
@@ -172,10 +177,16 @@ export function getWordAtPosition(document: TextDocument, position: Position): s
   const text = document.getText();
   const offset = document.offsetAt(position);
   let start = offset;
-  while (start > 0 && isWordChar(text[start - 1])) start--;
+  while (start > 0 && isWordChar(text[start - 1])) {
+    start--;
+  }
   let end = offset;
-  while (end < text.length && isWordChar(text[end])) end++;
-  if (start === end) return null;
+  while (end < text.length && isWordChar(text[end])) {
+    end++;
+  }
+  if (start === end) {
+    return null;
+  }
   return text.slice(start, end);
 }
 
@@ -254,14 +265,20 @@ export function buildDocumentSymbols(
     : typeof rawTransform === "object" && rawTransform !== null
       ? (rawTransform as Record<string, unknown>)
       : null;
-  if (!transform) return symbols;
+  if (!transform) {
+    return symbols;
+  }
 
   const rules = transform["rules"];
-  if (rules == null || typeof rules !== "object" || Array.isArray(rules)) return symbols;
+  if (rules == null || typeof rules !== "object" || Array.isArray(rules)) {
+    return symbols;
+  }
 
   const rulesObj = rules as Record<string, unknown>;
   const ruleNames = Object.keys(rulesObj);
-  if (ruleNames.length === 0) return symbols;
+  if (ruleNames.length === 0) {
+    return symbols;
+  }
 
   const topCalls = parseDtlText(text, "json").calls.filter(
     (c) => c.isTopLevel && c.functionName !== null,
@@ -271,7 +288,9 @@ export function buildDocumentSymbols(
   const ruleOffsets: Array<{ name: string; start: number; end: number }> = [];
   for (const name of ruleNames) {
     const off = findKeyOffset(text, name, rulesKeyOff);
-    if (off >= 0) ruleOffsets.push({ name, start: off, end: Infinity });
+    if (off >= 0) {
+      ruleOffsets.push({ name, start: off, end: Infinity });
+    }
   }
   ruleOffsets.sort((a, b) => a.start - b.start);
   for (let i = 0; i < ruleOffsets.length - 1; i++) {
@@ -306,7 +325,9 @@ export function buildDocumentSymbols(
     );
   }
 
-  if (ruleSymbols.length === 0) return symbols;
+  if (ruleSymbols.length === 0) {
+    return symbols;
+  }
 
   const rulesPos = document.positionAt(Math.max(0, rulesKeyOff));
   const lastRule = ruleSymbols[ruleSymbols.length - 1];

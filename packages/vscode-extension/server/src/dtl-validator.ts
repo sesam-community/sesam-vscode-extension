@@ -29,11 +29,15 @@ export function validateCalls(calls: DtlCall[], options: ValidatorOptions): Diag
   const diagnostics: Diagnostic[] = [];
 
   for (const call of calls) {
-    if (diagnostics.length >= options.maxProblems) break;
+    if (diagnostics.length >= options.maxProblems) {
+      break;
+    }
 
     const { functionName, nameRange, range, argCount } = call;
 
-    if (functionName === null) continue;
+    if (functionName === null) {
+      continue;
+    }
 
     // --- Unknown variable prefix
     if (functionName.startsWith("_") && !functionName.includes("-")) {
@@ -70,7 +74,9 @@ export function validateCalls(calls: DtlCall[], options: ValidatorOptions): Diag
       continue;
     }
 
-    if (!dtlFn) continue;
+    if (!dtlFn) {
+      continue;
+    }
 
     // --- Argument count validation
     if (options.validateArgCount) {

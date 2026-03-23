@@ -131,7 +131,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       const tabSize = typeof editor.options.tabSize === "number" ? editor.options.tabSize : 2;
       const formatted = formatSesamJson(parsed, tabSize);
-      if (formatted === text) return;
+      if (formatted === text) {
+        return;
+      }
       await editor.edit((editBuilder) => {
         const fullRange = new vscode.Range(
           editor.document.positionAt(0),
@@ -165,7 +167,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         placeHolder: "Select config template",
         title: "New Sesam Config File",
       });
-      if (!template) return;
+      if (!template) {
+        return;
+      }
 
       // ── Step 2: choose source type (pipes) or system type ────────────
       const SOURCE_TYPES: Array<{
@@ -302,14 +306,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           title: "New Sesam Config File — Source type",
           matchOnDescription: true,
         });
-        if (!picked) return;
+        if (!picked) {
+          return;
+        }
         sourceStub = picked.source;
       } else {
         const picked = await vscode.window.showQuickPick(SYSTEM_TYPES, {
           placeHolder: "Select system type",
           title: "New Sesam Config File — System type",
         });
-        if (!picked) return;
+        if (!picked) {
+          return;
+        }
         systemType = picked;
       }
 
@@ -318,12 +326,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         prompt: `Enter the config _id (used as filename: <id>${template.id === "system" ? ".conf.system" : ".conf.pipe"})`,
         placeHolder: template.id === "system" ? "my-rest-system" : "my-pipe-id",
         validateInput: (v) => {
-          if (!v.trim()) return "_id cannot be empty";
-          if (v.includes("/")) return 'Cannot contain "/"';
+          if (!v.trim()) {
+            return "_id cannot be empty";
+          }
+          if (v.includes("/")) {
+            return 'Cannot contain "/"';
+          }
           return null;
         },
       });
-      if (!configId) return;
+      if (!configId) {
+        return;
+      }
 
       // ── Step 4: build content ────────────────────────────────────────
       let content: object;
@@ -397,7 +411,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     vscode.workspace.onWillSaveTextDocument((event) => {
-      if (event.document.languageId !== "sesam-config") return;
+      if (event.document.languageId !== "sesam-config") {
+        return;
+      }
       const text = event.document.getText();
       let parsed: unknown;
       try {
@@ -408,7 +424,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const editor = vscode.window.visibleTextEditors.find((e) => e.document === event.document);
       const tabSize = typeof editor?.options.tabSize === "number" ? editor.options.tabSize : 2;
       const formatted = formatSesamJson(parsed, tabSize);
-      if (formatted === text) return;
+      if (formatted === text) {
+        return;
+      }
       const fullRange = new vscode.Range(
         event.document.positionAt(0),
         event.document.positionAt(text.length),
