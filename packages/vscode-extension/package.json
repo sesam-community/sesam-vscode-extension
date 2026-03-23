@@ -203,6 +203,7 @@
     "package": "vsce package"
   },
   "dependencies": {
+    "global": "^4.4.0",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
@@ -210,7 +211,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
-    "@vscode/vsce": "^3.0.0",
+    "@vscode/vsce": "^3.7.1",
     "typescript": "^5.4.0",
     "vite": "^6.0.0",
     "vitest": "^4.1.0"
