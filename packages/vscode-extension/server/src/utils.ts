@@ -255,96 +255,145 @@ export function buildDocumentSymbols(
     }
   }
 
-  // ── transform.rules ───────────────────────────────────────────────────────
+  // ── transform ─────────────────────────────────────────────────────────────
   const rawTransform = obj["transform"];
-  // Transform can be a plain object or an array of transform steps; find the DTL step.
-  const transform: Record<string, unknown> | null = Array.isArray(rawTransform)
-    ? (((rawTransform as unknown[]).find(
-        (t) => typeof t === "object" && t !== null && !Array.isArray(t),
-      ) as Record<string, unknown> | undefined) ?? null)
-    : typeof rawTransform === "object" && rawTransform !== null
-      ? (rawTransform as Record<string, unknown>)
-      : null;
-  if (!transform) {
+  if (rawTransform == null || typeof rawTransform !== "object") {
     return symbols;
   }
 
-  const rules = transform["rules"];
-  if (rules == null || typeof rules !== "object" || Array.isArray(rules)) {
+  // Normalise: always work with a flat list of step objects.
+  const isArrayTransform = Array.isArray(rawTransform);
+  const allSteps: unknown[] = isArrayTransform ? (rawTransform as unknown[]) : [rawTransform];
+
+  // Collect only DTL steps that have a "rules" object, in document order.
+  interface DtlStepInfo {
+    rulesObj: Record<string, unknown>;
+    rulesKeyOff: number;
+    /** Exclusive end offset bounding this step (start of next step's rules, or text.length). */
+    boundary: number;
+  }
+
+  const dtlStepInfos: DtlStepInfo[] = [];
+  let searchFrom = 0;
+
+  for (const step of allSteps) {
+    if (typeof step !== "object" || step === null || Array.isArray(step)) {
+      continue;
+    }
+    const rules = (step as Record<string, unknown>)["rules"];
+    if (rules == null || typeof rules !== "object" || Array.isArray(rules)) {
+      continue;
+    }
+    const rulesKeyOff = findKeyOffset(text, "rules", searchFrom);
+    if (rulesKeyOff < 0) {
+      continue;
+    }
+    dtlStepInfos.push({
+      rulesObj: rules as Record<string, unknown>,
+      rulesKeyOff,
+      boundary: 0, // filled below
+    });
+    searchFrom = rulesKeyOff + 7; // advance past `"rules"`
+  }
+
+  // Set each step's boundary to the next step's rulesKeyOff, last step → text.length.
+  for (let i = 0; i < dtlStepInfos.length; i++) {
+    dtlStepInfos[i].boundary =
+      i + 1 < dtlStepInfos.length ? dtlStepInfos[i + 1].rulesKeyOff : text.length;
+  }
+
+  if (dtlStepInfos.length === 0) {
     return symbols;
   }
 
-  const rulesObj = rules as Record<string, unknown>;
-  const ruleNames = Object.keys(rulesObj);
-  if (ruleNames.length === 0) {
-    return symbols;
-  }
-
-  const topCalls = parseDtlText(text, "json").calls.filter(
+  const allTopCalls = parseDtlText(text, "json").calls.filter(
     (c) => c.isTopLevel && c.functionName !== null,
   );
 
-  const rulesKeyOff = findKeyOffset(text, "rules");
-  const ruleOffsets: Array<{ name: string; start: number; end: number }> = [];
-  for (const name of ruleNames) {
-    const off = findKeyOffset(text, name, rulesKeyOff);
-    if (off >= 0) {
-      ruleOffsets.push({ name, start: off, end: Infinity });
+  // When the transform is an array with more than one DTL step, label each "dtl [N]".
+  const multiStep = isArrayTransform && dtlStepInfos.length > 1;
+
+  /** Build rule-name child symbols for one DTL step. */
+  const buildStepRuleSymbols = ({
+    rulesObj,
+    rulesKeyOff,
+    boundary,
+  }: DtlStepInfo): DocumentSymbol[] => {
+    const ruleNames = Object.keys(rulesObj);
+    if (ruleNames.length === 0) {
+      return [];
     }
-  }
-  ruleOffsets.sort((a, b) => a.start - b.start);
-  for (let i = 0; i < ruleOffsets.length - 1; i++) {
-    ruleOffsets[i].end = ruleOffsets[i + 1].start;
-  }
 
-  const ruleSymbols: DocumentSymbol[] = [];
-  for (const { name, start, end } of ruleOffsets) {
-    const callsInRule = topCalls.filter(
-      (c) => c.range.start.offset >= start && c.range.start.offset < end,
-    );
-    const callSymbols: DocumentSymbol[] = callsInRule.map((c) => {
-      const r = lspRange(c.range);
-      return DocumentSymbol.create(c.functionName!, undefined, SymbolKind.Function, r, r, []);
-    });
+    const ruleOffsets: Array<{ name: string; start: number; end: number }> = [];
+    let ruleSearchFrom = rulesKeyOff;
+    for (const name of ruleNames) {
+      const off = findKeyOffset(text, name, ruleSearchFrom);
+      if (off >= 0 && off < boundary) {
+        ruleOffsets.push({ name, start: off, end: 0 });
+        ruleSearchFrom = off + name.length + 3;
+      }
+    }
+    ruleOffsets.sort((a, b) => a.start - b.start);
+    for (let i = 0; i < ruleOffsets.length; i++) {
+      ruleOffsets[i].end = i + 1 < ruleOffsets.length ? ruleOffsets[i + 1].start : boundary;
+    }
 
-    const namePos = document.positionAt(start);
-    const bodyRange =
-      callSymbols.length > 0
-        ? Range.create(namePos, callSymbols[callSymbols.length - 1].range.end)
-        : Range.create(namePos, document.positionAt(start + name.length + 2));
+    return ruleOffsets.map(({ name, start, end }) => {
+      const callsInRule = allTopCalls.filter(
+        (c) => c.range.start.offset >= start && c.range.start.offset < end,
+      );
+      const callSymbols = callsInRule.map((c) => {
+        const r = lspRange(c.range);
+        return DocumentSymbol.create(c.functionName!, undefined, SymbolKind.Function, r, r, []);
+      });
 
-    ruleSymbols.push(
-      DocumentSymbol.create(
+      const namePos = document.positionAt(start);
+      const bodyRange =
+        callSymbols.length > 0
+          ? Range.create(namePos, callSymbols[callSymbols.length - 1].range.end)
+          : Range.create(namePos, document.positionAt(start + name.length + 2));
+
+      return DocumentSymbol.create(
         name,
         `${callSymbols.length} rule${callSymbols.length !== 1 ? "s" : ""}`,
         SymbolKind.Module,
         bodyRange,
         bodyRange,
         callSymbols,
-      ),
-    );
-  }
+      );
+    });
+  };
 
-  if (ruleSymbols.length === 0) {
-    return symbols;
-  }
+  // Build the child symbols that sit directly under "transform".
+  const transformChildren: DocumentSymbol[] = [];
 
-  const rulesPos = document.positionAt(Math.max(0, rulesKeyOff));
-  const lastRule = ruleSymbols[ruleSymbols.length - 1];
-  const rulesRange = Range.create(rulesPos, lastRule.range.end);
+  for (let si = 0; si < dtlStepInfos.length; si++) {
+    const stepInfo = dtlStepInfos[si];
+    const ruleSymbols = buildStepRuleSymbols(stepInfo);
+    if (ruleSymbols.length === 0) {
+      continue;
+    }
 
-  const transformOff = findKeyOffset(text, "transform");
-  const transformPos = document.positionAt(Math.max(0, transformOff));
-  const transformRange = Range.create(transformPos, lastRule.range.end);
+    const rulesPos = document.positionAt(Math.max(0, stepInfo.rulesKeyOff));
+    const lastRule = ruleSymbols[ruleSymbols.length - 1];
+    const rulesRange = Range.create(rulesPos, lastRule.range.end);
 
-  symbols.push(
-    DocumentSymbol.create(
-      "transform",
-      undefined,
-      SymbolKind.Namespace,
-      transformRange,
-      transformRange,
-      [
+    if (isArrayTransform) {
+      // Each DTL step is labelled "dtl" (or "dtl [N]" when there are multiple).
+      const label = multiStep ? `dtl [${si + 1}]` : "dtl";
+      transformChildren.push(
+        DocumentSymbol.create(
+          label,
+          undefined,
+          SymbolKind.Namespace,
+          rulesRange,
+          rulesRange,
+          ruleSymbols,
+        ),
+      );
+    } else {
+      // Plain-object transform: keep existing "rules" wrapper.
+      transformChildren.push(
         DocumentSymbol.create(
           "rules",
           undefined,
@@ -353,7 +402,27 @@ export function buildDocumentSymbols(
           rulesRange,
           ruleSymbols,
         ),
-      ],
+      );
+    }
+  }
+
+  if (transformChildren.length === 0) {
+    return symbols;
+  }
+
+  const transformOff = findKeyOffset(text, "transform");
+  const transformPos = document.positionAt(Math.max(0, transformOff));
+  const lastChild = transformChildren[transformChildren.length - 1];
+  const transformRange = Range.create(transformPos, lastChild.range.end);
+
+  symbols.push(
+    DocumentSymbol.create(
+      "transform",
+      undefined,
+      SymbolKind.Namespace,
+      transformRange,
+      transformRange,
+      transformChildren,
     ),
   );
 
