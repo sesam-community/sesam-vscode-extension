@@ -15,7 +15,7 @@ export interface DtlObject {
 }
 export type DtlValue = string | number | boolean | null | DtlValue[] | DtlObject;
 
-export interface EvalEntity extends DtlObject {}
+export type EvalEntity = DtlObject;
 
 export type EvalStatus = "ok" | "discarded" | "error";
 
@@ -26,10 +26,10 @@ export interface EvalResult {
 }
 
 interface EvalContext {
-  source: EvalEntity;
-  target: EvalEntity;
+  source: DtlObject;
+  target: DtlObject;
   current?: DtlValue; // _
-  parent?: EvalEntity; // _P
+  parent?: DtlObject; // _P
   warnings: string[];
 }
 
@@ -272,7 +272,7 @@ function evalStringExpr(str: string, ctx: EvalContext): DtlValue {
   }
   // _P — parent (not supported in preview)
   if (str === "_P" || str.startsWith("_P.")) {
-    return getProp(ctx.parent ?? ({} as EvalEntity), str.startsWith("_P.") ? str.slice(3) : "");
+    return getProp(ctx.parent ?? ({} as DtlObject), str.startsWith("_P.") ? str.slice(3) : "");
   }
   // _ — current value
   if (str === "_") {
@@ -283,7 +283,7 @@ function evalStringExpr(str: string, ctx: EvalContext): DtlValue {
   return str;
 }
 
-function getProp(entity: EvalEntity | Record<string, DtlValue>, path: string): DtlValue {
+function getProp(entity: DtlObject | Record<string, DtlValue>, path: string): DtlValue {
   const parts = path.split(".");
   let current: DtlValue = entity as unknown as DtlValue;
   for (const part of parts) {
