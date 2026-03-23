@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   sortObjectKeysRecursively,
   formatSesamJson,
-} from "../server/src/dtl-formatter";
+} from "../src/shared/config-formatter";
 
 // ---------------------------------------------------------------------------
 // sortObjectKeysRecursively
@@ -56,24 +56,25 @@ describe("sortObjectKeysRecursively", () => {
 });
 
 // ---------------------------------------------------------------------------
-// formatSesamJson — key sorting
+// formatSesamJson — key order
 // ---------------------------------------------------------------------------
 
-describe("formatSesamJson — key sorting", () => {
-  it("alphabetically sorts top-level keys", () => {
+describe("formatSesamJson — key order", () => {
+  it("preserves the original key insertion order", () => {
     const input = { z: "last", a: "first", m: "middle" };
     const out = formatSesamJson(input, 2);
     const zIdx = out.indexOf('"z"');
     const aIdx = out.indexOf('"a"');
     const mIdx = out.indexOf('"m"');
+    // z was inserted first, so it should appear first
+    expect(zIdx).toBeLessThan(aIdx);
     expect(aIdx).toBeLessThan(mIdx);
-    expect(mIdx).toBeLessThan(zIdx);
   });
 
-  it("sorts nested object keys", () => {
+  it("preserves insertion order in nested objects", () => {
     const input = { outer: { z: 1, a: 2 } };
     const out = formatSesamJson(input, 2);
-    expect(out.indexOf('"a"')).toBeLessThan(out.indexOf('"z"'));
+    expect(out.indexOf('"z"')).toBeLessThan(out.indexOf('"a"'));
   });
 });
 
