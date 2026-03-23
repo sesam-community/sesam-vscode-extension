@@ -425,6 +425,32 @@ export async function activate(
         PreviewPanel.currentPanel.updateDocument(event.document);
       }
     }),
+    vscode.workspace.onWillSaveTextDocument((event) => {
+      if (event.document.languageId !== "sesam-config") return;
+      const text = event.document.getText();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        return;
+      }
+      const editor = vscode.window.visibleTextEditors.find(
+        (e) => e.document === event.document,
+      );
+      const tabSize =
+        typeof editor?.options.tabSize === "number"
+          ? editor.options.tabSize
+          : 2;
+      const formatted = formatSesamJson(parsed, tabSize);
+      if (formatted === text) return;
+      const fullRange = new vscode.Range(
+        event.document.positionAt(0),
+        event.document.positionAt(text.length),
+      );
+      event.waitUntil(
+        Promise.resolve([vscode.TextEdit.replace(fullRange, formatted)]),
+      );
+    }),
   );
 }
 
