@@ -16,6 +16,7 @@ import {
 } from "vscode-languageclient/node";
 import { PipeGraphProvider } from "./graph/PipeGraphProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
+import { formatSesamJson } from "../../src/shared/dtl-formatter";
 
 let client: LanguageClient;
 
@@ -128,7 +129,7 @@ export async function activate(
       );
     }),
 
-    vscode.commands.registerCommand("sesam.formatDocument", () => {
+    vscode.commands.registerCommand("sesam.formatDocument", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor || editor.document.languageId !== "sesam-config") {
         vscode.window.showWarningMessage(
@@ -136,7 +137,25 @@ export async function activate(
         );
         return;
       }
-      vscode.commands.executeCommand("editor.action.formatDocument");
+      const text = editor.document.getText();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        vscode.window.showWarningMessage("Sesam: File is not valid JSON.");
+        return;
+      }
+      const tabSize =
+        typeof editor.options.tabSize === "number" ? editor.options.tabSize : 2;
+      const formatted = formatSesamJson(parsed, tabSize);
+      if (formatted === text) return;
+      await editor.edit((editBuilder) => {
+        const fullRange = new vscode.Range(
+          editor.document.positionAt(0),
+          editor.document.positionAt(text.length),
+        );
+        editBuilder.replace(fullRange, formatted);
+      });
     }),
 
     vscode.commands.registerCommand(

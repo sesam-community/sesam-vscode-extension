@@ -33,7 +33,7 @@ import {
 } from "../../src/shared/dtl-registry";
 import { parseDtlText } from "./dtl-parser";
 import { validateCalls, ValidatorOptions } from "./dtl-validator";
-import { formatSesamJson } from "./dtl-formatter";
+import { formatSesamJson } from "../../src/shared/dtl-formatter";
 
 // ---------------------------------------------------------------------------
 // Connection & document store
