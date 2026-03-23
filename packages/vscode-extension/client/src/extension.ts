@@ -347,20 +347,37 @@ export async function activate(
         }
 
         // ── Step 5: resolve target folder ────────────────────────────────
-        let folder: vscode.Uri;
+        // Always place pipes under <root>/pipes/ and systems under <root>/systems/
+        const subdir = template.id === "system" ? "systems" : "pipes";
+
+        let workspaceRoot: vscode.Uri;
         if (contextUri) {
           const stat = await vscode.workspace.fs.stat(contextUri);
-          folder =
+          const ctxDir =
             stat.type === vscode.FileType.Directory
               ? contextUri
               : vscode.Uri.file(path.dirname(contextUri.fsPath));
-        } else if (vscode.window.activeTextEditor) {
-          folder = vscode.Uri.file(
-            path.dirname(vscode.window.activeTextEditor.document.uri.fsPath),
-          );
+          // Walk up from the context dir to find (or use) a workspace folder root
+          workspaceRoot =
+            vscode.workspace.getWorkspaceFolder(ctxDir)?.uri ?? ctxDir;
         } else {
-          folder =
-            vscode.workspace.workspaceFolders?.[0]?.uri ?? vscode.Uri.file(".");
+          workspaceRoot =
+            vscode.workspace.workspaceFolders?.[0]?.uri ??
+            (vscode.window.activeTextEditor
+              ? vscode.Uri.file(
+                  path.dirname(
+                    vscode.window.activeTextEditor.document.uri.fsPath,
+                  ),
+                )
+              : vscode.Uri.file("."));
+        }
+
+        const folder = vscode.Uri.joinPath(workspaceRoot, subdir);
+        // Create the subdirectory if it doesn't exist
+        try {
+          await vscode.workspace.fs.createDirectory(folder);
+        } catch {
+          // already exists — ignore
         }
 
         // ── Step 6: write and open ────────────────────────────────────────
