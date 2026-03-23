@@ -1,0 +1,27 @@
+{
+  "iconDefinitions": {
+    "_sesam_config": {
+      "iconPath": "./original.png"
+    },
+    "_sesam_settings": {
+      "iconPath": "./settings.png"
+    },
+    "_sesam_node": {
+      "iconPath": "./node.png"
+    }
+  },
+  "languageIds": {
+    "sesam-config": "_sesam_config"
+  },
+  "fileExtensions": {
+    "conf.pipe": "_sesam_config",
+    "conf.system": "_sesam_config",
+    "conf.json": "_sesam_config"
+  },
+  "fileNames": {
+    ".syncconfig": "_sesam_settings",
+    ".sesamconfig.json": "_sesam_config",
+    ".authconfig": "_sesam_config",
+    "node-metadata.conf.json": "_sesam_node"
+  }
+}
