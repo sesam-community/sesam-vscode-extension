@@ -24,7 +24,7 @@ import type { DtlRange } from "./dtl-parser";
 // ---------------------------------------------------------------------------
 // Node-backed validation helpers (retained for future use)
 // ---------------------------------------------------------------------------
-export function levelToSeverity(level: string): DiagnosticSeverity {
+export const levelToSeverity = (level: string): DiagnosticSeverity => {
   switch (level) {
     case "warning":
       return DiagnosticSeverity.Warning;
@@ -33,13 +33,13 @@ export function levelToSeverity(level: string): DiagnosticSeverity {
     default: // "error" or "critical"
       return DiagnosticSeverity.Error;
   }
-}
+};
 
-export function escapeRegex(s: string): string {
+export const escapeRegex = (s: string): string => {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+};
 
-export function elementsToRange(document: TextDocument, text: string, elements: string): Range {
+export const elementsToRange = (document: TextDocument, text: string, elements: string): Range => {
   const match = /\['([^']+)'\]/.exec(elements);
   if (match) {
     const key = match[1];
@@ -52,16 +52,16 @@ export function elementsToRange(document: TextDocument, text: string, elements: 
     }
   }
   return Range.create(Position.create(0, 0), Position.create(0, Number.MAX_SAFE_INTEGER));
-}
+};
 
 // ---------------------------------------------------------------------------
 // Completion context predicates
 // ---------------------------------------------------------------------------
-export function isSourceTypeContext(prefix: string): boolean {
+export const isSourceTypeContext = (prefix: string): boolean => {
   return /"source"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix);
-}
+};
 
-export function isSystemTypeContext(prefix: string): boolean {
+export const isSystemTypeContext = (prefix: string): boolean => {
   if (!/"type"\s*:\s*"[^"]*$/.test(prefix)) {
     return false;
   }
@@ -90,20 +90,20 @@ export function isSystemTypeContext(prefix: string): boolean {
     }
   }
   return depth === 1;
-}
+};
 
-export function isVariableContext(prefix: string): boolean {
+export const isVariableContext = (prefix: string): boolean => {
   return /"\s*_[STPRB]?\.?[^"]*$/.test(prefix);
-}
+};
 
-export function isFunctionNameContext(prefix: string): boolean {
+export const isFunctionNameContext = (prefix: string): boolean => {
   return /\[\s*"[^"]*$/.test(prefix) || /\[\s*$/.test(prefix);
-}
+};
 
 // ---------------------------------------------------------------------------
 // Completion item builders
 // ---------------------------------------------------------------------------
-export function buildSystemTypeCompletions(): CompletionItem[] {
+export const buildSystemTypeCompletions = (): CompletionItem[] => {
   return SYSTEM_TYPES.map(({ label, detail, doc }) => ({
     label,
     kind: CompletionItemKind.EnumMember,
@@ -115,9 +115,9 @@ export function buildSystemTypeCompletions(): CompletionItem[] {
     insertText: label,
     sortText: label,
   }));
-}
+};
 
-export function buildSourceTypeCompletions(): CompletionItem[] {
+export const buildSourceTypeCompletions = (): CompletionItem[] => {
   return PIPE_SOURCE_TYPES.map(({ label, detail, doc }) => ({
     label,
     kind: CompletionItemKind.EnumMember,
@@ -129,9 +129,9 @@ export function buildSourceTypeCompletions(): CompletionItem[] {
     insertText: label,
     sortText: label,
   }));
-}
+};
 
-export function buildFunctionCompletions(): CompletionItem[] {
+export const buildFunctionCompletions = (): CompletionItem[] => {
   return getAllFunctions().map((fn: DtlFunction) => ({
     label: fn.name,
     kind: fn.kind === "transform" ? CompletionItemKind.Method : CompletionItemKind.Function,
@@ -144,9 +144,9 @@ export function buildFunctionCompletions(): CompletionItem[] {
     sortText: fn.kind === "transform" ? `0_${fn.name}` : `1_${fn.name}`,
     insertText: fn.name,
   }));
-}
+};
 
-export function buildVariableCompletions(): CompletionItem[] {
+export const buildVariableCompletions = (): CompletionItem[] => {
   const items: CompletionItem[] = Object.entries(DTL_VARIABLES).map(([name, desc]) => ({
     label: name,
     kind: CompletionItemKind.Variable,
@@ -168,12 +168,12 @@ export function buildVariableCompletions(): CompletionItem[] {
     });
   });
   return items;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Hover helpers
 // ---------------------------------------------------------------------------
-export function getWordAtPosition(document: TextDocument, position: Position): string | null {
+export const getWordAtPosition = (document: TextDocument, position: Position): string | null => {
   const text = document.getText();
   const offset = document.offsetAt(position);
   let start = offset;
@@ -188,13 +188,13 @@ export function getWordAtPosition(document: TextDocument, position: Position): s
     return null;
   }
   return text.slice(start, end);
-}
+};
 
-export function isWordChar(ch: string): boolean {
+export const isWordChar = (ch: string): boolean => {
   return /[a-zA-Z0-9_$\-!.]/.test(ch);
-}
+};
 
-export function buildFunctionMarkdown(fn: DtlFunction): string {
+export const buildFunctionMarkdown = (fn: DtlFunction): string => {
   const kindLabel = fn.kind === "transform" ? "🔧 Transform" : "📦 Expression";
   const params = fn.params
     .map((p) => `- \`${p.name}\`${p.optional ? " *(optional)*" : ""} — ${p.description}`)
@@ -216,30 +216,30 @@ export function buildFunctionMarkdown(fn: DtlFunction): string {
     "",
     `[📖 Documentation](${fn.docUrl})`,
   ].join("\n");
-}
+};
 
 // ---------------------------------------------------------------------------
 // Document Symbols helpers
 // ---------------------------------------------------------------------------
-export function lspRange(r: DtlRange): Range {
+export const lspRange = (r: DtlRange): Range => {
   return Range.create(
     Position.create(r.start.line, r.start.character),
     Position.create(r.end.line, r.end.character),
   );
-}
+};
 
-export function findKeyOffset(text: string, key: string, fromOffset = 0): number {
+export const findKeyOffset = (text: string, key: string, fromOffset = 0): number => {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(`"${escaped}"\\s*:`);
   const m = pattern.exec(text.slice(fromOffset));
   return m ? fromOffset + m.index : -1;
-}
+};
 
-export function buildDocumentSymbols(
+export const buildDocumentSymbols = (
   document: TextDocument,
   text: string,
   obj: Record<string, unknown>,
-): DocumentSymbol[] {
+): DocumentSymbol[] => {
   const symbols: DocumentSymbol[] = [];
 
   // ── _id symbol ────────────────────────────────────────────────────────────
@@ -427,4 +427,4 @@ export function buildDocumentSymbols(
   );
 
   return symbols;
-}
+};
