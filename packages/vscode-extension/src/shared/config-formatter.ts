@@ -19,7 +19,7 @@ const enum FmtContext {
   Escape,
 }
 
-export function sortObjectKeysRecursively(obj: unknown): unknown {
+export const sortObjectKeysRecursively = (obj: unknown): unknown => {
   if (typeof obj !== "object" || obj === null) {
     return obj;
   }
@@ -31,9 +31,9 @@ export function sortObjectKeysRecursively(obj: unknown): unknown {
     sorted[key] = sortObjectKeysRecursively((obj as Record<string, unknown>)[key]);
   }
   return sorted;
-}
+};
 
-export function formatSesamJson(value: unknown, tabSize: number): string {
+export const formatSesamJson = (value: unknown, tabSize: number): string => {
   const indentation = " ".repeat(tabSize);
   const compact = JSON.stringify(value, null, 0);
 
@@ -134,4 +134,4 @@ export function formatSesamJson(value: unknown, tabSize: number): string {
   }
 
   return output;
-}
+};
