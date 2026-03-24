@@ -214,8 +214,6 @@ const FUNCTIONS: DtlFunction[] = [
     category: "Transforms",
     // filter is overloaded: as a transform it drops the current entity (0–1 args);
     // as a list expression it filters a list (2 args: function + values).
-    // kind is set to "expression" to avoid false "transform-as-expression" warnings
-    // when the list variant is used nested inside another expression.
     kind: "expression",
     signature: "filter([condition]) | filter(function, values)",
     description:
