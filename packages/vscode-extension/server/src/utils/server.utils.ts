@@ -51,7 +51,7 @@ export const elementsToRange = (document: TextDocument, text: string, elements: 
       return Range.create(start, end);
     }
   }
-  return Range.create(Position.create(0, 0), Position.create(0, Number.MAX_SAFE_INTEGER));
+  return Range.create(Position.create(0, 0), Position.create(0, Number.MAX_VALUE));
 };
 
 // ---------------------------------------------------------------------------
