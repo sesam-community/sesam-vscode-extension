@@ -4,54 +4,9 @@
  * Based on official Sesam DTL documentation: https://docs.sesam.io/hub/data-transformation-language.html
  */
 
-export type DtlFunctionKind = "transform" | "expression";
+import type { DtlCategory, DtlFunction, DtlFunctionKind, DtlParam } from "./dtl-registry.types";
 
-export type DtlCategory =
-  | "Transforms"
-  | "Boolean logic"
-  | "Booleans"
-  | "Bytes"
-  | "Comparisons"
-  | "Conditionals"
-  | "Date and time"
-  | "Dictionaries"
-  | "Encryption"
-  | "Hops"
-  | "JSON"
-  | "Lists"
-  | "Math"
-  | "Misc"
-  | "Namespaced identifiers"
-  | "Nulls"
-  | "Numbers"
-  | "Phonenumbers"
-  | "Sets"
-  | "Strings"
-  | "URIs"
-  | "UUIDs";
-
-export interface DtlParam {
-  name: string;
-  description: string;
-  optional?: boolean;
-}
-
-export interface DtlFunction {
-  /** The function name as it appears in DTL (e.g. "add", "concat") */
-  name: string;
-  category: DtlCategory;
-  kind: DtlFunctionKind;
-  /** Human-readable call signature, e.g. "add(property, value)" */
-  signature: string;
-  /** Short description shown in hover and completion details */
-  description: string;
-  params: DtlParam[];
-  /** Minimum number of arguments (excluding function name) */
-  minArgs: number;
-  /** Maximum number of arguments. null = variadic */
-  maxArgs: number | null;
-  docUrl: string;
-}
+export type { DtlCategory, DtlFunction, DtlFunctionKind, DtlParam };
 
 const BASE_DOC_URL = "https://docs.sesam.io/hub/dtl";
 
@@ -2164,39 +2119,28 @@ const INDEX = new Map<string, DtlFunction>(FUNCTIONS.map((f) => [f.name, f]));
 // ---------------------------------------------------------------------------
 
 /** Returns the definition for the given function name, or undefined if unknown. */
-export function getDtlFunction(name: string): DtlFunction | undefined {
-  return INDEX.get(name);
-}
+export const getDtlFunction = (name: string): DtlFunction | undefined => INDEX.get(name);
 
 /** Returns all registered DTL functions. */
-export function getAllFunctions(): DtlFunction[] {
-  return FUNCTIONS;
-}
+export const getAllFunctions = (): DtlFunction[] => FUNCTIONS;
 
 /** Returns all transform functions (those with side-effects). */
-export function getTransformFunctions(): DtlFunction[] {
-  return FUNCTIONS.filter((f) => f.kind === "transform");
-}
+export const getTransformFunctions = (): DtlFunction[] =>
+  FUNCTIONS.filter((f) => f.kind === "transform");
 
 /** Returns all expression functions (no side-effects, return values). */
-export function getExpressionFunctions(): DtlFunction[] {
-  return FUNCTIONS.filter((f) => f.kind === "expression");
-}
+export const getExpressionFunctions = (): DtlFunction[] =>
+  FUNCTIONS.filter((f) => f.kind === "expression");
 
 /** Returns all functions in a given category. */
-export function getFunctionsByCategory(category: DtlCategory): DtlFunction[] {
-  return FUNCTIONS.filter((f) => f.category === category);
-}
+export const getFunctionsByCategory = (category: DtlCategory): DtlFunction[] =>
+  FUNCTIONS.filter((f) => f.category === category);
 
 /** Returns all known function names. */
-export function getAllFunctionNames(): string[] {
-  return FUNCTIONS.map((f) => f.name);
-}
+export const getAllFunctionNames = (): string[] => FUNCTIONS.map((f) => f.name);
 
 /** Returns true if the given name is a known DTL function. */
-export function isKnownFunction(name: string): boolean {
-  return INDEX.has(name);
-}
+export const isKnownFunction = (name: string): boolean => INDEX.has(name);
 
 /** Built-in DTL variable descriptions. */
 export const DTL_VARIABLES: Record<string, string> = {
