@@ -17,6 +17,8 @@ import {
   TextEdit,
   Range,
   Position,
+  Location,
+  ReferenceParams,
   Diagnostic,
   DocumentSymbol,
   DocumentSymbolParams,
@@ -45,6 +47,12 @@ import {
   buildFunctionMarkdown,
   buildDocumentSymbols,
 } from "./utils/server.utils";
+import {
+  findApplyRuleReference,
+  findRuleDefinition,
+  findRuleKeyAtOffset,
+  findAllApplyReferences,
+} from "./utils/definition.utils";
 
 import type { DtlSettings } from "./server.types";
 
@@ -70,6 +78,8 @@ connection.onInitialize((): InitializeResult => {
         resolveProvider: false,
       },
       hoverProvider: true,
+      definitionProvider: true,
+      referencesProvider: true,
       documentFormattingProvider: true,
       documentSymbolProvider: true,
     },
@@ -293,6 +303,77 @@ connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] =
 
   const endPos = document.positionAt(text.length);
   return [TextEdit.replace(Range.create(Position.create(0, 0), endPos), formatted)];
+});
+
+// ---------------------------------------------------------------------------
+// Go to Definition
+// ---------------------------------------------------------------------------
+connection.onDefinition((params: TextDocumentPositionParams): Location | null => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return null;
+  }
+
+  const text = document.getText();
+  const offset = document.offsetAt(params.position);
+
+  const ref = findApplyRuleReference(text, offset);
+  if (!ref) {
+    return null;
+  }
+
+  const def = findRuleDefinition(text, ref.ruleName, offset);
+  if (!def) {
+    return null;
+  }
+
+  return Location.create(
+    params.textDocument.uri,
+    Range.create(document.positionAt(def.keyStart), document.positionAt(def.keyEnd)),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Find All References
+// ---------------------------------------------------------------------------
+connection.onReferences((params: ReferenceParams): Location[] | null => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return null;
+  }
+
+  const text = document.getText();
+  const offset = document.offsetAt(params.position);
+
+  const keyHit = findRuleKeyAtOffset(text, offset);
+  const applyHit = keyHit ? null : findApplyRuleReference(text, offset);
+  const ruleName = keyHit?.ruleName ?? applyHit?.ruleName ?? null;
+
+  if (!ruleName) {
+    return null;
+  }
+
+  const refs = findAllApplyReferences(text, ruleName);
+  const locations: Location[] = refs.map(({ start, end }) =>
+    Location.create(
+      params.textDocument.uri,
+      Range.create(document.positionAt(start), document.positionAt(end)),
+    ),
+  );
+
+  if (params.context.includeDeclaration) {
+    const def = findRuleDefinition(text, ruleName, offset);
+    if (def) {
+      locations.push(
+        Location.create(
+          params.textDocument.uri,
+          Range.create(document.positionAt(def.keyStart), document.positionAt(def.keyEnd)),
+        ),
+      );
+    }
+  }
+
+  return locations.length > 0 ? locations : null;
 });
 
 // ---------------------------------------------------------------------------
