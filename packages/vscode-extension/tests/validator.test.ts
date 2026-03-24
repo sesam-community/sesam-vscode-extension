@@ -48,18 +48,15 @@ describe("unknown function diagnostics", () => {
 
   it("emits no diagnostic for a known function with correct args", () => {
     // "add" requires 2 args
-    const diags = validateCalls(
-      [makeCall({ functionName: "add", argCount: 2 })],
-      defaultOptions,
-    );
+    const diags = validateCalls([makeCall({ functionName: "add", argCount: 2 })], defaultOptions);
     expect(diags).toHaveLength(0);
   });
 
   it("skips unknown-function check when validateUnknownFunctions is false", () => {
-    const diags = validateCalls(
-      [makeCall({ functionName: "fantasy-function" })],
-      { ...defaultOptions, validateUnknownFunctions: false },
-    );
+    const diags = validateCalls([makeCall({ functionName: "fantasy-function" })], {
+      ...defaultOptions,
+      validateUnknownFunctions: false,
+    });
     expect(diags).toHaveLength(0);
   });
 });
@@ -71,10 +68,7 @@ describe("unknown function diagnostics", () => {
 describe("argument count diagnostics", () => {
   it("emits a warning when too few arguments are provided", () => {
     // "add" minArgs = 2; provide 0
-    const diags = validateCalls(
-      [makeCall({ functionName: "add", argCount: 0 })],
-      defaultOptions,
-    );
+    const diags = validateCalls([makeCall({ functionName: "add", argCount: 0 })], defaultOptions);
     const warning = diags.find((d) => d.code === "too-few-args");
     expect(warning).toBeDefined();
     expect(warning!.severity).toBe(DiagnosticSeverity.Warning);
@@ -82,20 +76,17 @@ describe("argument count diagnostics", () => {
 
   it("emits a warning when too many arguments are provided", () => {
     // "copy" maxArgs = 1; provide 5
-    const diags = validateCalls(
-      [makeCall({ functionName: "copy", argCount: 5 })],
-      defaultOptions,
-    );
+    const diags = validateCalls([makeCall({ functionName: "copy", argCount: 5 })], defaultOptions);
     const warning = diags.find((d) => d.code === "too-many-args");
     expect(warning).toBeDefined();
     expect(warning!.severity).toBe(DiagnosticSeverity.Warning);
   });
 
   it("skips arg-count check when validateArgCount is false", () => {
-    const diags = validateCalls(
-      [makeCall({ functionName: "add", argCount: 0 })],
-      { ...defaultOptions, validateArgCount: false },
-    );
+    const diags = validateCalls([makeCall({ functionName: "add", argCount: 0 })], {
+      ...defaultOptions,
+      validateArgCount: false,
+    });
     expect(diags.find((d) => d.code === "too-few-args")).toBeUndefined();
   });
 });
@@ -106,10 +97,7 @@ describe("argument count diagnostics", () => {
 
 describe("unknown variable prefix diagnostics", () => {
   it("emits a warning for an unknown variable prefix", () => {
-    const diags = validateCalls(
-      [makeCall({ functionName: "_X.field" })],
-      defaultOptions,
-    );
+    const diags = validateCalls([makeCall({ functionName: "_X.field" })], defaultOptions);
     expect(diags).toHaveLength(1);
     expect(diags[0].severity).toBe(DiagnosticSeverity.Warning);
     expect(diags[0].code).toBe("unknown-variable");
@@ -118,15 +106,9 @@ describe("unknown variable prefix diagnostics", () => {
 
   it("does not warn for known variable prefixes", () => {
     for (const prefix of ["_S", "_T", "_P", "_R", "_B", "_"]) {
-      const diags = validateCalls(
-        [makeCall({ functionName: `${prefix}.field` })],
-        defaultOptions,
-      );
+      const diags = validateCalls([makeCall({ functionName: `${prefix}.field` })], defaultOptions);
       const varWarning = diags.find((d) => d.code === "unknown-variable");
-      expect(
-        varWarning,
-        `Expected no unknown-variable warning for ${prefix}`,
-      ).toBeUndefined();
+      expect(varWarning, `Expected no unknown-variable warning for ${prefix}`).toBeUndefined();
     }
   });
 });
@@ -137,9 +119,7 @@ describe("unknown variable prefix diagnostics", () => {
 
 describe("maxProblems", () => {
   it("stops reporting after maxProblems is reached", () => {
-    const calls = Array.from({ length: 20 }, () =>
-      makeCall({ functionName: "unknown-fn-xyz" }),
-    );
+    const calls = Array.from({ length: 20 }, () => makeCall({ functionName: "unknown-fn-xyz" }));
     const diags = validateCalls(calls, { ...defaultOptions, maxProblems: 5 });
     expect(diags.length).toBeLessThanOrEqual(5);
   });
@@ -151,50 +131,8 @@ describe("maxProblems", () => {
 
 describe("null function name", () => {
   it("skips calls with a null function name", () => {
-    const diags = validateCalls(
-      [makeCall({ functionName: null })],
-      defaultOptions,
-    );
+    const diags = validateCalls([makeCall({ functionName: null })], defaultOptions);
     expect(diags).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// transform-as-expression
-// ---------------------------------------------------------------------------
-
-describe("transform-as-expression diagnostics", () => {
-  it("emits a warning when a transform function is used nested (non-top-level)", () => {
-    // "add" is a transform; nesting it inside an expression is invalid
-    const diags = validateCalls(
-      [makeCall({ functionName: "add", argCount: 2, isTopLevel: false })],
-      defaultOptions,
-    );
-    const warning = diags.find((d) => d.code === "transform-as-expression");
-    expect(warning).toBeDefined();
-    expect(warning!.severity).toBe(DiagnosticSeverity.Warning);
-    expect(warning!.message).toContain("add");
-  });
-
-  it("does not warn when a transform function is used at the top level", () => {
-    const diags = validateCalls(
-      [makeCall({ functionName: "add", argCount: 2, isTopLevel: true })],
-      defaultOptions,
-    );
-    expect(
-      diags.find((d) => d.code === "transform-as-expression"),
-    ).toBeUndefined();
-  });
-
-  it("does not warn when an expression function is used nested", () => {
-    // "and" is an expression, nesting is fine
-    const diags = validateCalls(
-      [makeCall({ functionName: "and", argCount: 2, isTopLevel: false })],
-      defaultOptions,
-    );
-    expect(
-      diags.find((d) => d.code === "transform-as-expression"),
-    ).toBeUndefined();
   });
 });
 
@@ -204,28 +142,13 @@ describe("transform-as-expression diagnostics", () => {
 
 describe("diagnostic source field", () => {
   it("sets source to 'dtl' on unknown-function diagnostics", () => {
-    const diags = validateCalls(
-      [makeCall({ functionName: "no-such-fn" })],
-      defaultOptions,
-    );
+    const diags = validateCalls([makeCall({ functionName: "no-such-fn" })], defaultOptions);
     expect(diags[0].source).toBe("dtl");
   });
 
   it("sets source to 'dtl' on too-few-args diagnostics", () => {
-    const diags = validateCalls(
-      [makeCall({ functionName: "add", argCount: 0 })],
-      defaultOptions,
-    );
+    const diags = validateCalls([makeCall({ functionName: "add", argCount: 0 })], defaultOptions);
     const diag = diags.find((d) => d.code === "too-few-args");
-    expect(diag!.source).toBe("dtl");
-  });
-
-  it("sets source to 'dtl' on transform-as-expression diagnostics", () => {
-    const diags = validateCalls(
-      [makeCall({ functionName: "add", argCount: 2, isTopLevel: false })],
-      defaultOptions,
-    );
-    const diag = diags.find((d) => d.code === "transform-as-expression");
     expect(diag!.source).toBe("dtl");
   });
 });

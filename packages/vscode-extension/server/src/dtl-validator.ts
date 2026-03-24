@@ -98,20 +98,6 @@ export const validateCalls = (calls: DtlCall[], options: ValidatorOptions): Diag
         });
       }
     }
-
-    // --- Transform used as expression (nested non-top-level)
-    if (!call.isTopLevel && dtlFn.kind === "transform") {
-      const diagRange = nameRange
-        ? toRange(nameRange.start, nameRange.end)
-        : toRange(range.start, range.end);
-      diagnostics.push({
-        range: diagRange,
-        severity: DiagnosticSeverity.Warning,
-        message: `"${functionName}" is a transform function with side-effects and should only be used at the top level of a rules list, not nested inside expressions.`,
-        source: "dtl",
-        code: "transform-as-expression",
-      });
-    }
   }
 
   return diagnostics;

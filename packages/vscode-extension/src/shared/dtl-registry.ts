@@ -41,36 +41,48 @@ const FUNCTIONS: DtlFunction[] = [
     name: "add-if",
     category: "Transforms",
     kind: "transform",
-    signature: "add-if(property, value)",
-    description: "Adds a property to the target entity only if the value is truthy.",
+    signature: "add-if(property [, condition], value)",
+    description:
+      "Adds PROPERTY to the target entity with VALUE if the optional CONDITION is truthy (defaults to non-null check).",
     params: [
       {
         name: "property",
         description: "The property name to set on the target entity.",
       },
       {
+        name: "condition",
+        optional: true,
+        description: "Optional boolean expression; defaults to non-null check on value.",
+      },
+      {
         name: "value",
-        description: "The value to assign. Property is not set if value is null/false.",
+        description: "The value to assign. Property is not set if condition is falsy.",
       },
     ],
     minArgs: 2,
-    maxArgs: 2,
+    maxArgs: 3,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
   {
     name: "copy",
     category: "Transforms",
     kind: "transform",
-    signature: "copy(property-or-wildcard)",
-    description: "Copies one or more properties from the source entity to the target entity.",
+    signature: "copy(include [, exclude])",
+    description:
+      "Copies properties matching INCLUDE from the source entity to the target entity. Properties matching EXCLUDE are omitted.",
     params: [
       {
-        name: "property-or-wildcard",
-        description: 'Property name or wildcard (e.g. "*").',
+        name: "include",
+        description: 'Property name or wildcard pattern(s) to include (e.g. "*").',
+      },
+      {
+        name: "exclude",
+        optional: true,
+        description: "Property name or wildcard pattern(s) to exclude.",
       },
     ],
     minArgs: 1,
-    maxArgs: 1,
+    maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
   {
@@ -91,14 +103,19 @@ const FUNCTIONS: DtlFunction[] = [
     name: "make-ni",
     category: "Transforms",
     kind: "transform",
-    signature: "make-ni(property, namespace, value)",
-    description: "Creates a namespaced identifier and adds it to the target entity.",
+    signature: "make-ni(namespace, from-property [, to-property])",
+    description:
+      "Adds FROM_PROPERTY as namespaced identifiers in NAMESPACE to the target entity. TO_PROPERTY defaults to FROM_PROPERTY + '-ni'.",
     params: [
-      { name: "property", description: "Target property name." },
       { name: "namespace", description: "Namespace string." },
-      { name: "value", description: "Value to namespace." },
+      { name: "from-property", description: "Source property name whose values are namespaced." },
+      {
+        name: "to-property",
+        optional: true,
+        description: "Target property name. Defaults to from-property + '-ni'.",
+      },
     ],
-    minArgs: 3,
+    minArgs: 2,
     maxArgs: 3,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
@@ -163,39 +180,12 @@ const FUNCTIONS: DtlFunction[] = [
     name: "create",
     category: "Transforms",
     kind: "transform",
-    signature: "create(entity, ...)",
-    description: "Creates one or more new root entities in the output stream.",
-    params: [{ name: "entity", description: "Entity or list of entities to emit." }],
-    minArgs: 1,
-    maxArgs: null,
-    docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
-  },
-  {
-    name: "create-child",
-    category: "Transforms",
-    kind: "transform",
-    signature: "create-child(entity, ...)",
-    description: "Creates child entities added to the $children field of the target entity.",
+    signature: "create(values)",
+    description: "For each entity in VALUES emits it as a new root entity in the output pipeline.",
     params: [
       {
-        name: "entity",
-        description: "Entity or list of entities to create as children.",
-      },
-    ],
-    minArgs: 1,
-    maxArgs: null,
-    docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
-  },
-  {
-    name: "filter",
-    category: "Transforms",
-    kind: "transform",
-    signature: "filter(condition)",
-    description: "Discards the current entity if the condition is falsy.",
-    params: [
-      {
-        name: "condition",
-        description: "Boolean expression. Entity is kept when truthy.",
+        name: "values",
+        description: "A value expression yielding the entity or entities to emit.",
       },
     ],
     minArgs: 1,
@@ -203,14 +193,64 @@ const FUNCTIONS: DtlFunction[] = [
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
   {
+    name: "create-child",
+    category: "Transforms",
+    kind: "transform",
+    signature: "create-child(values)",
+    description:
+      "For each entity in VALUES adds it to the $children property on the target entity.",
+    params: [
+      {
+        name: "values",
+        description: "A value expression yielding the entity or entities to add as children.",
+      },
+    ],
+    minArgs: 1,
+    maxArgs: 1,
+    docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
+  },
+  {
+    name: "filter",
+    category: "Transforms",
+    // filter is overloaded: as a transform it drops the current entity (0–1 args);
+    // as a list expression it filters a list (2 args: function + values).
+    kind: "expression",
+    signature: "filter([condition]) | filter(function, values)",
+    description:
+      "As a transform: discards the current entity if CONDITION is falsy (or unconditionally if omitted). " +
+      "As a list expression: returns the elements of VALUES for which FUNCTION evaluates to true.",
+    params: [
+      {
+        name: "condition / function",
+        description:
+          "Transform variant: boolean condition (optional). Expression variant: function applied to each element (use _ for current).",
+      },
+      {
+        name: "values",
+        optional: true,
+        description: "Expression variant: the list to filter.",
+      },
+    ],
+    minArgs: 0,
+    maxArgs: 2,
+    docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
+  },
+  {
     name: "discard",
     category: "Transforms",
     kind: "transform",
-    signature: "discard()",
-    description: "Unconditionally discards the current entity from the output stream.",
-    params: [],
+    signature: "discard([unless-condition])",
+    description:
+      "Drops the target entity. If UNLESS_CONDITION is given and evaluates to true, the entity is kept.",
+    params: [
+      {
+        name: "unless-condition",
+        optional: true,
+        description: "If this expression is true the entity is NOT discarded.",
+      },
+    ],
     minArgs: 0,
-    maxArgs: 0,
+    maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
   {
@@ -273,11 +313,12 @@ const FUNCTIONS: DtlFunction[] = [
     name: "comment",
     category: "Transforms",
     kind: "transform",
-    signature: "comment(text)",
-    description: "A no-op transform used for inline documentation.",
-    params: [{ name: "text", description: "Comment text (ignored at runtime)." }],
-    minArgs: 1,
-    maxArgs: 1,
+    signature: "comment(text, ...)",
+    description:
+      "A no-op transform used for inline documentation. Any number of comment lines can be given.",
+    params: [{ name: "text", optional: true, description: "Comment text (ignored at runtime)." }],
+    minArgs: 0,
+    maxArgs: null,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
   {

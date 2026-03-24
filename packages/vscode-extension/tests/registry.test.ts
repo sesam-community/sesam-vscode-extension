@@ -149,13 +149,19 @@ describe("getTransformFunctions", () => {
     expect(fns.every((f) => f.kind === "transform")).toBe(true);
   });
 
-  it("includes add, copy, remove, filter, discard", () => {
+  it("includes add, copy, remove, discard", () => {
     const names = getTransformFunctions().map((f) => f.name);
     expect(names).toContain("add");
     expect(names).toContain("copy");
     expect(names).toContain("remove");
-    expect(names).toContain("filter");
     expect(names).toContain("discard");
+  });
+
+  it("filter is a known function (overloaded: transform + list expression)", () => {
+    // filter is kind "expression" to avoid false positives when used nested as a list
+    // expression; verify it is still registered and accessible
+    const names = getExpressionFunctions().map((f) => f.name);
+    expect(names).toContain("filter");
   });
 });
 
