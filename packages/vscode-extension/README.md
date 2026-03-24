@@ -117,9 +117,8 @@ A live preview panel that evaluates DTL transforms against a sample input entity
 
 1. Open a pipe config `.json` file.
 2. Run **DTL: Preview Pipe** from the Command Palette (`Ctrl+Shift+P`).
-3. Edit the **Input Entity** (left pane) and press **▶ Evaluate** (or `Ctrl+Enter`).
-4. The **Output Entity** (right pane) updates instantly.
-5. The **DTL Rules** pane (centre) always reflects the active document.
+3. Edit the **Input Entity** and press **▶ Evaluate** (or `Ctrl+Enter`).
+4. The **Output Entity** updates instantly.
 
 > **Note:** Functions that require a live Sesam node (e.g. `hops`, `apply-hops`, `lookup-entity`, encryption, UUID) will show a warning and return `null` rather than throwing.
 
