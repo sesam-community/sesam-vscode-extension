@@ -646,4 +646,82 @@ describe("buildDocumentSymbols — mock fixtures", () => {
     expect(symbols).toHaveLength(1);
     expect(symbols[0].name).toBe("_id: my-microservice");
   });
+
+  // ── Complex real-world pipes ─────────────────────────────────────────────
+
+  it("difi-enhetsregisteret-classification-enrich.json: many named rules all appear", () => {
+    const text = loadMock("pipes/difi-enhetsregisteret-classification-enrich.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    expect(
+      symbols.find((s) => s.name === "_id: difi-enhetsregisteret-classification-enrich"),
+    ).toBeDefined();
+
+    const transformSym = symbols.find((s) => s.name === "transform")!;
+    expect(transformSym).toBeDefined();
+
+    // plain-object transform → "rules" wrapper
+    const rulesSym = transformSym.children!.find((c) => c.name === "rules")!;
+    expect(rulesSym).toBeDefined();
+
+    const ruleNames = rulesSym.children!.map((c) => c.name);
+    expect(ruleNames).toContain("default");
+    expect(ruleNames).toContain("1-history");
+    expect(ruleNames).toContain("add-P248");
+    expect(ruleNames).toContain("map-nkode1");
+    expect(ruleNames).toContain("strip-dates");
+    // 19 total rules
+    expect(ruleNames.length).toBe(19);
+  });
+
+  it("difi-enhetsregisteret-classification-enrich.json: default rule has function call symbols", () => {
+    const text = loadMock("pipes/difi-enhetsregisteret-classification-enrich.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    const transformSym = symbols.find((s) => s.name === "transform")!;
+    const rulesSym = transformSym.children!.find((c) => c.name === "rules")!;
+    const defaultRule = rulesSym.children!.find((c) => c.name === "default")!;
+
+    expect(defaultRule.children!.length).toBeGreaterThan(0);
+    const callNames = defaultRule.children!.map((c) => c.name);
+    expect(callNames).toContain("copy");
+    expect(callNames).toContain("merge");
+  });
+
+  it("wikidata-classification-collect.json: 3-step array transform, only DTL steps labelled", () => {
+    const text = loadMock("pipes/wikidata-classification-collect.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    expect(symbols.find((s) => s.name === "_id: wikidata-classification-collect")).toBeDefined();
+
+    const transformSym = symbols.find((s) => s.name === "transform")!;
+    expect(transformSym).toBeDefined();
+
+    // 2 DTL steps (step[1] is "rest" with no rules — skipped by buildDocumentSymbols)
+    const childNames = transformSym.children!.map((c) => c.name);
+    expect(childNames).toContain("dtl [1]");
+    expect(childNames).toContain("dtl [2]");
+    expect(childNames).not.toContain("dtl [3]");
+  });
+
+  it("wikidata-classification-collect.json: dtl [2] has both default and bnode rules", () => {
+    const text = loadMock("pipes/wikidata-classification-collect.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    const transformSym = symbols.find((s) => s.name === "transform")!;
+    const step2 = transformSym.children!.find((c) => c.name === "dtl [2]")!;
+    expect(step2).toBeDefined();
+
+    const ruleNames = step2.children!.map((c) => c.name);
+    expect(ruleNames).toContain("default");
+    expect(ruleNames).toContain("bnode");
+  });
 });

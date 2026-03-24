@@ -1,0 +1,106 @@
+{
+  "_id": "wikidata-classification-collect",
+  "type": "pipe",
+  "source": {
+    "type": "merge",
+    "datasets": ["wikidata-classification-transform wct", "global-classification-vocabulary gcv"],
+    "equality_sets": [
+      ["wct.$ids", "gcv.$ids"]
+    ],
+    "identity": "first",
+    "strategy": "compact",
+    "version": 2
+  },
+  "transform": [{
+    "type": "dtl",
+    "rules": {
+      "default": [
+        ["add", "_deleted", false], 
+        ["add", "_ids", 
+          ["hops", {
+            "datasets": ["global-classification-vocabulary t"],
+            "where": [
+              ["eq", 
+                ["is-not-empty", "_S._id"], 
+                ["is-not-empty", "t._id"]
+              ]
+            ],
+            "return": "t._id"
+          }]
+        ], 
+        ["add", "_url", 
+          ["concat", "CONSTRUCT {?id ps:P1476 ?idLabel . ?id ps:P31 ?class .?id ps:P279 ?subclass .?id ps:P625 ?coor . ?id p:P4649 _:bn . _:bn ps:P4649 ?uid . _:bn ps:P3865 ?po . ?id wdt:P576 ?dissolved }", "WHERE", "{ ?id wdt:P31|wdt:P279 [] . ", "OPTIONAL { ?id wdt:P31 ?class } . OPTIONAL { ?id wdt:P279 ?subclass } . OPTIONAL { ?id wdt:P576 ?dissolved } .", "FILTER ( ?id = ", "_S._id", " ) ", "SERVICE wikibase:label { bd:serviceParam wikibase:language 'en' }", "OPTIONAL { ?id wdt:P625 ?coor } .", "OPTIONAL { VALUES ?po { ", 
+            ["join", " ", "_T._ids"], " } ?id ?direct ?uid . ?p wdt:P31/wdt:P279* wd:Q19847637 . ?p wikibase:directClaim ?direct . ?p wdt:P1629 ?po }", "}"]
+        ], 
+        ["add", "::url", 
+          ["url-quote", "_T._url"]
+        ], 
+        ["add", "::operation", "sparql"]
+      ]
+    }
+  }, {
+    "type": "rest",
+    "system": "wikidata",
+    "trace": true,
+    "replace_entity": false,
+    "side_effects": false
+  }, {
+    "type": "dtl",
+    "rules": {
+      "default": [
+        ["add", "_res", 
+          ["json-parse", 
+            ["string", "_S.response"]
+          ]
+        ], 
+        ["merge", 
+          ["apply", "bnode", "_S._id"]
+        ]
+      ],
+      "bnode": [
+        ["merge", 
+          ["dict", 
+            ["map", 
+              ["list", "_.key", 
+                ["map", 
+                  ["if", 
+                    ["neq", "_.object.type", "bnode"], 
+                    ["if", 
+                      ["eq", "_.object.type", "literal"], "_.object.value", 
+                      ["if", 
+                        ["eq", "_.object.type", "uri"], 
+                        ["ni-collapse", "_.object.value"]
+                      ]
+                    ], 
+                    ["apply", "bnode", "_.object.value"]
+                  ], 
+                  ["sorted", 
+                    ["string", "_.object.value"], "_.value"]
+                ]
+              ], 
+              ["key-values", 
+                ["group-by", "_.predicate.value", 
+                  ["string", 
+                    ["ni-collapse", "_."]
+                  ], 
+                  ["filter", 
+                    ["eq", 
+                      ["string", 
+                        ["ni-collapse", "_.subject.value"]
+                      ], "_S."], "_R._T._res.results.bindings"]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    }
+  }],
+  "metadata": {
+    "connector": "wikidata",
+    "connector_base": "wikidata",
+    "datatype": "classification",
+    "phase": "collect"
+  },
+  "add_namespaces": false
+}
