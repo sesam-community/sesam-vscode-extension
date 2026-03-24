@@ -72,7 +72,9 @@ export class PreviewPanel {
   }
 
   updateDocument(document: vscode.TextDocument): void {
-    if (document.languageId !== "dtl" && document.languageId !== "json") return;
+    if (document.languageId !== "dtl" && document.languageId !== "json") {
+      return;
+    }
     this._document = document;
     this._sendTransforms();
   }
@@ -347,20 +349,30 @@ function extractRules(text: string): unknown[] | null {
     const parsed = JSON.parse(text);
 
     // Bare array — treat as rules list directly
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
 
-    if (typeof parsed !== "object" || parsed === null) return null;
+    if (typeof parsed !== "object" || parsed === null) {
+      return null;
+    }
     const obj = parsed as Record<string, unknown>;
 
     // Full pipe config
     const transform = obj["transform"] as Record<string, unknown> | undefined;
-    if (!transform) return null;
+    if (!transform) {
+      return null;
+    }
 
     // Shorthand direct array
-    if (Array.isArray(transform)) return transform;
+    if (Array.isArray(transform)) {
+      return transform;
+    }
 
     const rules = transform["rules"] as Record<string, unknown> | undefined;
-    if (!rules) return null;
+    if (!rules) {
+      return null;
+    }
 
     // Return the "default" rule, or the first rule found
     if (Array.isArray((rules as Record<string, unknown>)["default"])) {
