@@ -32,7 +32,7 @@ import {
 } from "../../src/shared/dtl-registry";
 import { formatSesamJson } from "../../src/shared/config-formatter";
 import { parseDtlText } from "./dtl-parser";
-import { validateCalls, ValidatorOptions } from "./dtl-validator";
+import { validateCalls } from "./dtl-validator";
 import { defaultSettings } from "./constants";
 import {
   isSourceTypeContext,
@@ -55,6 +55,7 @@ import {
 } from "./utils/definition.utils";
 
 import type { DtlSettings } from "./server.types";
+import type { ValidatorOptions } from "../../types/dtl-validator.types";
 
 // ---------------------------------------------------------------------------
 // Connection & document store

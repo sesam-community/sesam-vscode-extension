@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { validateCalls, ValidatorOptions } from "../server/src/dtl-validator";
-import type { DtlCall } from "../server/src/dtl-parser";
 import { DiagnosticSeverity } from "vscode-languageserver/node";
+
+import { validateCalls } from "../server/src/dtl-validator";
+
+import type { DtlCall } from "../server/src/dtl-parser";
+import type { ValidatorOptions } from "../types/dtl-validator.types";
 
 // ---------------------------------------------------------------------------
 // Helpers
