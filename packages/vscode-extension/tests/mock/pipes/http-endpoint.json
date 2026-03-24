@@ -1,0 +1,15 @@
+{
+  "_id": "http-endpoint",
+  "type": "pipe",
+  "source": {
+    "type": "http_endpoint"
+  },
+  "transform": {
+    "type": "dtl",
+    "rules": {
+      "default": [
+        ["copy", "_id"]
+      ]
+    }
+  }
+}

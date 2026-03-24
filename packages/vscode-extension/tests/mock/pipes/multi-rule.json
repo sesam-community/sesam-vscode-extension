@@ -1,0 +1,37 @@
+{
+  "_id": "multi-rule",
+  "type": "pipe",
+  "source": {
+    "type": "dataset",
+    "dataset": "order"
+  },
+  "transform": {
+    "type": "dtl",
+    "rules": {
+      "default": [
+        ["copy", "*"],
+        ["add", "customer-id", "_S.customer._id"],
+        ["add", "items",
+          ["map", "_S.lines",
+            ["dict",
+              "product", "_S.product",
+              "qty", "_S.qty",
+              "price", "_S.unit-price"
+            ]
+          ]
+        ]
+      ],
+      "order-ref": [
+        ["copy", "_id"],
+        ["add", "order-date", "_S.created-at"],
+        ["add", "total",
+          ["sum",
+            ["map", "_S.lines",
+              ["multiply", "_S.qty", "_S.unit-price"]
+            ]
+          ]
+        ]
+      ]
+    }
+  }
+}

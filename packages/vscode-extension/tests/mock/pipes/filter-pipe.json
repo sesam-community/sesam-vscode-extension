@@ -1,0 +1,21 @@
+{
+  "_id": "filter-pipe",
+  "type": "pipe",
+  "source": {
+    "type": "http_endpoint"
+  },
+  "transform": {
+    "type": "dtl",
+    "rules": {
+      "default": [
+        ["copy", "_id"],
+        ["filter",
+          ["eq", "_S.status", "active"]
+        ],
+        ["add", "full-name",
+          ["concat", "_S.first-name", " ", "_S.last-name"]
+        ]
+      ]
+    }
+  }
+}

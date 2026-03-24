@@ -1,0 +1,8 @@
+{
+  "_id": "my-microservice",
+  "type": "system:microservice",
+  "docker": {
+    "image": "my-org/my-service:latest",
+    "port": 5000
+  }
+}

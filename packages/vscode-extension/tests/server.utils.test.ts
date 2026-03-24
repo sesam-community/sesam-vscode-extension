@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+
 import { describe, it, expect } from "vitest";
 
 import { DiagnosticSeverity, CompletionItemKind, Position } from "vscode-languageserver/node";
@@ -31,6 +34,9 @@ import { getDtlFunction } from "../src/shared/dtl-registry";
 
 const makeDoc = (content: string) =>
   TextDocument.create("file:///test.conf.pipe", "sesam-config", 1, content);
+
+const MOCK_DIR = path.join(__dirname, "mock");
+const loadMock = (rel: string): string => fs.readFileSync(path.join(MOCK_DIR, rel), "utf-8");
 
 // ---------------------------------------------------------------------------
 // levelToSeverity
@@ -515,5 +521,129 @@ describe("buildDocumentSymbols", () => {
     const childNames = transformSym!.children!.map((c) => c.name);
     expect(childNames).toContain("dtl [1]");
     expect(childNames).toContain("dtl [2]");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildDocumentSymbols — mock file fixtures
+// ---------------------------------------------------------------------------
+
+describe("buildDocumentSymbols — mock fixtures", () => {
+  it("http-endpoint.json: single transform, one rule, copy _id", () => {
+    const text = loadMock("pipes/http-endpoint.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    const idSym = symbols.find((s) => s.name.startsWith("_id:"));
+    expect(idSym!.name).toBe("_id: http-endpoint");
+
+    const transformSym = symbols.find((s) => s.name === "transform");
+    expect(transformSym).toBeDefined();
+
+    // single plain-object transform → "rules" wrapper → "default" rule
+    const rulesSym = transformSym!.children!.find((c) => c.name === "rules");
+    expect(rulesSym).toBeDefined();
+
+    const defaultRule = rulesSym!.children!.find((c) => c.name === "default");
+    expect(defaultRule).toBeDefined();
+    expect(defaultRule!.children!.some((c) => c.name === "copy")).toBe(true);
+  });
+
+  it("filter-pipe.json: single transform, multiple top-level calls", () => {
+    const text = loadMock("pipes/filter-pipe.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    const transformSym = symbols.find((s) => s.name === "transform");
+    const rulesSym = transformSym!.children!.find((c) => c.name === "rules");
+    const defaultRule = rulesSym!.children!.find((c) => c.name === "default");
+    expect(defaultRule).toBeDefined();
+
+    const callNames = defaultRule!.children!.map((c) => c.name);
+    expect(callNames).toContain("copy");
+    expect(callNames).toContain("filter");
+    expect(callNames).toContain("add");
+  });
+
+  it("multi-transform.json: array transform produces dtl [1] / dtl [2]", () => {
+    const text = loadMock("pipes/multi-transform.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    expect(symbols.find((s) => s.name === "_id: multi-transform")).toBeDefined();
+
+    const transformSym = symbols.find((s) => s.name === "transform");
+    expect(transformSym).toBeDefined();
+
+    const childNames = transformSym!.children!.map((c) => c.name);
+    expect(childNames).toContain("dtl [1]");
+    expect(childNames).toContain("dtl [2]");
+  });
+
+  it("multi-transform.json: dtl [1] has copy+add, dtl [2] has filter+add", () => {
+    const text = loadMock("pipes/multi-transform.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    const transformSym = symbols.find((s) => s.name === "transform")!;
+    const step1 = transformSym.children!.find((c) => c.name === "dtl [1]")!;
+    const step2 = transformSym.children!.find((c) => c.name === "dtl [2]")!;
+
+    const step1Default = step1.children!.find((c) => c.name === "default")!;
+    const step1Calls = step1Default.children!.map((c) => c.name);
+    expect(step1Calls).toContain("copy");
+    expect(step1Calls).toContain("add");
+
+    const step2Default = step2.children!.find((c) => c.name === "default")!;
+    const step2Calls = step2Default.children!.map((c) => c.name);
+    expect(step2Calls).toContain("filter");
+    expect(step2Calls).toContain("add");
+  });
+
+  it("csv-source.json: pipe with no transform yields only _id symbol", () => {
+    const text = loadMock("pipes/csv-source.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    expect(symbols).toHaveLength(1);
+    expect(symbols[0].name).toBe("_id: csv-source");
+  });
+
+  it("multi-rule.json: single transform with two named rules (default + order-ref)", () => {
+    const text = loadMock("pipes/multi-rule.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    const transformSym = symbols.find((s) => s.name === "transform")!;
+    const rulesSym = transformSym.children!.find((c) => c.name === "rules")!;
+    const ruleNames = rulesSym.children!.map((c) => c.name);
+    expect(ruleNames).toContain("default");
+    expect(ruleNames).toContain("order-ref");
+  });
+
+  it("smtp.json: system file with no transform yields only _id symbol", () => {
+    const text = loadMock("systems/smtp.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = TextDocument.create("file:///smtp.json", "sesam-config", 1, text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    expect(symbols).toHaveLength(1);
+    expect(symbols[0].name).toBe("_id: smtp");
+  });
+
+  it("microservice.json: system file with no transform yields only _id symbol", () => {
+    const text = loadMock("systems/microservice.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = TextDocument.create("file:///ms.json", "sesam-config", 1, text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    expect(symbols).toHaveLength(1);
+    expect(symbols[0].name).toBe("_id: my-microservice");
   });
 });
