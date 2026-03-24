@@ -44,9 +44,9 @@ import {
   getWordAtPosition,
   buildFunctionMarkdown,
   buildDocumentSymbols,
-} from "./utils";
+} from "./utils/server.utils";
 
-import type { DtlSettings } from "./types";
+import type { DtlSettings } from "./server.types";
 
 // ---------------------------------------------------------------------------
 // Connection & document store

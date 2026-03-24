@@ -1,0 +1,9 @@
+{
+  "_id": "csv-source",
+  "type": "pipe",
+  "source": {
+    "type": "csv",
+    "system": "my-system",
+    "url": "/api/data.csv"
+  }
+}

@@ -1,4 +1,4 @@
-import type { DtlSettings, SystemTypeInfo, SourceTypeInfo } from "./types";
+import type { DtlSettings, SystemTypeInfo, SourceTypeInfo } from "./server.types";
 
 // ---------------------------------------------------------------------------
 // Default settings

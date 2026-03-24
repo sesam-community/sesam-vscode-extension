@@ -10,34 +10,27 @@
  *   +, -, *, /, %, abs, round, floor, ceil, min, max, sum
  */
 
-export interface DtlObject {
-  [key: string]: DtlValue;
-}
-export type DtlValue = string | number | boolean | null | DtlValue[] | DtlObject;
+export type {
+  DtlObject,
+  DtlValue,
+  EvalEntity,
+  EvalStatus,
+  EvalResult,
+} from "../../types/dtl-evaluator.types";
 
-export type EvalEntity = DtlObject;
-
-export type EvalStatus = "ok" | "discarded" | "error";
-
-export interface EvalResult {
-  status: EvalStatus;
-  output: EvalEntity;
-  warnings: string[];
-}
-
-interface EvalContext {
-  source: DtlObject;
-  target: DtlObject;
-  current?: DtlValue; // _
-  parent?: DtlObject; // _P
-  warnings: string[];
-}
+import type {
+  DtlObject,
+  DtlValue,
+  EvalEntity,
+  EvalResult,
+  EvalContext,
+} from "../../types/dtl-evaluator.types";
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-export function evaluate(rules: unknown[], inputEntity: EvalEntity): EvalResult {
+export const evaluate = (rules: unknown[], inputEntity: EvalEntity): EvalResult => {
   const ctx: EvalContext = {
     source: inputEntity,
     target: {},
@@ -60,13 +53,13 @@ export function evaluate(rules: unknown[], inputEntity: EvalEntity): EvalResult 
   }
 
   return { status: "ok", output: ctx.target, warnings: ctx.warnings };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Transform dispatch
 // ---------------------------------------------------------------------------
 
-function applyTransform(rule: unknown, ctx: EvalContext): "discard" | void {
+const applyTransform = (rule: unknown, ctx: EvalContext): "discard" | void => {
   if (!Array.isArray(rule) || rule.length === 0) {
     return;
   }
@@ -221,13 +214,13 @@ function applyTransform(rule: unknown, ctx: EvalContext): "discard" | void {
       return;
     }
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // Expression evaluator
 // ---------------------------------------------------------------------------
 
-function evalExpr(expr: unknown, ctx: EvalContext): DtlValue {
+const evalExpr = (expr: unknown, ctx: EvalContext): DtlValue => {
   // Literal values
   if (expr === null || typeof expr === "boolean" || typeof expr === "number") {
     return expr as DtlValue;
@@ -253,9 +246,9 @@ function evalExpr(expr: unknown, ctx: EvalContext): DtlValue {
   }
 
   return null;
-}
+};
 
-function evalStringExpr(str: string, ctx: EvalContext): DtlValue {
+const evalStringExpr = (str: string, ctx: EvalContext): DtlValue => {
   // _S.property or _S (whole source entity)
   if (str === "_S") {
     return ctx.source as unknown as DtlValue;
@@ -281,9 +274,9 @@ function evalStringExpr(str: string, ctx: EvalContext): DtlValue {
 
   // Literal string
   return str;
-}
+};
 
-function getProp(entity: DtlObject | Record<string, DtlValue>, path: string): DtlValue {
+const getProp = (entity: DtlObject | Record<string, DtlValue>, path: string): DtlValue => {
   const parts = path.split(".");
   let current: DtlValue = entity as unknown as DtlValue;
   for (const part of parts) {
@@ -293,9 +286,9 @@ function getProp(entity: DtlObject | Record<string, DtlValue>, path: string): Dt
     current = (current as Record<string, DtlValue>)[part] ?? null;
   }
   return current;
-}
+};
 
-function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
+const evalFunction = (arr: unknown[], ctx: EvalContext): DtlValue => {
   if (arr.length === 0) {
     return null;
   }
@@ -737,4 +730,4 @@ function evalFunction(arr: unknown[], ctx: EvalContext): DtlValue {
       return null;
     }
   }
-}
+};

@@ -1,0 +1,34 @@
+{
+  "_id": "multi-transform",
+  "type": "pipe",
+  "source": {
+    "type": "dataset",
+    "dataset": "person"
+  },
+  "transform": [
+    {
+      "type": "dtl",
+      "rules": {
+        "default": [
+          ["copy", "*"],
+          ["add", "full-name",
+            ["concat", "_S.first-name", " ", "_S.last-name"]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "dtl",
+      "rules": {
+        "default": [
+          ["filter",
+            ["is-not-null", "_T.full-name"]
+          ],
+          ["add", "name-length",
+            ["length", "_T.full-name"]
+          ]
+        ]
+      }
+    }
+  ]
+}

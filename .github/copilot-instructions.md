@@ -1,5 +1,17 @@
 # GitHub Copilot Instructions
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Repository Structure](#repository-structure)
+- [Language & File Conventions](#language--file-conventions)
+- [Key Architectural Facts](#key-architectural-facts)
+- [Development Commands](#development-commands)
+- [File Naming Conventions](#file-naming-conventions)
+- [Coding Conventions](#coding-conventions)
+  - [Import Order](#import-order)
+- [Feature Planning](#feature-planning)
+
 ## Project Overview
 
 This is a **pnpm monorepo** (`sesam-ts`) containing a VS Code extension that provides language support for
@@ -50,6 +62,17 @@ pnpm test        # Run Vitest unit tests
 ```
 
 Press **F5** in VS Code to launch the extension in a new Extension Development Host window.
+
+## File Naming Conventions
+
+| File type | Naming | Example |
+|---|---|---|
+| Source module | kebab-case | `dtl-validator.ts`, `config-formatter.ts` |
+| VS Code provider / class | kebab-case | `pipe-graph-provider.ts`, `pipe-outline-provider.ts` |
+| Types / interfaces only | `*.types.ts` | `dtl-registry.types.ts`, `server.types.ts` |
+| Utility / helper functions only | `*.utils.ts` | `string.utils.ts`, `range.utils.ts` |
+| Constants only | `*.constants.ts` or `constants.ts` | `constants.ts` |
+| Test file | mirrors source, `*.test.ts` | `dtl-validator.ts` → `validator.test.ts` |
 
 ## Coding Conventions
 

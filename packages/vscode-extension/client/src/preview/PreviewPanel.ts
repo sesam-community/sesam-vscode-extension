@@ -9,7 +9,7 @@
 import * as vscode from "vscode";
 import { evaluate, EvalEntity } from "../../../src/shared/dtl-evaluator";
 
-type MessageFromWebview = { type: "evaluate"; inputJson: string } | { type: "ready" };
+type MessageFromWebview = { type: "evaluate"; inputJson: string };
 
 export class PreviewPanel {
   static currentPanel: PreviewPanel | undefined;
@@ -60,9 +60,7 @@ export class PreviewPanel {
 
     this._panel.webview.onDidReceiveMessage(
       (message: MessageFromWebview) => {
-        if (message.type === "ready") {
-          this._sendTransforms();
-        } else if (message.type === "evaluate") {
+        if (message.type === "evaluate") {
           this._runEvaluation(message.inputJson);
         }
       },
@@ -72,19 +70,10 @@ export class PreviewPanel {
   }
 
   updateDocument(document: vscode.TextDocument): void {
-    if (document.languageId !== "dtl" && document.languageId !== "json") return;
+    if (document.languageId !== "dtl" && document.languageId !== "json") {
+      return;
+    }
     this._document = document;
-    this._sendTransforms();
-  }
-
-  private _sendTransforms(): void {
-    const text = this._document.getText();
-    const rules = extractRules(text);
-    this._panel.webview.postMessage({
-      type: "transforms",
-      rules: JSON.stringify(rules, null, 2),
-      filename: this._document.fileName.split("/").pop(),
-    });
   }
 
   private _runEvaluation(inputJson: string): void {
@@ -170,7 +159,7 @@ export class PreviewPanel {
     .panes {
       flex: 1;
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr;
       gap: 0;
       overflow: hidden;
     }
@@ -230,7 +219,6 @@ export class PreviewPanel {
 <body>
   <header>
     <h1>DTL Preview</h1>
-    <span class="file-name" id="file-name">—</span>
     <button class="run-btn" id="run-btn" onclick="runEval()">▶ Evaluate</button>
   </header>
 
@@ -243,14 +231,6 @@ export class PreviewPanel {
   "name": "Alice",
   "status": "active"
 }</textarea>
-    </div>
-
-    <!-- DTL Transforms (read-only) -->
-    <div class="pane">
-      <div class="pane-header">DTL Rules (active file)</div>
-      <div class="output-box" id="transforms-box" style="color: var(--vscode-descriptionForeground);">
-        Open a .dtl or pipe config .json file and run preview.
-      </div>
     </div>
 
     <!-- Output Entity -->
@@ -283,11 +263,6 @@ export class PreviewPanel {
 
     window.addEventListener('message', (event) => {
       const msg = event.data;
-
-      if (msg.type === 'transforms') {
-        document.getElementById('file-name').textContent = msg.filename || '';
-        document.getElementById('transforms-box').textContent = msg.rules || '(no rules found)';
-      }
 
       if (msg.type === 'result') {
         const r = msg.result;
@@ -329,9 +304,6 @@ export class PreviewPanel {
     function escHtml(str) {
       return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
-
-    // Notify extension that we are ready
-    vscode.postMessage({ type: 'ready' });
   </script>
 </body>
 </html>`;
@@ -347,20 +319,30 @@ function extractRules(text: string): unknown[] | null {
     const parsed = JSON.parse(text);
 
     // Bare array — treat as rules list directly
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
 
-    if (typeof parsed !== "object" || parsed === null) return null;
+    if (typeof parsed !== "object" || parsed === null) {
+      return null;
+    }
     const obj = parsed as Record<string, unknown>;
 
     // Full pipe config
     const transform = obj["transform"] as Record<string, unknown> | undefined;
-    if (!transform) return null;
+    if (!transform) {
+      return null;
+    }
 
     // Shorthand direct array
-    if (Array.isArray(transform)) return transform;
+    if (Array.isArray(transform)) {
+      return transform;
+    }
 
     const rules = transform["rules"] as Record<string, unknown> | undefined;
-    if (!rules) return null;
+    if (!rules) {
+      return null;
+    }
 
     // Return the "default" rule, or the first rule found
     if (Array.isArray((rules as Record<string, unknown>)["default"])) {

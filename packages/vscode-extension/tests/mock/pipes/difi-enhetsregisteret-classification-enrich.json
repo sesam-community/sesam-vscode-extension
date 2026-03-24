@@ -1,0 +1,1077 @@
+{
+  "_id": "difi-enhetsregisteret-classification-enrich",
+  "type": "pipe",
+  "source": {
+    "type": "dataset",
+    "dataset": "difi-enhetsregisteret-collect",
+    "include_previous_versions": true
+  },
+  "sink": {
+    "set_initial_offset": "onload"
+  },
+  "transform": {
+    "type": "dtl",
+    "rules": {
+      "default": [
+        ["discard",
+          ["not", "_S._deleted"]
+        ],
+        ["add", "_$retrieved",
+          ["datetime",
+            ["*", "_S._ts", 1000]
+          ]
+        ],
+        ["add", "ps:P813", "_T._$retrieved"],
+        ["add", "_$last-modified",
+          ["last",
+            ["sorted",
+              ["datetime",
+                ["coalesce",
+                  ["list", "_S.$last-modified", null, "_R._T._$retrieved"]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["add", "p:P5017",
+          ["dict", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+            ["ni", "_T._id"]
+          ]
+        ],
+        ["add", "ps:P5017", "_T._$last-modified"],
+        ["copy", "$origin"],
+        ["if",
+          ["is-not-empty", "_S.nkode1"],
+          [
+            ["add", "_history",
+              ["apply-hops", "mappings", {
+                "datasets": ["difi-enhetsregisteret-classification-enrich t"],
+                "where": [
+                  ["eq",
+                    ["concat", "difi-enhetsregisteret-classification-nkode1:",
+                      ["string", "_S.nkode1"]
+                    ], "t._id"]
+                ],
+                "track-dependencies": false
+              }]
+            ],
+            ["merge",
+              ["apply", "1-history",
+                ["dict", "key", "p:P571", "value",
+                  ["dict", "ps:P571",
+                    ["first",
+                      ["coalesce",
+                        ["sorted",
+                          ["datetime",
+                            ["combine", "_R._T._history.ps:P571", "_R._T._history.p:P571.ps:P571", "_R._T._$last-modified"]
+                          ]
+                        ]
+                      ]
+                    ], "ps:P248",
+                    ["ni", "_R._T._id"], "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved"]
+                ]
+              ]
+            ],
+            ["create",
+              ["filter",
+                ["is-not-null", "_._id"],
+                ["map",
+                  ["apply", "add-claim-ids",
+                    ["dict",
+                      ["combine",
+                        ["items",
+                          ["apply", "map-enum-nkode1", "_."]
+                        ],
+                        ["items",
+                          ["first",
+                            ["apply-hops", "map-nkode1", {
+                              "datasets": ["difi-enhetsregisteret-collect t"],
+                              "where": [
+                                ["eq",
+                                  ["ni-id",
+                                    ["ni", "_S._id"]
+                                  ], "t._id"]
+                              ],
+                              "track-dependencies": false
+                            }]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ],
+                  ["apply", "add-enum",
+                    ["enumerate",
+                      ["list", "_S."]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["if",
+          ["is-not-empty", "_S.nkode2"],
+          [
+            ["add", "_history",
+              ["apply-hops", "mappings", {
+                "datasets": ["difi-enhetsregisteret-classification-enrich t"],
+                "where": [
+                  ["eq",
+                    ["concat", "difi-enhetsregisteret-classification-nkode2:",
+                      ["string", "_S.nkode2"]
+                    ], "t._id"]
+                ],
+                "track-dependencies": false
+              }]
+            ],
+            ["merge",
+              ["apply", "1-history",
+                ["dict", "key", "p:P571", "value",
+                  ["dict", "ps:P571",
+                    ["first",
+                      ["coalesce",
+                        ["sorted",
+                          ["datetime",
+                            ["combine", "_R._T._history.ps:P571", "_R._T._history.p:P571.ps:P571", "_R._T._$last-modified"]
+                          ]
+                        ]
+                      ]
+                    ], "ps:P248",
+                    ["ni", "_R._T._id"], "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved"]
+                ]
+              ]
+            ],
+            ["create",
+              ["filter",
+                ["is-not-null", "_._id"],
+                ["map",
+                  ["apply", "add-claim-ids",
+                    ["dict",
+                      ["combine",
+                        ["items",
+                          ["apply", "map-enum-nkode2", "_."]
+                        ],
+                        ["items",
+                          ["first",
+                            ["apply-hops", "map-nkode2", {
+                              "datasets": ["difi-enhetsregisteret-collect t"],
+                              "where": [
+                                ["eq",
+                                  ["ni-id",
+                                    ["ni", "_S._id"]
+                                  ], "t._id"]
+                              ],
+                              "track-dependencies": false
+                            }]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ],
+                  ["apply", "add-enum",
+                    ["enumerate",
+                      ["list", "_S."]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["if",
+          ["is-not-empty", "_S.nkode3"],
+          [
+            ["add", "_history",
+              ["apply-hops", "mappings", {
+                "datasets": ["difi-enhetsregisteret-classification-enrich t"],
+                "where": [
+                  ["eq",
+                    ["concat", "difi-enhetsregisteret-classification-nkode3:",
+                      ["string", "_S.nkode3"]
+                    ], "t._id"]
+                ],
+                "track-dependencies": false
+              }]
+            ],
+            ["merge",
+              ["apply", "1-history",
+                ["dict", "key", "p:P571", "value",
+                  ["dict", "ps:P571",
+                    ["first",
+                      ["coalesce",
+                        ["sorted",
+                          ["datetime",
+                            ["combine", "_R._T._history.ps:P571", "_R._T._history.p:P571.ps:P571", "_R._T._$last-modified"]
+                          ]
+                        ]
+                      ]
+                    ], "ps:P248",
+                    ["ni", "_R._T._id"], "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved"]
+                ]
+              ]
+            ],
+            ["create",
+              ["filter",
+                ["is-not-null", "_._id"],
+                ["map",
+                  ["apply", "add-claim-ids",
+                    ["dict",
+                      ["combine",
+                        ["items",
+                          ["apply", "map-enum-nkode3", "_."]
+                        ],
+                        ["items",
+                          ["first",
+                            ["apply-hops", "map-nkode3", {
+                              "datasets": ["difi-enhetsregisteret-collect t"],
+                              "where": [
+                                ["eq",
+                                  ["ni-id",
+                                    ["ni", "_S._id"]
+                                  ], "t._id"]
+                              ],
+                              "track-dependencies": false
+                            }]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ],
+                  ["apply", "add-enum",
+                    ["enumerate",
+                      ["list", "_S."]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["merge",
+          ["map-dict", "_.",
+            ["if",
+              ["gt",
+                ["count", "_."], 1], "_.",
+              ["first", "_."]
+            ], "_T."]
+        ],
+        ["discard"]
+      ],
+      "1-history": [
+        ["add", "_property", "_S.value"],
+        ["add", "_pid", "_P._T._id"],
+        ["add", "_property-history",
+          ["path", "_S.key",
+            ["if",
+              ["and",
+                ["eq",
+                  ["count", "_R._T._history"], 1],
+                ["is-empty", "_T._pid"]
+              ],
+              ["first", "_R._T._history"],
+              ["filter",
+                ["eq", "_._id", "_T._pid"], "_R._T._history"]
+            ]
+          ]
+        ],
+        ["add", "_property-history-newer",
+          ["filter",
+            ["gt", "_.ps:P5017", "_R._T.$last-modified"], "_T._property-history"]
+        ],
+        ["if",
+          ["eq",
+            ["count", "_T._property-history"], 0],
+          ["add", "_S.key",
+            ["apply", "add-merge", "_T._property"]
+          ],
+          [
+            ["comment", "Ignore new data if older than history"],
+            ["if",
+              ["gt",
+                ["count", "_T._property-history-newer"], 0],
+              ["add", "_S.key", "_T._property-history"],
+              [
+                ["add", "_property-history-latest",
+                  ["filter",
+                    ["is-empty", "_.ps:P582"], "_T._property-history"]
+                ],
+                ["add", "_property-history-old",
+                  ["filter",
+                    ["is-not-empty", "_.ps:P582"], "_T._property-history"]
+                ],
+                ["add", "_property-compare",
+                  ["map",
+                    ["apply", "match-dict",
+                      ["dict", "source", "_.", "target", "_T._property-history-latest"]
+                    ], "_T._property"]
+                ],
+                ["add", "_property-history-compare",
+                  ["map",
+                    ["apply", "match-dict",
+                      ["dict", "source", "_.", "target", "_T._property-compare.match"]
+                    ], "_T._property-history-latest"]
+                ],
+                ["if",
+                  ["eq",
+                    ["count", "_T._property-compare.new"], 0],
+                  ["add", "_S.key",
+                    ["combine",
+                      ["apply", "add-merge", "_T._property-history-compare.match"],
+                      ["apply", "add-end", "_T._property-history-compare.new"],
+                      ["apply", "add-end", "_T._property-history-old"]
+                    ]
+                  ],
+                  ["add", "_S.key",
+                    ["combine",
+                      ["apply", "add-merge", "_T._property-compare.new"],
+                      ["apply", "add-merge", "_T._property-history-compare.match"],
+                      ["apply", "add-end", "_T._property-history-compare.new"],
+                      ["apply", "add-end", "_T._property-history-old"]
+                    ]
+                  ]
+                ]
+              ]
+            ],
+            ["remove", "_property*"]
+          ]
+        ]
+      ],
+      "add-P248": [
+        ["copy", "*"],
+        ["if",
+          ["is-empty", "_S.ps:P248"],
+          ["add", "ps:P248",
+            ["ni", "_P._S._id"]
+          ]
+        ]
+      ],
+      "add-claim-ids": [
+        ["copy", "*"],
+        ["merge",
+          ["map",
+            ["dict", "_.key",
+              ["apply", "add-P248", "_.value"]
+            ],
+            ["filter",
+              ["in", "ps:P248",
+                ["map", "_.key",
+                  ["key-values", "_.value"]
+                ]
+              ],
+              ["key-values", "_S."]
+            ]
+          ]
+        ]
+      ],
+      "add-end": [
+        ["copy", "*"],
+        ["remove", "ps:P2309"],
+        ["if",
+          ["is-empty", "_S.ps:P582"],
+          ["add", "ps:P582", "_R._T._$last-modified"]
+        ],
+        ["merge",
+          ["dict",
+            ["items", "_T."]
+          ]
+        ]
+      ],
+      "add-enum": [
+        ["merge", "_S.value"],
+        ["add", "_enum", "_S.key"]
+      ],
+      "add-merge": [
+        ["copy", "*"],
+        ["if",
+          ["is-not-empty", "_S.ps:P4649"],
+          ["add", "ps:P2309",
+            ["if",
+              ["and",
+                ["is-not-empty", "_S.ps:P4649"],
+                ["is-not-empty", "_S.ps:P3865"]
+              ],
+              ["concat",
+                ["string", "_S.ps:P4649"], "-",
+                ["string", "_S.ps:P3865"]
+              ], null]
+          ]
+        ]
+      ],
+      "is-match": [
+        ["comment", "workaround for shadowing the outer _. variable"],
+        ["discard",
+          ["is-not-empty",
+            ["filter",
+              ["matches", "_S.pattern", "_."], "_R._T._based_on_properties"]
+          ]
+        ]
+      ],
+      "map-enum-nkode1": [
+        ["add", "_id",
+          ["concat", "difi-enhetsregisteret-classification", "-nkode1", ":",
+            ["string", "_R._S.nkode1"]
+          ]
+        ],
+        ["if",
+          ["is-not-empty", "_R._T._history.p:P170"],
+          [
+            ["comment", "*** Move Origin from history ***"],
+            ["add", "_origin",
+              ["path", "ps:P170",
+                ["last",
+                  ["sorted", "_.ps:P5017",
+                    ["filter",
+                      ["is-empty", "_.ps:P582"], "_R._T._history.p:P170"]
+                  ]
+                ]
+              ]
+            ]
+          ],
+          [
+            ["comment", "*** Move Origin into p:P170 property for sub-object if this is a new object  ***"],
+            ["if",
+              ["or",
+                ["is-null",
+                  ["is-changed", "_.nkode1"]
+                ],
+                ["and",
+                  ["not",
+                    ["is-changed", "_.nkode1"]
+                  ],
+                  ["is-empty", "_R._T._history"]
+                ]
+              ],
+              ["add", "_origin",
+                ["first",
+                  ["if",
+                    ["is-not-empty",
+                      ["filter",
+                        ["eq", "_.key", "classification-nkode1"], "_R._S.$origin.detail"]
+                    ],
+                    ["path", "id",
+                      ["filter",
+                        ["and",
+                          ["eq", "_.key", "classification-nkode1"],
+                          ["if",
+                            ["is-not-empty", "_.enum"],
+                            ["eq", "_.enum", "_S._enum"], true],
+                          ["if",
+                            ["is-not-empty", "_.value"],
+                            ["eq", "_.value",
+                              ["string", "_R._S.nkode1"]
+                            ], true]
+                        ], "_R._S.$origin.detail"]
+                    ],
+                    ["path", "classification-nkode1", "_R._S.$origin"]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["if",
+          ["is-not-empty", "_T._origin"],
+          [
+            ["merge",
+              ["apply", "1-history",
+                ["dict", "id", "_T._id", "key", "p:P170", "value",
+                  ["list",
+                    ["dict",
+                      ["items",
+                        ["map",
+                          ["dict", "ps:P170", "_.", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+                            ["ni", "_T._id"]
+                          ], "_T._origin"]
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            ],
+            ["add", "ps:P170", "_T._origin"],
+            ["remove", "$origin"]
+          ]
+        ]
+      ],
+      "map-enum-nkode2": [
+        ["add", "_id",
+          ["concat", "difi-enhetsregisteret-classification", "-nkode2", ":",
+            ["string", "_R._S.nkode2"]
+          ]
+        ],
+        ["if",
+          ["is-not-empty", "_R._T._history.p:P170"],
+          [
+            ["comment", "*** Move Origin from history ***"],
+            ["add", "_origin",
+              ["path", "ps:P170",
+                ["last",
+                  ["sorted", "_.ps:P5017",
+                    ["filter",
+                      ["is-empty", "_.ps:P582"], "_R._T._history.p:P170"]
+                  ]
+                ]
+              ]
+            ]
+          ],
+          [
+            ["comment", "*** Move Origin into p:P170 property for sub-object if this is a new object  ***"],
+            ["if",
+              ["or",
+                ["is-null",
+                  ["is-changed", "_.nkode2"]
+                ],
+                ["and",
+                  ["not",
+                    ["is-changed", "_.nkode2"]
+                  ],
+                  ["is-empty", "_R._T._history"]
+                ]
+              ],
+              ["add", "_origin",
+                ["first",
+                  ["if",
+                    ["is-not-empty",
+                      ["filter",
+                        ["eq", "_.key", "classification-nkode2"], "_R._S.$origin.detail"]
+                    ],
+                    ["path", "id",
+                      ["filter",
+                        ["and",
+                          ["eq", "_.key", "classification-nkode2"],
+                          ["if",
+                            ["is-not-empty", "_.enum"],
+                            ["eq", "_.enum", "_S._enum"], true],
+                          ["if",
+                            ["is-not-empty", "_.value"],
+                            ["eq", "_.value",
+                              ["string", "_R._S.nkode2"]
+                            ], true]
+                        ], "_R._S.$origin.detail"]
+                    ],
+                    ["path", "classification-nkode2", "_R._S.$origin"]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["if",
+          ["is-not-empty", "_T._origin"],
+          [
+            ["merge",
+              ["apply", "1-history",
+                ["dict", "id", "_T._id", "key", "p:P170", "value",
+                  ["list",
+                    ["dict",
+                      ["items",
+                        ["map",
+                          ["dict", "ps:P170", "_.", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+                            ["ni", "_T._id"]
+                          ], "_T._origin"]
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            ],
+            ["add", "ps:P170", "_T._origin"],
+            ["remove", "$origin"]
+          ]
+        ]
+      ],
+      "map-enum-nkode3": [
+        ["add", "_id",
+          ["concat", "difi-enhetsregisteret-classification", "-nkode3", ":",
+            ["string", "_R._S.nkode3"]
+          ]
+        ],
+        ["if",
+          ["is-not-empty", "_R._T._history.p:P170"],
+          [
+            ["comment", "*** Move Origin from history ***"],
+            ["add", "_origin",
+              ["path", "ps:P170",
+                ["last",
+                  ["sorted", "_.ps:P5017",
+                    ["filter",
+                      ["is-empty", "_.ps:P582"], "_R._T._history.p:P170"]
+                  ]
+                ]
+              ]
+            ]
+          ],
+          [
+            ["comment", "*** Move Origin into p:P170 property for sub-object if this is a new object  ***"],
+            ["if",
+              ["or",
+                ["is-null",
+                  ["is-changed", "_.nkode3"]
+                ],
+                ["and",
+                  ["not",
+                    ["is-changed", "_.nkode3"]
+                  ],
+                  ["is-empty", "_R._T._history"]
+                ]
+              ],
+              ["add", "_origin",
+                ["first",
+                  ["if",
+                    ["is-not-empty",
+                      ["filter",
+                        ["eq", "_.key", "classification-nkode3"], "_R._S.$origin.detail"]
+                    ],
+                    ["path", "id",
+                      ["filter",
+                        ["and",
+                          ["eq", "_.key", "classification-nkode3"],
+                          ["if",
+                            ["is-not-empty", "_.enum"],
+                            ["eq", "_.enum", "_S._enum"], true],
+                          ["if",
+                            ["is-not-empty", "_.value"],
+                            ["eq", "_.value",
+                              ["string", "_R._S.nkode3"]
+                            ], true]
+                        ], "_R._S.$origin.detail"]
+                    ],
+                    ["path", "classification-nkode3", "_R._S.$origin"]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["if",
+          ["is-not-empty", "_T._origin"],
+          [
+            ["merge",
+              ["apply", "1-history",
+                ["dict", "id", "_T._id", "key", "p:P170", "value",
+                  ["list",
+                    ["dict",
+                      ["items",
+                        ["map",
+                          ["dict", "ps:P170", "_.", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+                            ["ni", "_T._id"]
+                          ], "_T._origin"]
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            ],
+            ["add", "ps:P170", "_T._origin"],
+            ["remove", "$origin"]
+          ]
+        ]
+      ],
+      "map-nkode1": [
+        ["add", "_id",
+          ["concat", "difi-enhetsregisteret-classification", "-nkode1", ":",
+            ["string", "_R._S.nkode1"]
+          ]
+        ],
+        ["comment", "*****  -> p:P31.ps:P31 (string) *****"],
+        ["comment", ""],
+        ["merge",
+          ["apply", "1-history",
+            ["dict", "key", "p:P31", "value",
+              ["combine",
+                ["if", true,
+                  ["map",
+                    ["dict",
+                      ["combine", null,
+                        ["items",
+                          ["dict", "ps:P31", "_.", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+                            ["ni", "_T._id"], null, null]
+                        ]
+                      ]
+                    ], "~:wd:Q100231013"]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["remove", "temp_P1329*"],
+        ["comment", "***** nkode1 -> _id (string) *****"],
+        ["comment", ""],
+        ["comment", "Ignore _id if not in master data"],
+        ["remove", "temp_P1329*"],
+        ["comment", "***** nkode1 -> p:P1476.ps:P1476 (string) *****"],
+        ["comment", ""],
+        ["merge",
+          ["apply", "1-history",
+            ["dict", "key", "p:P1476", "value",
+              ["combine",
+                ["if", true,
+                  ["map",
+                    ["dict",
+                      ["combine", null,
+                        ["items",
+                          ["dict", "ps:P1476", "_.", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+                            ["ni", "_T._id"], null, null]
+                        ]
+                      ]
+                    ], "_R._S.nkode1"]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["remove", "temp_P1329*"]
+      ],
+      "map-nkode2": [
+        ["add", "_id",
+          ["concat", "difi-enhetsregisteret-classification", "-nkode2", ":",
+            ["string", "_R._S.nkode2"]
+          ]
+        ],
+        ["comment", "*****  -> p:P31.ps:P31 (string) *****"],
+        ["comment", ""],
+        ["merge",
+          ["apply", "1-history",
+            ["dict", "key", "p:P31", "value",
+              ["combine",
+                ["if", true,
+                  ["map",
+                    ["dict",
+                      ["combine", null,
+                        ["items",
+                          ["dict", "ps:P31", "_.", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+                            ["ni", "_T._id"], null, null]
+                        ]
+                      ]
+                    ], "~:wd:Q100231013"]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["remove", "temp_P1329*"],
+        ["comment", "***** nkode2 -> _id (string) *****"],
+        ["comment", ""],
+        ["comment", "Ignore _id if not in master data"],
+        ["remove", "temp_P1329*"],
+        ["comment", "***** nkode2 -> p:P1476.ps:P1476 (string) *****"],
+        ["comment", ""],
+        ["merge",
+          ["apply", "1-history",
+            ["dict", "key", "p:P1476", "value",
+              ["combine",
+                ["if", true,
+                  ["map",
+                    ["dict",
+                      ["combine", null,
+                        ["items",
+                          ["dict", "ps:P1476", "_.", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+                            ["ni", "_T._id"], null, null]
+                        ]
+                      ]
+                    ], "_R._S.nkode2"]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["remove", "temp_P1329*"]
+      ],
+      "map-nkode3": [
+        ["add", "_id",
+          ["concat", "difi-enhetsregisteret-classification", "-nkode3", ":",
+            ["string", "_R._S.nkode3"]
+          ]
+        ],
+        ["comment", "*****  -> p:P31.ps:P31 (string) *****"],
+        ["comment", ""],
+        ["merge",
+          ["apply", "1-history",
+            ["dict", "key", "p:P31", "value",
+              ["combine",
+                ["if", true,
+                  ["map",
+                    ["dict",
+                      ["combine", null,
+                        ["items",
+                          ["dict", "ps:P31", "_.", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+                            ["ni", "_T._id"], null, null]
+                        ]
+                      ]
+                    ], "~:wd:Q100231013"]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["remove", "temp_P1329*"],
+        ["comment", "***** nkode3 -> _id (string) *****"],
+        ["comment", ""],
+        ["comment", "Ignore _id if not in master data"],
+        ["remove", "temp_P1329*"],
+        ["comment", "***** nkode3 -> p:P1476.ps:P1476 (string) *****"],
+        ["comment", ""],
+        ["merge",
+          ["apply", "1-history",
+            ["dict", "key", "p:P1476", "value",
+              ["combine",
+                ["if", true,
+                  ["map",
+                    ["dict",
+                      ["combine", null,
+                        ["items",
+                          ["dict", "ps:P1476", "_.", "ps:P5017", "_R._T._$last-modified", "ps:P813", "_R._T._$retrieved", "ps:P248",
+                            ["ni", "_T._id"], null, null]
+                        ]
+                      ]
+                    ], "_R._S.nkode3"]
+                ]
+              ]
+            ]
+          ]
+        ],
+        ["remove", "temp_P1329*"]
+      ],
+      "mappings": [
+        ["copy", "p:*"],
+        ["copy", "ps:*"],
+        ["copy", "_id"]
+      ],
+      "match-dict": [
+        ["add", "key", "_P._S.key"],
+        ["if",
+          ["in", true,
+            ["map",
+              ["eq",
+                ["apply", "strip-dates", "_S.source"],
+                ["apply", "strip-dates", "_."]
+              ], "_S.target"]
+          ],
+          ["add", "::match", "_S.source"],
+          ["add", "::new", "_S.source"]
+        ]
+      ],
+      "match-phonenumber-prefix": [
+        ["add", "_temp_phone", "_S.ps:P1329"],
+        ["add", "_temp_replace",
+          ["if",
+            ["matches", "00*", "_S.ps:P1329"],
+            ["substring", 0,
+              ["+", "_S.range", 1], "_S.ps:P1329"],
+            ["substring", 0, "_S.range", "_S.ps:P1329"]
+          ]
+        ],
+        ["add", "_temp_prefix",
+          ["join", "",
+            ["map",
+              ["if",
+                ["in",
+                  ["substring", "_.",
+                    ["+", 1, "_."],
+                    ["if",
+                      ["matches", "00*",
+                        ["first", "_S.ps:P1329"]
+                      ],
+                      ["concat", "+",
+                        ["substring", 2,
+                          ["first", "_S.ps:P1329"]
+                        ]
+                      ],
+                      ["first", "_S.ps:P1329"]
+                    ]
+                  ],
+                  ["if",
+                    ["eq", "_.", 0],
+                    ["list", "+"],
+                    ["list", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "("]
+                  ]
+                ],
+                ["substring", "_.",
+                  ["+", 1, "_."],
+                  ["if",
+                    ["matches", "00*",
+                      ["first", "_S.ps:P1329"]
+                    ],
+                    ["concat", "+",
+                      ["substring", 2,
+                        ["first", "_S.ps:P1329"]
+                      ]
+                    ],
+                    ["first", "_S.ps:P1329"]
+                  ]
+                ]
+              ],
+              ["range", 0, "_S.range"]
+            ]
+          ]
+        ],
+        ["add", "_temp_ps_p474",
+          ["first",
+            ["filter",
+              ["eq", "_.ps:P474", "_T._temp_prefix"], "_S.countries"]
+          ]
+        ],
+        ["if",
+          ["is-not-null", "_T._temp_ps_p474"],
+          ["add", "p:P1329",
+            ["dict", "ps:P1329",
+              ["if",
+                ["is-not-empty", "_T._temp_replace"],
+                ["replace", "_T._temp_replace",
+                  ["concat",
+                    ["first",
+                      ["sorted", "_T._temp_ps_p474.ps:P474"]
+                    ], " "],
+                  ["first", "_S.ps:P1329"]
+                ],
+                ["if",
+                  ["is-not-empty", "_T._temp_ps_p474"],
+                  ["concat",
+                    ["first",
+                      ["sorted", "_T._temp_ps_p474.ps:P474"]
+                    ], " ",
+                    ["first", "_S.ps:P1329"]
+                  ],
+                  ["first", "_S.ps:P1329"]
+                ]
+              ], "ps:P17", "_T._temp_ps_p474._id"]
+          ]
+        ]
+      ],
+      "remove-unmapped-properties": [
+        ["comment", "function that builds up the dotted key and checks if one of dotted notations in $based_on_properties starts with this dotted key, recurses if the value is a dict"],
+        ["comment", "the inner 'map' checks if key matches any of the paths in $based_on_properties and recurses dicts"],
+        ["comment", "the 'group' removes keys for values that are null, empty strings, empty lists or empty dicts (after recursively removing unmapped properties) and groups lists of dicts"],
+        ["comment", "the 'map-dict' checks if the values are single valued lists and unwraps them as the previous group collects all values in lists"],
+        ["comment", "possible optimizations: don't recurse deep or long lists of dicts if there is no prefix that matches"],
+        ["comment", "possible optimizations: drop outer map-dict that unwraps the single value lists as the values are normalized regardless"],
+        ["merge",
+          ["map-dict", "_.",
+            ["if",
+              ["eq",
+                ["count", "_."], 1],
+              ["first", "_."], "_."],
+            ["dict",
+              ["group",
+                ["if",
+                  ["or",
+                    ["and",
+                      ["is-dict",
+                        ["last", "_."]
+                      ],
+                      ["gt",
+                        ["count",
+                          ["last", "_."]
+                        ], 0]
+                    ],
+                    ["and",
+                      ["not",
+                        ["is-dict",
+                          ["last", "_."]
+                        ]
+                      ],
+                      ["and",
+                        ["is-not-empty",
+                          ["last", "_."]
+                        ],
+                        ["neq",
+                          ["last", "_."], ""]
+                      ]
+                    ]
+                  ],
+                  ["first", "_."]
+                ],
+                ["last", "_."],
+                ["map",
+                  ["list",
+                    ["if",
+                      ["is-not-empty",
+                        ["apply", "is-match",
+                          ["dict", "pattern",
+                            ["concat", "_S.prefix",
+                              ["ni-id",
+                                ["ni",
+                                  ["first", "_."]
+                                ]
+                              ], "*"]
+                          ]
+                        ]
+                      ],
+                      ["ni-id",
+                        ["ni",
+                          ["first", "_."]
+                        ]
+                      ]
+                    ],
+                    ["if",
+                      ["is-dict",
+                        ["last", "_."]
+                      ],
+                      ["apply", "remove-unmapped-properties",
+                        ["dict", "data",
+                          ["last", "_."], "prefix",
+                          ["concat", "_S.prefix",
+                            ["ni-id",
+                              ["ni",
+                                ["first", "_."]
+                              ]
+                            ], "."]
+                        ]
+                      ],
+                      ["last", "_."]
+                    ]
+                  ],
+                  ["items", "_S.data"]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ],
+      "strip-dates": [
+        ["copy", "ps:*"],
+        ["if",
+          ["neq", "_P._T.key", "p:P582"],
+          ["remove", "ps:P582"]
+        ],
+        ["if",
+          ["neq", "_P._T.key", "p:P2309"],
+          ["remove", "ps:P2309"]
+        ],
+        ["if",
+          ["neq", "_P._T.key", "p:P5017"],
+          ["remove", "ps:P5017"]
+        ],
+        ["if",
+          ["neq", "_P._T.key", "p:P813"],
+          ["remove", "ps:P813"]
+        ],
+        ["if",
+          ["neq", "_P._T.key", "p:P580"],
+          ["remove", "ps:P580"]
+        ],
+        ["if",
+          ["neq", "_P._T.key", "p:P571"],
+          ["remove", "ps:P571"]
+        ],
+        ["if",
+          ["neq", "_P._T.key", "p:P248"],
+          ["remove", "ps:P248"]
+        ]
+      ]
+    }
+  },
+  "metadata": {
+    "connector": "difi",
+    "datatype": "enhetsregisteret",
+    "phase": "enrich"
+  },
+  "add_namespaces": true,
+  "batch_size": 1,
+  "include_completeness": ["difi-enhetsregisteret-collect"],
+  "namespaces": {
+    "identity": "difi-enhetsregisteret-classification",
+    "property": "difi-enhetsregisteret-classification"
+  },
+  "rescan_when_config_changes": true
+}

@@ -7,25 +7,23 @@ import { Diagnostic, DiagnosticSeverity, Range, Position } from "vscode-language
 import { DtlCall } from "./dtl-parser";
 import { getDtlFunction, isKnownFunction, DTL_VARIABLES } from "../../src/shared/dtl-registry";
 
-export interface ValidatorOptions {
-  maxProblems: number;
-  validateUnknownFunctions: boolean;
-  validateArgCount: boolean;
-}
+export type { ValidatorOptions } from "../../types/dtl-validator.types";
+
+import type { ValidatorOptions } from "../../types/dtl-validator.types";
 
 const VALID_VARIABLE_PREFIXES = new Set(Object.keys(DTL_VARIABLES));
 
-function toRange(
+const toRange = (
   start: { line: number; character: number },
   end: { line: number; character: number },
-): Range {
+): Range => {
   return {
     start: Position.create(start.line, start.character),
     end: Position.create(end.line, end.character),
   };
-}
+};
 
-export function validateCalls(calls: DtlCall[], options: ValidatorOptions): Diagnostic[] {
+export const validateCalls = (calls: DtlCall[], options: ValidatorOptions): Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];
 
   for (const call of calls) {
@@ -117,4 +115,4 @@ export function validateCalls(calls: DtlCall[], options: ValidatorOptions): Diag
   }
 
   return diagnostics;
-}
+};
