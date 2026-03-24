@@ -7,9 +7,9 @@ import { Diagnostic, DiagnosticSeverity, Range, Position } from "vscode-language
 import { DtlCall } from "./dtl-parser";
 import { getDtlFunction, isKnownFunction, DTL_VARIABLES } from "../../src/shared/dtl-registry";
 
-export type { ValidatorOptions } from "../../src/shared/dtl-validator.types";
+export type { ValidatorOptions } from "../../types/dtl-validator.types";
 
-import type { ValidatorOptions } from "../../src/shared/dtl-validator.types";
+import type { ValidatorOptions } from "../../types/dtl-validator.types";
 
 const VALID_VARIABLE_PREFIXES = new Set(Object.keys(DTL_VARIABLES));
 

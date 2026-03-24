@@ -4,7 +4,12 @@
  * Based on official Sesam DTL documentation: https://docs.sesam.io/hub/data-transformation-language.html
  */
 
-import type { DtlCategory, DtlFunction, DtlFunctionKind, DtlParam } from "./dtl-registry.types";
+import type {
+  DtlCategory,
+  DtlFunction,
+  DtlFunctionKind,
+  DtlParam,
+} from "../../types/dtl-registry.types";
 
 export type { DtlCategory, DtlFunction, DtlFunctionKind, DtlParam };
 

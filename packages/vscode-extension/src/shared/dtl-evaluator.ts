@@ -16,7 +16,7 @@ export type {
   EvalEntity,
   EvalStatus,
   EvalResult,
-} from "./dtl-evaluator.types";
+} from "../../types/dtl-evaluator.types";
 
 import type {
   DtlObject,
@@ -24,7 +24,7 @@ import type {
   EvalEntity,
   EvalResult,
   EvalContext,
-} from "./dtl-evaluator.types";
+} from "../../types/dtl-evaluator.types";
 
 // ---------------------------------------------------------------------------
 // Public API
