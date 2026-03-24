@@ -70,6 +70,7 @@ Press **F5** in VS Code to launch the extension in a new Extension Development H
 | Source module | kebab-case | `dtl-validator.ts`, `config-formatter.ts` |
 | VS Code provider / class | kebab-case | `pipe-graph-provider.ts`, `pipe-outline-provider.ts` |
 | Types / interfaces only | `*.types.ts` | `dtl-registry.types.ts`, `server.types.ts` |
+| Utility / helper functions only | `*.utils.ts` | `string.utils.ts`, `range.utils.ts` |
 | Constants only | `*.constants.ts` or `constants.ts` | `constants.ts` |
 | Test file | mirrors source, `*.test.ts` | `dtl-validator.ts` → `validator.test.ts` |
 
