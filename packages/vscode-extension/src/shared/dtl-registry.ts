@@ -61,16 +61,22 @@ const FUNCTIONS: DtlFunction[] = [
     name: "copy",
     category: "Transforms",
     kind: "transform",
-    signature: "copy(property-or-wildcard)",
-    description: "Copies one or more properties from the source entity to the target entity.",
+    signature: "copy(include [, exclude])",
+    description:
+      "Copies properties matching INCLUDE from the source entity to the target entity. Properties matching EXCLUDE are omitted.",
     params: [
       {
-        name: "property-or-wildcard",
-        description: 'Property name or wildcard (e.g. "*").',
+        name: "include",
+        description: 'Property name or wildcard pattern(s) to include (e.g. "*").',
+      },
+      {
+        name: "exclude",
+        optional: true,
+        description: "Property name or wildcard pattern(s) to exclude.",
       },
     ],
     minArgs: 1,
-    maxArgs: 1,
+    maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
   {
@@ -189,17 +195,29 @@ const FUNCTIONS: DtlFunction[] = [
   {
     name: "filter",
     category: "Transforms",
-    kind: "transform",
-    signature: "filter(condition)",
-    description: "Discards the current entity if the condition is falsy.",
+    // filter is overloaded: as a transform it drops the current entity (0–1 args);
+    // as a list expression it filters a list (2 args: function + values).
+    // kind is set to "expression" to avoid false "transform-as-expression" warnings
+    // when the list variant is used nested inside another expression.
+    kind: "expression",
+    signature: "filter([condition]) | filter(function, values)",
+    description:
+      "As a transform: discards the current entity if CONDITION is falsy (or unconditionally if omitted). " +
+      "As a list expression: returns the elements of VALUES for which FUNCTION evaluates to true.",
     params: [
       {
-        name: "condition",
-        description: "Boolean expression. Entity is kept when truthy.",
+        name: "condition / function",
+        description:
+          "Transform variant: boolean condition (optional). Expression variant: function applied to each element (use _ for current).",
+      },
+      {
+        name: "values",
+        optional: true,
+        description: "Expression variant: the list to filter.",
       },
     ],
-    minArgs: 1,
-    maxArgs: 1,
+    minArgs: 0,
+    maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
   {
