@@ -11,6 +11,7 @@
   - [Code Snippets](#code-snippets)
   - [Pipe Graph Explorer](#pipe-graph-explorer)
   - [Pipe Preview](#pipe-preview)
+  - [Go to Rule Definition](#go-to-rule-definition)
   - [New Sesam Config File](#new-sesam-config-file)
 - [Getting Started](#getting-started)
 - [DTL Primer](#dtl-primer)
@@ -86,6 +87,23 @@ A sidebar panel (**DTL Graph**) that scans your workspace for pipe and system co
 - Hop dataset references shown as children — **✓ resolved** (file found) or **⚠ unresolved** (not found in workspace).
 - Named rules listed under each pipe.
 - **Refresh** button to rescan after adding files.
+
+### Go to Rule Definition
+
+Navigate between `apply`/`apply-hops` call sites and their rule definitions without leaving the editor.
+
+| Action | How to invoke |
+|---|---|
+| **Go to Definition** | `F12` or `Ctrl+Click` on the rule name in `["apply", "<rule>", …]` |
+| **Peek Definition** | `Alt+F12` on the rule name |
+| **Find All References** | Right-click a rule definition key → **Find All References** |
+| **Peek References** | `Shift+Alt+F12` on the rule definition key |
+
+Example — Ctrl+Click on `"based-on"` in `["apply", "based-on", "_S."]` jumps directly to the `"based-on": […]` rule definition in the same file.
+
+> **Note:** Navigation is within the same pipe config file only — Sesam DTL rules are always local to the transform block. Array transforms are supported; each step's rules are scoped independently.
+
+---
 
 ### New Sesam Config File
 Create a new `*.conf.json` pipe or system config from a template — no copy-pasting boilerplate.
