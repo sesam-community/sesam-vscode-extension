@@ -86,6 +86,7 @@ Press **F5** in VS Code to launch the extension in a new Extension Development H
 - **Array functions over loops** — prefer `map`, `filter`, `reduce`, `flatMap`, `find`, `every`, `some` over `for`/`while` loops
 - **Parentheses in conditions** — always wrap `if` / `else if` conditions in parentheses; also wrap ternary conditions when they contain operators
 - **Functional Programming** — favour pure functions (no side-effects, same input → same output), immutability (`const`, spread instead of mutation), and function composition over classes with mutable state where practical
+- **Breathing space** — always leave a blank line before and after `if`, `for`, and `return` statements, unless the block contains only a single statement or the `if`/`return` is the very first or last line of a block
 
 ### Import Order
 
