@@ -7,21 +7,6 @@ import {
 } from "../server/src/utils/alias-rename.utils";
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Returns the offset of `needle` in `haystack` (first occurrence). */
-const off = (text: string, needle: string, occurrence = 0): number => {
-  let idx = -1;
-
-  for (let n = 0; n <= occurrence; n++) {
-    idx = text.indexOf(needle, idx + 1);
-  }
-
-  return idx;
-};
-
-// ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
@@ -166,12 +151,10 @@ describe("collectAliasRanges", () => {
 
   it("finds prefixed usage wct.$ids", () => {
     const ranges = collectAliasRanges(PIPE, "wct");
-    const target = '"wct.$ids"'; // inside _S.wct.$ids — it won't match this one; let me check
-    // _S.wct.$ids — "wct" appears as part of a dot chain, not as wct.something starting with quote
-    // Actually the fixture has "_S.wct.$ids" which is inside a string "wct.$ids" would need to start right after quote
-    // The raw string in PIPE is "_S.wct.$ids" → starts with _S, not wct, so prefixRe won't match
-    // Let's just confirm that at least 2 ranges exist (declaration + wct.name)
-    expect(ranges.length).toBeGreaterThanOrEqual(2);
+    const target = '"wct.$ids"';
+    const expectedStart = PIPE.indexOf(target) + 1;
+    const usage = ranges.find((r) => r.start === expectedStart);
+    expect(usage).toBeDefined();
   });
 
   it("finds bare 'wct' usage", () => {
