@@ -18,7 +18,7 @@ const BASE_DOC_URL = "https://docs.sesam.io/hub/dtl";
 // ---------------------------------------------------------------------------
 // Category arrays
 // ---------------------------------------------------------------------------
-const TRANSFORM_FNS: DtlFunction[] = [
+const TransformFns = [
   // ─── TRANSFORMS ─────────────────────────────────────────────────────────
   {
     name: "add",
@@ -354,9 +354,9 @@ const TRANSFORM_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const BOOLEAN_LOGIC_FNS: DtlFunction[] = [
+const BooleanLogicFns = [
   // ─── BOOLEAN LOGIC ───────────────────────────────────────────────────────
   {
     name: "and",
@@ -419,9 +419,9 @@ const BOOLEAN_LOGIC_FNS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-boolean-logic.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const BOOLEAN_FNS: DtlFunction[] = [
+const BooleanFns = [
   // ─── BOOLEANS ────────────────────────────────────────────────────────────
   {
     name: "boolean",
@@ -445,9 +445,9 @@ const BOOLEAN_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-booleans.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const BYTES_FNS: DtlFunction[] = [
+const BytesFns = [
   // ─── BYTES ───────────────────────────────────────────────────────────────
   {
     name: "base64-encode",
@@ -493,9 +493,9 @@ const BYTES_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-bytes.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const COMPARISON_FNS: DtlFunction[] = [
+const ComparisonFns = [
   // ─── COMPARISONS ─────────────────────────────────────────────────────────
   {
     name: "eq",
@@ -581,9 +581,9 @@ const COMPARISON_FNS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-comparisons.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const CONDITIONAL_FNS: DtlFunction[] = [
+const ConditionalFns = [
   // ─── CONDITIONALS ────────────────────────────────────────────────────────
   {
     name: "coalesce",
@@ -607,9 +607,9 @@ const CONDITIONAL_FNS: DtlFunction[] = [
     maxArgs: null,
     docUrl: `${BASE_DOC_URL}/dtl-functions-conditionals.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const DATE_TIME_FNS: DtlFunction[] = [
+const DateTimeFns = [
   // ─── DATE AND TIME ───────────────────────────────────────────────────────
   {
     name: "now",
@@ -728,9 +728,9 @@ const DATE_TIME_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-date-and-time.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const DICTIONARY_FNS: DtlFunction[] = [
+const DictionaryFns = [
   // ─── DICTIONARIES ────────────────────────────────────────────────────────
   {
     name: "dict",
@@ -882,9 +882,9 @@ const DICTIONARY_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-dictionaries.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const ENCRYPTION_FNS: DtlFunction[] = [
+const EncryptionFns = [
   // ─── ENCRYPTION ──────────────────────────────────────────────────────────
   {
     name: "encrypt",
@@ -964,9 +964,9 @@ const ENCRYPTION_FNS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-encryption.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const HOPS_FNS: DtlFunction[] = [
+const HopsFns = [
   // ─── HOPS ────────────────────────────────────────────────────────────────
   {
     name: "hops",
@@ -998,9 +998,9 @@ const HOPS_FNS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-hops.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const JSON_FNS: DtlFunction[] = [
+const JsonFns = [
   // ─── JSON ────────────────────────────────────────────────────────────────
   {
     name: "json",
@@ -1046,9 +1046,9 @@ const JSON_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-json.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const LIST_FNS: DtlFunction[] = [
+const ListFns = [
   // ─── LISTS ───────────────────────────────────────────────────────────────
   {
     name: "list",
@@ -1459,9 +1459,9 @@ const LIST_FNS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-lists.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const MATH_FNS: DtlFunction[] = [
+const MathFns = [
   // ─── MATH ────────────────────────────────────────────────────────────────
   {
     name: "+",
@@ -1650,9 +1650,9 @@ const MATH_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-math.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const MISC_FNS: DtlFunction[] = [
+const MiscFns = [
   // ─── MISC ────────────────────────────────────────────────────────────────
   {
     name: "hash128",
@@ -1712,9 +1712,9 @@ const MISC_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-misc.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const NI_FNS: DtlFunction[] = [
+const NiFns = [
   // ─── NAMESPACED IDENTIFIERS ──────────────────────────────────────────────
   {
     name: "ni",
@@ -1804,9 +1804,9 @@ const NI_FNS: DtlFunction[] = [
     maxArgs: null,
     docUrl: "https://docs.sesam.io/hub/deprecations.html#ni-expand",
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const NULL_FNS: DtlFunction[] = [
+const NullFns = [
   // ─── NULLS ───────────────────────────────────────────────────────────────
   {
     name: "is-null",
@@ -1844,9 +1844,9 @@ const NULL_FNS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-nulls.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const NUMBER_FNS: DtlFunction[] = [
+const NumberFns = [
   // ─── NUMBERS ─────────────────────────────────────────────────────────────
   {
     name: "integer",
@@ -1925,9 +1925,9 @@ const NUMBER_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-numbers.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const PHONENUMBER_FNS: DtlFunction[] = [
+const PhonenumberFns = [
   // ─── PHONENUMBERS ────────────────────────────────────────────────────────
   {
     name: "phonenumber-parse",
@@ -1960,9 +1960,9 @@ const PHONENUMBER_FNS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-phonenumbers.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const SET_FNS: DtlFunction[] = [
+const SetFns = [
   // ─── SETS ────────────────────────────────────────────────────────────────
   {
     name: "union",
@@ -2020,9 +2020,9 @@ const SET_FNS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-sets.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const STRING_FNS: DtlFunction[] = [
+const StringFns = [
   // ─── STRINGS ─────────────────────────────────────────────────────────────
   {
     name: "concat",
@@ -2233,9 +2233,9 @@ const STRING_FNS: DtlFunction[] = [
     maxArgs: 3,
     docUrl: `${BASE_DOC_URL}/dtl-functions-strings.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const URI_FNS: DtlFunction[] = [
+const UriFns = [
   // ─── URIs ────────────────────────────────────────────────────────────────
   {
     name: "uri",
@@ -2281,9 +2281,9 @@ const URI_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-uris.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
-const UUID_FNS: DtlFunction[] = [
+const UuidFns = [
   // ─── UUIDs ───────────────────────────────────────────────────────────────
   {
     name: "uuid",
@@ -2307,34 +2307,34 @@ const UUID_FNS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-uuids.html`,
   },
-];
+] as const satisfies readonly DtlFunction[];
 
 // ---------------------------------------------------------------------------
 // Combined registry
 // ---------------------------------------------------------------------------
 const FUNCTIONS: DtlFunction[] = [
-  ...TRANSFORM_FNS,
-  ...BOOLEAN_LOGIC_FNS,
-  ...BOOLEAN_FNS,
-  ...BYTES_FNS,
-  ...COMPARISON_FNS,
-  ...CONDITIONAL_FNS,
-  ...DATE_TIME_FNS,
-  ...DICTIONARY_FNS,
-  ...ENCRYPTION_FNS,
-  ...HOPS_FNS,
-  ...JSON_FNS,
-  ...LIST_FNS,
-  ...MATH_FNS,
-  ...MISC_FNS,
-  ...NI_FNS,
-  ...NULL_FNS,
-  ...NUMBER_FNS,
-  ...PHONENUMBER_FNS,
-  ...SET_FNS,
-  ...STRING_FNS,
-  ...URI_FNS,
-  ...UUID_FNS,
+  ...TransformFns,
+  ...BooleanLogicFns,
+  ...BooleanFns,
+  ...BytesFns,
+  ...ComparisonFns,
+  ...ConditionalFns,
+  ...DateTimeFns,
+  ...DictionaryFns,
+  ...EncryptionFns,
+  ...HopsFns,
+  ...JsonFns,
+  ...ListFns,
+  ...MathFns,
+  ...MiscFns,
+  ...NiFns,
+  ...NullFns,
+  ...NumberFns,
+  ...PhonenumberFns,
+  ...SetFns,
+  ...StringFns,
+  ...UriFns,
+  ...UuidFns,
 ];
 
 // ---------------------------------------------------------------------------

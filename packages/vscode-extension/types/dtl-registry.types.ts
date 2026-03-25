@@ -44,7 +44,7 @@ export interface DtlFunction {
   signature: string;
   /** Short description shown in hover and completion details */
   description: string;
-  params: DtlParam[];
+  params: readonly DtlParam[];
   /** Minimum number of arguments (excluding function name) */
   minArgs: number;
   /** Maximum number of arguments. null = variadic */
