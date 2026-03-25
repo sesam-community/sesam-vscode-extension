@@ -21,6 +21,8 @@ export interface FullPipeInfo {
   sourceSystem: string | null;
   /** System _id referenced in sink.system (null if absent). */
   sinkSystem: string | null;
+  /** System _ids referenced in rest-transform steps inside transform[]. */
+  transformSystems: string[];
   /** Dataset IDs joined via hops in the transform. */
   hopDatasets: string[];
   /** Named rules in transform.rules. */
@@ -46,6 +48,8 @@ export interface DagIndex {
   sourceSystemPipes: Map<string, string[]>;
   /** System id → list of pipe ids that have sink.system = this id. */
   sinkSystemPipes: Map<string, string[]>;
+  /** System id → list of pipe ids that reference it in a rest-transform step. */
+  transformSystemPipes: Map<string, string[]>;
 }
 
 /** Source types that reference internal datasets (and have no external origin). */
@@ -211,14 +215,43 @@ export function extractFullPipeInfo(parsed: unknown, fileUri: string): FullPipeI
 
   const hopDatasets = new Set<string>();
   const ruleNames: string[] = [];
+  const transformSystems: string[] = [];
   const transformRaw = obj["transform"];
+
   if (typeof transformRaw === "object" && transformRaw !== null) {
-    const rules = (transformRaw as Record<string, unknown>)["rules"];
-    if (typeof rules === "object" && rules !== null) {
-      ruleNames.push(...Object.keys(rules as Record<string, unknown>));
-      for (const ruleArr of Object.values(rules as Record<string, unknown>)) {
-        if (Array.isArray(ruleArr)) {
-          collectHopDatasets(ruleArr, hopDatasets);
+    if (Array.isArray(transformRaw)) {
+      // Array of transform steps
+      for (const step of transformRaw as unknown[]) {
+        if (typeof step !== "object" || step === null || Array.isArray(step)) {
+          continue;
+        }
+        const s = step as Record<string, unknown>;
+        // Collect system from rest-transform steps
+        if (typeof s["system"] === "string" && s["system"]) {
+          transformSystems.push(s["system"]);
+        }
+        // Collect hop datasets and rule names from dtl steps
+        const rules = s["rules"];
+        if (typeof rules === "object" && rules !== null && !Array.isArray(rules)) {
+          ruleNames.push(...Object.keys(rules as Record<string, unknown>));
+
+          for (const ruleArr of Object.values(rules as Record<string, unknown>)) {
+            if (Array.isArray(ruleArr)) {
+              collectHopDatasets(ruleArr, hopDatasets);
+            }
+          }
+        }
+      }
+    } else {
+      // Plain-object transform
+      const rules = (transformRaw as Record<string, unknown>)["rules"];
+      if (typeof rules === "object" && rules !== null) {
+        ruleNames.push(...Object.keys(rules as Record<string, unknown>));
+
+        for (const ruleArr of Object.values(rules as Record<string, unknown>)) {
+          if (Array.isArray(ruleArr)) {
+            collectHopDatasets(ruleArr, hopDatasets);
+          }
         }
       }
     }
@@ -232,6 +265,7 @@ export function extractFullPipeInfo(parsed: unknown, fileUri: string): FullPipeI
     sourceType,
     sourceSystem,
     sinkSystem,
+    transformSystems,
     hopDatasets: [...hopDatasets],
     ruleNames,
   };
@@ -248,6 +282,7 @@ export function buildDagIndex(pipes: FullPipeInfo[]): DagIndex {
   const hopConsumers = new Map<string, string[]>();
   const sourceSystemPipes = new Map<string, string[]>();
   const sinkSystemPipes = new Map<string, string[]>();
+  const transformSystemPipes = new Map<string, string[]>();
 
   const pushTo = (map: Map<string, string[]>, key: string, value: string): void => {
     const list = map.get(key) ?? [];
@@ -265,18 +300,32 @@ export function buildDagIndex(pipes: FullPipeInfo[]): DagIndex {
     for (const ds of pipe.sourceDatasets) {
       pushTo(sourceDependents, ds, pipe.id);
     }
+
     for (const ds of pipe.hopDatasets) {
       pushTo(hopConsumers, ds, pipe.id);
     }
+
     if (pipe.sourceSystem) {
       pushTo(sourceSystemPipes, pipe.sourceSystem, pipe.id);
     }
+
     if (pipe.sinkSystem) {
       pushTo(sinkSystemPipes, pipe.sinkSystem, pipe.id);
     }
+
+    for (const sys of pipe.transformSystems) {
+      pushTo(transformSystemPipes, sys, pipe.id);
+    }
   }
 
-  return { byId, sourceDependents, hopConsumers, sourceSystemPipes, sinkSystemPipes };
+  return {
+    byId,
+    sourceDependents,
+    hopConsumers,
+    sourceSystemPipes,
+    sinkSystemPipes,
+    transformSystemPipes,
+  };
 }
 
 /** Build a system id → SystemEntry map from a list of all parsed configs. Pure function. */

@@ -22,9 +22,16 @@ function makePipe(
     hopDatasets?: string[];
     sourceSystem?: string;
     sinkSystem?: string;
+    transformSystems?: string[];
   } = {},
 ): FullPipeInfo {
-  const { sourceType, hopDatasets = [], sourceSystem = null, sinkSystem = null } = opts;
+  const {
+    sourceType,
+    hopDatasets = [],
+    sourceSystem = null,
+    sinkSystem = null,
+    transformSystems = [],
+  } = opts;
   return {
     id,
     fileUri: `file:///pipes/${id}.json`,
@@ -33,6 +40,7 @@ function makePipe(
     sourceType: sourceType ?? (sourceDataset ? "dataset" : "http_endpoint"),
     sourceSystem,
     sinkSystem,
+    transformSystems,
     hopDatasets,
     ruleNames: [],
   };
@@ -250,6 +258,7 @@ describe("buildDagIndex", () => {
         sourceType: "",
         sourceSystem: null,
         sinkSystem: null,
+        transformSystems: [],
         hopDatasets: [],
         ruleNames: [],
       },
@@ -291,6 +300,7 @@ describe("buildDagIndex", () => {
       sourceType: "merge",
       sourceSystem: null,
       sinkSystem: null,
+      transformSystems: [],
       hopDatasets: [],
       ruleNames: [],
     };
@@ -331,6 +341,21 @@ describe("buildDagIndex", () => {
     const index = buildDagIndex([makePipe("p", "ds")]);
     expect(index.sourceSystemPipes.size).toBe(0);
     expect(index.sinkSystemPipes.size).toBe(0);
+    expect(index.transformSystemPipes.size).toBe(0);
+  });
+
+  it("transformSystemPipes reverse map is correct for rest-transform systems", () => {
+    const pipes = [
+      makePipe("wikidata-collect", null, { transformSystems: ["wikidata"] }),
+      makePipe("wikidata-enrich", null, { transformSystems: ["wikidata"] }),
+      makePipe("other-pipe", null, { transformSystems: ["other-system"] }),
+    ];
+    const index = buildDagIndex(pipes);
+    expect(index.transformSystemPipes.get("wikidata")?.sort()).toEqual([
+      "wikidata-collect",
+      "wikidata-enrich",
+    ]);
+    expect(index.transformSystemPipes.get("other-system")).toEqual(["other-pipe"]);
   });
 });
 
@@ -385,12 +410,62 @@ describe("extractFullPipeInfo — system fields", () => {
     );
     expect(info?.sourceSystem).toBeNull();
     expect(info?.sinkSystem).toBeNull();
+    expect(info?.transformSystems).toEqual([]);
   });
 
   it("system config stores root type in sourceType", () => {
     const info = extractFullPipeInfo({ _id: "s", type: "system:rest" }, "file:///systems/s.json");
     expect(info?.kind).toBe("system");
     expect(info?.sourceType).toBe("system:rest");
+  });
+
+  it("extracts transformSystems from a rest step in an array transform", () => {
+    const info = extractFullPipeInfo(
+      {
+        _id: "wikidata-collect",
+        type: "pipe",
+        source: { type: "dataset", dataset: "upstream" },
+        transform: [
+          { type: "dtl", rules: { default: [["add", "x", 1]] } },
+          { type: "rest", system: "wikidata", trace: true },
+          { type: "dtl", rules: { default: [["merge", "_S."]] } },
+        ],
+      },
+      uri,
+    );
+    expect(info?.transformSystems).toEqual(["wikidata"]);
+    expect(info?.sourceSystem).toBeNull();
+    expect(info?.sinkSystem).toBeNull();
+  });
+
+  it("collects multiple rest steps in an array transform", () => {
+    const info = extractFullPipeInfo(
+      {
+        _id: "multi-rest",
+        type: "pipe",
+        source: { type: "dataset", dataset: "upstream" },
+        transform: [
+          { type: "rest", system: "system-a" },
+          { type: "dtl", rules: {} },
+          { type: "rest", system: "system-b" },
+        ],
+      },
+      uri,
+    );
+    expect(info?.transformSystems).toEqual(["system-a", "system-b"]);
+  });
+
+  it("plain-object transform has empty transformSystems", () => {
+    const info = extractFullPipeInfo(
+      {
+        _id: "p",
+        type: "pipe",
+        source: { type: "dataset", dataset: "x" },
+        transform: { type: "dtl", rules: { default: [["copy", "*"]] } },
+      },
+      uri,
+    );
+    expect(info?.transformSystems).toEqual([]);
   });
 });
 
@@ -410,6 +485,7 @@ describe("buildSystemIndex", () => {
         sourceType: "system:rest",
         sourceSystem: null,
         sinkSystem: null,
+        transformSystems: [],
         hopDatasets: [],
         ruleNames: [],
       },

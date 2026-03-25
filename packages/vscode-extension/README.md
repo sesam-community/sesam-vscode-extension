@@ -109,9 +109,9 @@ Navigate between pipe/system config files by clicking on **dataset IDs** in sour
 
 | Action | How to invoke |
 |---|---|
-| **Go to Definition** | `F12` or `Ctrl+Click` on a dataset ID in `"source": { "dataset": "…" }` or inside a `hops.datasets` array |
-| **Peek Definition** | `Alt+F12` on a dataset ID |
-| **Document Links** | Dataset IDs in sources and hops become underlined clickable links |
+| **Go to Definition** | `F12` or `Ctrl+Click` on a dataset ID in `"source": { "dataset": "…" }`, inside a `hops.datasets` array, or on a `"system"` value anywhere in the config |
+| **Peek Definition** | `Alt+F12` on a dataset ID or system ID |
+| **Document Links** | Dataset IDs in sources and hops, and system IDs (including in `"type": "rest"` transform steps), become underlined clickable links |
 | **Find All References** | Right-click a pipe's `_id` value → **Find All References** — lists all pipes that source or hop-join this dataset |
 
 The language server maintains a live workspace index of all config files. The index updates automatically on file create, change, or delete.
