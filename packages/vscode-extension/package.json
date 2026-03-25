@@ -84,11 +84,6 @@
         "icon": "$(play)"
       },
       {
-        "command": "dtl.refreshGraph",
-        "title": "Sesam: Refresh Graph",
-        "icon": "$(refresh)"
-      },
-      {
         "command": "dtl.openDocs",
         "title": "Sesam: Open Function Documentation"
       },
@@ -136,11 +131,6 @@
     },
     "views": {
       "explorer": [
-        {
-          "id": "dtlGraphExplorer",
-          "name": "Pipe Graph",
-          "when": "workspaceFolderCount > 0"
-        },
         {
           "id": "sesamPipeLineage",
           "name": "Pipe Lineage",

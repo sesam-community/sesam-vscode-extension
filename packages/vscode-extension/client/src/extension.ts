@@ -17,7 +17,6 @@ import {
 } from "vscode-languageclient/node";
 
 import { formatSesamJson } from "../../src/shared/config-formatter";
-import { PipeGraphProvider } from "./graph/PipeGraphProvider";
 import { buildDagIndex, buildSystemIndex, extractFullPipeInfo } from "./graph/pipe-dag-builder";
 import { PipeDependentsProvider } from "./graph/PipeDependentsProvider";
 import { PipeLineageProvider } from "./graph/PipeLineageProvider";
@@ -76,16 +75,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   await client.start();
 
-  // ── Graph Navigation Tree View ────────────────────────────────────────────
-  const graphProvider = new PipeGraphProvider();
-
-  const treeView = vscode.window.createTreeView("dtlGraphExplorer", {
-    treeDataProvider: graphProvider,
-    showCollapseAll: true,
-  });
-
-  context.subscriptions.push(treeView);
-
   // ── Pipe DAG Views (Lineage + Dependents) ───────────────────────────────
   const dagRef: { current: DagIndex | null } = { current: null };
   const systemRef: { current: Map<string, SystemEntry> | null } = { current: null };
@@ -140,41 +129,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Watch for file changes to update the graph
   const watcher = vscode.workspace.createFileSystemWatcher("**/{pipes,systems}/**/*.json");
   watcher.onDidCreate(() => {
-    graphProvider.refresh();
     rescanDag();
   });
   watcher.onDidChange(() => {
-    graphProvider.refresh();
     rescanDag();
   });
   watcher.onDidDelete(() => {
-    graphProvider.refresh();
     rescanDag();
   });
   context.subscriptions.push(watcher);
 
   const confWatcher = vscode.workspace.createFileSystemWatcher("**/*.conf.{json,pipe,system}");
   confWatcher.onDidCreate(() => {
-    graphProvider.refresh();
     rescanDag();
   });
   confWatcher.onDidChange(() => {
-    graphProvider.refresh();
     rescanDag();
   });
   confWatcher.onDidDelete(() => {
-    graphProvider.refresh();
     rescanDag();
   });
   context.subscriptions.push(confWatcher);
 
   // ── Commands ──────────────────────────────────────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand("dtl.refreshGraph", () => {
-      graphProvider.refresh();
-      vscode.window.setStatusBarMessage("DTL: Graph refreshed", 2000);
-    }),
-
     vscode.commands.registerCommand("dtl.refreshDag", () => {
       rescanDag();
       vscode.window.setStatusBarMessage("Sesam: DAG refreshed", 2000);
