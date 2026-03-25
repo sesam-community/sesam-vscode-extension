@@ -113,6 +113,10 @@ Navigate between pipe/system config files by clicking on **dataset IDs** in sour
 | **Peek Definition** | `Alt+F12` on a dataset ID or system ID |
 | **Document Links** | Dataset IDs in sources and hops, and system IDs (including in `"type": "rest"` transform steps), become underlined clickable links |
 | **Find All References** | Right-click a pipe's `_id` value → **Find All References** — lists all pipes that source or hop-join this dataset |
+| **Dataset Alias Highlight** | In `"datasets"` arrays, the alias token in `"dataset-id alias"` strings is coloured distinctly from the dataset ID |
+| **Alias Hover** | Hovering over an alias token (declaration or usage) shows which dataset it stands for |
+| **Rename Alias** | Position the cursor on any alias token and press `F2` to rename it everywhere in the file — declaration and all uses |
+| **Find Alias References** | Right-click an alias token → **Find All References** — lists the declaration plus all prefixed and bare uses in the file |
 
 The language server maintains a live workspace index of all config files. The index updates automatically on file create, change, or delete.
 
