@@ -29,7 +29,7 @@ export const validateCalls = (calls: DtlCall[], options: ValidatorOptions): Diag
       break;
     }
 
-    const { functionName, nameRange, range, argCount } = call;
+    const { functionName, nameRange, range, argCount, isTopLevel } = call;
 
     if (functionName === null) {
       continue;
@@ -71,6 +71,21 @@ export const validateCalls = (calls: DtlCall[], options: ValidatorOptions): Diag
     }
 
     if (!dtlFn) {
+      continue;
+    }
+
+    // --- Phase C: transform function used as a nested expression argument
+    if (options.validateTransformInExpression && !isTopLevel && dtlFn.kind === "transform") {
+      const diagRange = nameRange
+        ? toRange(nameRange.start, nameRange.end)
+        : toRange(range.start, range.end);
+      diagnostics.push({
+        range: diagRange,
+        severity: DiagnosticSeverity.Error,
+        message: `Transform function "${functionName}" cannot be used as an expression argument. Only expression functions are valid here.`,
+        source: "dtl",
+        code: "transform-in-expression",
+      });
       continue;
     }
 

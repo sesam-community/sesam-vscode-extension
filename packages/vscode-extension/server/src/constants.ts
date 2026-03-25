@@ -5,7 +5,15 @@ import type { DtlSettings, SystemTypeInfo, SourceTypeInfo } from "./server.types
 // ---------------------------------------------------------------------------
 export const defaultSettings: DtlSettings = {
   maxNumberOfProblems: 100,
-  validate: { enabled: true, unknownFunctions: true, argCount: true },
+  validate: {
+    enabled: true,
+    unknownFunctions: true,
+    argCount: true,
+    jsonSyntax: true,
+    dtlStructure: true,
+    transformInExpression: true,
+    pathExpressions: false,
+  },
 };
 
 // ---------------------------------------------------------------------------

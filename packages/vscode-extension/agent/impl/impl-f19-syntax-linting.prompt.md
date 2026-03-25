@@ -1,6 +1,6 @@
 # F19: DTL Syntax Linting
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 1 - MVP
 > **Depends on**: none (enhances existing `dtl-parser.ts` / `dtl-validator.ts` pipeline)
 > **Tracking**: [README.md](README.md)

@@ -186,3 +186,124 @@ describe("parseDtlText — json extension", () => {
     expect(topLevel.map((c) => c.functionName)).toEqual(["add", "add", "add", "add", "add"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase A — parseError
+// ---------------------------------------------------------------------------
+
+describe("parseDtlText — parseError (invalid JSON)", () => {
+  it("returns parseError: null for valid JSON", () => {
+    const { parseError } = parseDtlText('[["add", "foo", "bar"]]', "dtl");
+    expect(parseError).toBeNull();
+  });
+
+  it("populates parseError for invalid JSON", () => {
+    const { parseError, calls } = parseDtlText("not json", "json");
+    expect(parseError).not.toBeNull();
+    expect(parseError!.message).toBeTruthy();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("returns no calls when parseError is present", () => {
+    const { calls, parseError } = parseDtlText('{"_id": "x" "type": "pipe"}', "json");
+    expect(parseError).not.toBeNull();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("reports a numeric offset when JSON error position is available", () => {
+    // Most Node versions can report a position; we just check it's a number >= 0 or -1
+    const { parseError } = parseDtlText('{"a": 1 "b": 2}', "json");
+    expect(parseError).not.toBeNull();
+    expect(typeof parseError!.offset).toBe("number");
+  });
+
+  it("populates ruleNames and structuralErrors as empty on parse error", () => {
+    const { ruleNames, structuralErrors } = parseDtlText("{bad}", "json");
+    expect(ruleNames.size).toBe(0);
+    expect(structuralErrors).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase A/B — ParseResult new fields on valid JSON
+// ---------------------------------------------------------------------------
+
+describe("parseDtlText — ruleNames", () => {
+  it("collects rule names from a standard transforms block", () => {
+    const text = JSON.stringify({
+      transform: {
+        type: "dtl",
+        rules: {
+          default: [["copy", "_id"]],
+          enrich: [["add", "x", 1]],
+        },
+      },
+    });
+    const { ruleNames } = parseDtlText(text, "json");
+    expect(ruleNames.has("default")).toBe(true);
+    expect(ruleNames.has("enrich")).toBe(true);
+  });
+
+  it("returns empty ruleNames when there is no transform", () => {
+    const text = JSON.stringify({ _id: "no-transform" });
+    const { ruleNames } = parseDtlText(text, "json");
+    expect(ruleNames.size).toBe(0);
+  });
+});
+
+describe("parseDtlText — firstStringArg and stringArgs", () => {
+  it("populates firstStringArg with arr[1] when it is a string", () => {
+    const text = '[["apply", "my-rule", "_S."]]';
+    const { calls } = parseDtlText(text, "dtl");
+    const call = calls.find((c) => c.functionName === "apply");
+    expect(call?.firstStringArg).toBe("my-rule");
+  });
+
+  it("sets firstStringArg to null when arr[1] is not a string", () => {
+    const text = '[["count", ["list", 1, 2]]]';
+    const { calls } = parseDtlText(text, "dtl");
+    const call = calls.find((c) => c.functionName === "count");
+    expect(call?.firstStringArg).toBeNull();
+  });
+
+  it("populates stringArgs with all string arguments", () => {
+    const text = '[["add", "name", "_S.firstname"]]';
+    const { calls } = parseDtlText(text, "dtl");
+    const call = calls.find((c) => c.functionName === "add");
+    expect(call?.stringArgs).toContain("name");
+    expect(call?.stringArgs).toContain("_S.firstname");
+  });
+});
+
+describe("parseDtlText — structuralErrors (rule-not-array)", () => {
+  it("records a structural error for a non-array item in a rules list", () => {
+    const text = JSON.stringify({
+      transform: {
+        type: "dtl",
+        rules: {
+          default: ["just-a-string", ["copy", "_id"]],
+        },
+      },
+    });
+    const { structuralErrors, calls } = parseDtlText(text, "json");
+    expect(structuralErrors.some((e) => e.kind === "rule-not-array")).toBe(true);
+    // The valid array item is still parsed
+    expect(calls.some((c) => c.functionName === "copy")).toBe(true);
+  });
+
+  it("returns no structural errors when all rules items are arrays", () => {
+    const text = JSON.stringify({
+      transform: {
+        type: "dtl",
+        rules: {
+          default: [
+            ["add", "x", 1],
+            ["copy", "_id"],
+          ],
+        },
+      },
+    });
+    const { structuralErrors } = parseDtlText(text, "json");
+    expect(structuralErrors).toHaveLength(0);
+  });
+});
