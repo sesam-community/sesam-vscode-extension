@@ -44,9 +44,12 @@ primitive value or bare object:
 Each DTL call array must have a **string** as its first element (the function name):
 
 ```json
-["add", "foo", "bar"]   ✓
-[["eq", "a", "b"]]      ✗  first element is an array, not a string
+["add", "foo", "bar"]          ✓  string first element — valid call
+[["add", "x", 1], ["copy", "_"]]  ✓  array first element — inline transform block (e.g. "if" then/else branch)
 ```
+
+A bare non-array, non-string item *inside* a `rules` list (e.g. `"just-a-string"`) is invalid —
+only array items (calls or inline transform blocks) are permitted.
 
 ### Transform vs. expression functions
 The `DtlFunctionKind` in `dtl-registry.types.ts` distinguishes:
@@ -297,7 +300,7 @@ Wire these through `ValidatorOptions` in `dtl-validator.types.ts`.
 | Input | Expected |
 |---|---|
 | `"rules": { "default": ["just-a-string"] }` | `rule-not-array` error |
-| `"rules": { "default": [ [["nested-first", "x"]] ] }` | `missing-function-name` error |
+| `["if", cond, [["add", "x", 1], ["merge", "_T"]]]` — then-block (array of arrays) | no diagnostic — treated as inline transform block |
 | `["apply", "nonexistent"]` at top level | `undefined-rule` warning |
 | `["apply", "order"]` where `"order"` exists in `rules` | no diagnostic |
 
