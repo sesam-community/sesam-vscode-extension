@@ -87,6 +87,23 @@ describe("collectDocumentLinks", () => {
     expect(links.map((l) => l.target)).toContain("file:///pipes/address-lookup.json");
   });
 
+  it("creates a link for a system reference in a rest-transform step", () => {
+    const text = JSON.stringify({
+      _id: "wikidata-collect",
+      transform: [
+        { type: "dtl", rules: {} },
+        { type: "rest", system: "wikidata", trace: true },
+        { type: "dtl", rules: {} },
+      ],
+    });
+
+    const systemIndex = new Map([["wikidata", entry("file:///systems/wikidata.json")]]);
+    const links = collectDocumentLinks(text, new Map(), systemIndex);
+
+    expect(links).toHaveLength(1);
+    expect(links[0].target).toBe("file:///systems/wikidata.json");
+  });
+
   it("link range points to the correct position in the document", () => {
     // Layout: {"dataset": "abc"}
     //          0123456789012345678

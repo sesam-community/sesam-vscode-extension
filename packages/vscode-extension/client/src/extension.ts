@@ -381,7 +381,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       // ── Step 3: ask for _id ──────────────────────────────────────────
       const configId = await vscode.window.showInputBox({
-        prompt: `Enter the config _id (used as filename: <id>${template.id === "system" ? ".conf.system" : ".conf.pipe"})`,
+        prompt: `Enter the config _id (used as filename: <id>.conf.json)`,
         placeHolder: template.id === "system" ? "my-rest-system" : "my-pipe-id",
         validateInput: (v) => {
           if (!v.trim()) {
@@ -447,7 +447,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
 
       // ── Step 6: write and open ────────────────────────────────────────
-      const ext = template.id === "system" ? ".conf.system" : ".conf.pipe";
+      const ext = ".conf.json";
       const fileUri = vscode.Uri.joinPath(folder, `${configId}${ext}`);
       const text = JSON.stringify(content, null, 2) + "\n";
       await vscode.workspace.fs.writeFile(fileUri, Buffer.from(text, "utf-8"));

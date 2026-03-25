@@ -82,6 +82,15 @@ describe("findSystemReference", () => {
     expect(result!.range.end).toBe(text.indexOf("hr-system") + "hr-system".length);
   });
 
+  it("detects a system key value inside a rest-transform step", () => {
+    const text = `{"transform": [{"type": "rest", "system": "wikidata"}]}`;
+    const offset = text.indexOf("wikidata") + 3;
+    const result = findSystemReference(text, offset);
+
+    expect(result).not.toBeNull();
+    expect(result!.name).toBe("wikidata");
+  });
+
   it("returns null for a dataset key value", () => {
     const text = `{"dataset": "some-pipe"}`;
     const offset = text.indexOf("some-pipe") + 3;

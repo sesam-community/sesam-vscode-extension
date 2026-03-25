@@ -30,8 +30,10 @@ type Payload =
   | { type: "pipe-root"; id: string }
   | { type: "source-pipes-group"; systemId: string }
   | { type: "sink-pipes-group"; systemId: string }
+  | { type: "transform-pipes-group"; systemId: string }
   | { type: "source-systems-group"; pipeId: string }
   | { type: "sink-systems-group"; pipeId: string }
+  | { type: "transform-systems-group"; pipeId: string }
   | { type: "pipe-leaf"; id: string }
   | { type: "system-leaf"; id: string }
   | { type: "empty"; message: string };
@@ -73,6 +75,9 @@ function pickIcon(p: Payload): vscode.ThemeIcon {
     case "sink-pipes-group":
     case "sink-systems-group":
       return new vscode.ThemeIcon("cloud-upload");
+    case "transform-pipes-group":
+    case "transform-systems-group":
+      return new vscode.ThemeIcon("symbol-event");
     case "empty":
       return new vscode.ThemeIcon("info");
   }
@@ -173,14 +178,16 @@ export class SystemPipesProvider implements vscode.TreeDataProvider<SystemPipesI
       return [
         groupItem("source-pipes-group", p.id, index),
         groupItem("sink-pipes-group", p.id, index),
+        groupItem("transform-pipes-group", p.id, index),
       ];
     }
 
-    // ── Pipe root → two groups ───────────────────────────────────────────
+    // ── Pipe root → three groups ─────────────────────────────────────────
     if (p.type === "pipe-root") {
       return [
         groupItem("source-systems-group", p.id, index),
         groupItem("sink-systems-group", p.id, index),
+        groupItem("transform-systems-group", p.id, index),
       ];
     }
 
@@ -192,6 +199,11 @@ export class SystemPipesProvider implements vscode.TreeDataProvider<SystemPipesI
     // ── Sink pipes group ──────────────────────────────────────────────────
     if (p.type === "sink-pipes-group") {
       return pipeLeaves(index?.sinkSystemPipes.get(p.systemId) ?? [], index);
+    }
+
+    // ── Transform pipes group ─────────────────────────────────────────────
+    if (p.type === "transform-pipes-group") {
+      return pipeLeaves(index?.transformSystemPipes.get(p.systemId) ?? [], index);
     }
 
     // ── Source systems group ──────────────────────────────────────────────
@@ -212,6 +224,15 @@ export class SystemPipesProvider implements vscode.TreeDataProvider<SystemPipesI
       return [systemLeaf(pipe.sinkSystem, systems)];
     }
 
+    // ── Transform systems group ───────────────────────────────────────────
+    if (p.type === "transform-systems-group") {
+      const pipe = index?.byId.get(p.pipeId);
+      if (!pipe?.transformSystems.length) {
+        return [noneItem()];
+      }
+      return pipe.transformSystems.map((sys) => systemLeaf(sys, systems));
+    }
+
     return [];
   }
 }
@@ -221,7 +242,13 @@ export class SystemPipesProvider implements vscode.TreeDataProvider<SystemPipesI
 // ---------------------------------------------------------------------------
 
 function groupItem(
-  type: "source-pipes-group" | "sink-pipes-group" | "source-systems-group" | "sink-systems-group",
+  type:
+    | "source-pipes-group"
+    | "sink-pipes-group"
+    | "transform-pipes-group"
+    | "source-systems-group"
+    | "sink-systems-group"
+    | "transform-systems-group",
   id: string,
   index: DagIndex | null,
 ): SystemPipesItem {
@@ -239,15 +266,25 @@ function groupItem(
     count = index?.sinkSystemPipes.get(id)?.length ?? 0;
     label = "Sink pipes";
     payload = { type, systemId: id };
+  } else if (type === "transform-pipes-group") {
+    count = index?.transformSystemPipes.get(id)?.length ?? 0;
+    label = "Transform pipes";
+    payload = { type, systemId: id };
   } else if (type === "source-systems-group") {
     const pipe = index?.byId.get(id);
     count = pipe?.sourceSystem ? 1 : 0;
     label = "Source systems";
     payload = { type, pipeId: id };
-  } else {
+  } else if (type === "sink-systems-group") {
     const pipe = index?.byId.get(id);
     count = pipe?.sinkSystem ? 1 : 0;
     label = "Sink systems";
+    payload = { type, pipeId: id };
+  } else {
+    // transform-systems-group
+    const pipe = index?.byId.get(id);
+    count = pipe?.transformSystems.length ?? 0;
+    label = "Transform systems";
     payload = { type, pipeId: id };
   }
 
