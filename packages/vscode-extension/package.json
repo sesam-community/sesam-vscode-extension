@@ -84,11 +84,6 @@
         "icon": "$(play)"
       },
       {
-        "command": "dtl.refreshGraph",
-        "title": "Sesam: Refresh Graph",
-        "icon": "$(refresh)"
-      },
-      {
         "command": "dtl.openDocs",
         "title": "Sesam: Open Function Documentation"
       },
@@ -101,6 +96,11 @@
         "command": "sesam.formatDocument",
         "title": "Sesam: Format Document",
         "icon": "$(symbol-misc)"
+      },
+      {
+        "command": "dtl.refreshDag",
+        "title": "Sesam: Refresh Pipe DAG",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -132,8 +132,18 @@
     "views": {
       "explorer": [
         {
-          "id": "dtlGraphExplorer",
-          "name": "Pipe Graph",
+          "id": "sesamPipeLineage",
+          "name": "Pipe Lineage",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "id": "sesamPipeDependents",
+          "name": "Pipe Dependents",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "id": "sesamSystemPipes",
+          "name": "System Pipes",
           "when": "workspaceFolderCount > 0"
         }
       ]

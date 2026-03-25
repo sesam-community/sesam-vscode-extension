@@ -1664,6 +1664,40 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-namespaced-identifiers.html`,
   },
+  {
+    name: "ni-collapse",
+    category: "Namespaced identifiers",
+    kind: "expression",
+    signature: "ni-collapse(values)",
+    description:
+      "Deprecated. Uses the namespaces.default service metadata to produce a namespaced identifier from URLs. Non-URL values are ignored. Requires the global_defaults.symmetric_namespace_collapse option.",
+    params: [
+      {
+        name: "values",
+        description: "One or more URL strings or URI parameters to collapse into NIs.",
+      },
+    ],
+    minArgs: 1,
+    maxArgs: null,
+    docUrl: "https://docs.sesam.io/hub/deprecations.html#ni-collapse",
+  },
+  {
+    name: "ni-expand",
+    category: "Namespaced identifiers",
+    kind: "expression",
+    signature: "ni-expand(values)",
+    description:
+      "Deprecated. Uses the namespaces.default service metadata to produce a URL string from a namespaced identifier. Non-NI values are ignored. Requires the global_defaults.symmetric_namespace_collapse option.",
+    params: [
+      {
+        name: "values",
+        description: "One or more namespaced identifiers to expand into URLs.",
+      },
+    ],
+    minArgs: 1,
+    maxArgs: null,
+    docUrl: "https://docs.sesam.io/hub/deprecations.html#ni-expand",
+  },
 
   // ─── NULLS ───────────────────────────────────────────────────────────────
   {

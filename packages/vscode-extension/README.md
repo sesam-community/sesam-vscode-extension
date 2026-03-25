@@ -9,9 +9,12 @@
   - [Diagnostics (Linting)](#diagnostics-linting)
   - [Formatter](#formatter)
   - [Code Snippets](#code-snippets)
-  - [Pipe Graph Explorer](#pipe-graph-explorer)
-  - [Pipe Preview](#pipe-preview)
   - [Go to Rule Definition](#go-to-rule-definition)
+  - [Cross-file Navigation](#cross-file-navigation)
+  - [Pipe Lineage](#pipe-lineage)
+  - [Pipe Dependents](#pipe-dependents)
+  - [System Pipes](#system-pipes)
+  - [Pipe Preview](#pipe-preview)
   - [New Sesam Config File](#new-sesam-config-file)
 - [Getting Started](#getting-started)
 - [DTL Primer](#dtl-primer)
@@ -54,7 +57,11 @@ The long-term goal is to make this extension the single tool Sesam developers ne
 - **Unknown variable** — warning for `_X.` prefixes where X is not a known built-in variable.
 
 ### Formatter
-- Format `.json` pipe configs with **Shift+Alt+F** — reformats only the `"rules"` block, leaving the rest of the config untouched.
+Format any Sesam config file with **Shift+Alt+F** (or **Format Document**). The formatter:
+- Preserves insertion key order — keys are never re-sorted.
+- Renders DTL rule arrays compactly (one rule per line) so diff output stays readable.
+- Pretty-prints top-level config objects with standard indentation.
+- Works on `.conf.pipe`, `.conf.system`, and `.conf.json` files; also triggers automatically on save.
 
 ### Code Snippets
 30+ snippets covering all common patterns. Type the prefix and press Tab:
@@ -79,15 +86,6 @@ The long-term goal is to make this extension the single tool Sesam developers ne
 | `dtl-rules` | Transform rules block |
 | … | And many more |
 
-### Pipe Graph Explorer
-A sidebar panel (**DTL Graph**) that scans your workspace for pipe and system config files and shows a navigable tree:
-
-- Each pipe/system listed with its `_id`.
-- Click to open the file.
-- Hop dataset references shown as children — **✓ resolved** (file found) or **⚠ unresolved** (not found in workspace).
-- Named rules listed under each pipe.
-- **Refresh** button to rescan after adding files.
-
 ### Go to Rule Definition
 
 Navigate between `apply`/`apply-hops` call sites and their rule definitions without leaving the editor.
@@ -101,7 +99,57 @@ Navigate between `apply`/`apply-hops` call sites and their rule definitions with
 
 Example — Ctrl+Click on `"based-on"` in `["apply", "based-on", "_S."]` jumps directly to the `"based-on": […]` rule definition in the same file.
 
-> **Note:** Navigation is within the same pipe config file only — Sesam DTL rules are always local to the transform block. Array transforms are supported; each step's rules are scoped independently.
+> **Note:** Rule definitions are always local to the transform block of a single config file.
+
+---
+
+### Cross-file Navigation
+
+Navigate between pipe/system config files by clicking on **dataset IDs** in source and hop references.
+
+| Action | How to invoke |
+|---|---|
+| **Go to Definition** | `F12` or `Ctrl+Click` on a dataset ID in `"source": { "dataset": "…" }` or inside a `hops.datasets` array |
+| **Peek Definition** | `Alt+F12` on a dataset ID |
+| **Document Links** | Dataset IDs in sources and hops become underlined clickable links |
+| **Find All References** | Right-click a pipe's `_id` value → **Find All References** — lists all pipes that source or hop-join this dataset |
+
+The language server maintains a live workspace index of all config files. The index updates automatically on file create, change, or delete.
+
+---
+
+### Pipe Lineage
+
+A sidebar panel that shows the **upstream ancestry** of the pipe open in the active editor.
+
+- Each node is the pipe that produces the dataset the active pipe reads from.
+- Hop-joined datasets appear under a collapsible **Joins** group.
+- Recursively expands ancestors up to a depth of 8; cycles shown as `(cycle)`.
+- Clicking a node opens the corresponding config file.
+- Updates automatically when you switch files or when files change; use **Sesam: Refresh Pipe DAG** to force a rescan.
+
+---
+
+### Pipe Dependents
+
+A sidebar panel that shows **downstream consumers** of the pipe open in the active editor.
+
+- Lists all pipes that read the active pipe's output dataset as their primary source.
+- A **Hop consumers** group lists pipes that join the dataset in their hops block.
+- Recursively expands descendants with the same cycle-guard and depth limit as Pipe Lineage.
+
+---
+
+### System Pipes
+
+A sidebar panel with a **dual-mode** view:
+
+| Active file | What is shown |
+|---|---|
+| A **system** config | **Source pipes** (pipes that pull from this system) + **Sink pipes** (pipes that push to this system) |
+| A **pipe** config | **Source systems** (systems the pipe reads from) + **Sink systems** (systems the pipe writes to) |
+
+Each group shows a count, and every item is a clickable link that opens the relevant config file.
 
 ---
 
@@ -169,9 +217,10 @@ my-sesam-project/
 | Command | Description |
 |---|---|
 | `DTL: Preview Pipe` | Open the preview panel for the active file |
-| `DTL: Refresh Graph` | Rescan workspace and refresh the Pipe Graph sidebar |
+| `Sesam: Refresh Pipe DAG` | Rescan workspace and refresh Lineage / Dependents / System Pipes sidebars |
 | `DTL: Open Documentation` | Open the Sesam DTL docs in a browser |
-| `DTL: New Sesam Config File` | Create a new pipe or system `.conf.json` from a template |
+| `DTL: New Sesam Config File` | Create a new pipe or system config file from a template |
+| `Sesam: Format Document` | Format the active Sesam config file |
 
 ---
 
@@ -211,11 +260,10 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 |---|---|---|
 | `dtl.validate.enabled` | `true` | Enable/disable all diagnostics |
 | `dtl.validate.unknownFunctions` | `true` | Report unknown function names |
-| `dtl.validate.argumentCount` | `true` | Report wrong argument counts |
-| `dtl.validate.transformAsExpression` | `true` | Warn when a transform is used nested |
+| `dtl.validate.argCount` | `true` | Report wrong argument counts |
 | `dtl.maxNumberOfProblems` | `100` | Cap on diagnostics per file |
 | `dtl.trace.server` | `off` | LSP communication trace (`off`/`messages`/`verbose`) |
-| `dtl.graph.scanDepth` | `5` | Directory depth to scan for pipe/system files |
+| `dtl.graph.scanDepth` | `3` | Directory depth to scan for pipe/system files |
 | `sesam.nodeUrl` | `""` | Base URL of your Sesam node (e.g. `https://abc123.sesam.cloud`) — enables node-backed validation on `.conf.json` save |
 | `sesam.jwt` | `""` | JWT token for the Sesam node API. Set in **user** settings only — do not commit to `.vscode/settings.json` |
 

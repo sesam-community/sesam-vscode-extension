@@ -24,12 +24,17 @@
 | F02 | Config File Intelligence | Phase 1 | `planned` | [impl-f02-config-file-intelligence.prompt.md](impl-f02-config-file-intelligence.prompt.md) |
 | F03 | Secure Credential Management | Phase 1 | `planned` | [impl-f03-credential-management.prompt.md](impl-f03-credential-management.prompt.md) |
 | F12 | Sesam Config File Extensions & Formatter | Phase 1 | `implemented` | [impl-f12-conf-json-formatter.prompt.md](impl-f12-conf-json-formatter.prompt.md) |
+| F13 | Go to Rule Definition | — | `implemented` | [go-to-rule-definition.prompt.md](../plans/go-to-rule-definition.prompt.md) |
+| F14 | Cross-file Dataset Navigation | — | `implemented` | [cross-file-navigation.prompt.md](../plans/cross-file-navigation.prompt.md) |
+| F15 | Interactive Pipe Graph (canvas / webview) | Phase 4 | `planned` | [interactive-pipe-graph.prompt.md](../plans/interactive-pipe-graph.prompt.md) |
+| F16 | Pipe DAG Tree Views (Lineage + Dependents) | — | `implemented` | [pipe-dag-tree.prompt.md](../plans/pipe-dag-tree.prompt.md) |
+| F17 | System Pipes View | — | `implemented` | [system-pipes-view.prompt.md](../plans/system-pipes-view.prompt.md) |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
 | F04 | Node-Connected Live Preview | Phase 3 | `planned` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
 | F10 | Inline Output & Diagnostics from Node | Phase 3 | `planned` | [impl-f10-inline-diagnostics.prompt.md](impl-f10-inline-diagnostics.prompt.md) |
 | F09 | Copilot Agent Participant (@sesam) | Phase 4 | `planned` | [impl-f09-copilot-agent.prompt.md](impl-f09-copilot-agent.prompt.md) |
-| F07 | Pipe Graph Enhancements | Phase 4 | `planned` | [impl-f07-pipe-graph.prompt.md](impl-f07-pipe-graph.prompt.md) |
+| F07 | Interactive Pipe Graph (canvas) | Phase 4 | `planned` (tracked as F15) | [impl-f07-pipe-graph.prompt.md](impl-f07-pipe-graph.prompt.md) |
 | F08 | Connector Development Tools | Phase 4 | `planned` | [impl-f08-connector-tools.prompt.md](impl-f08-connector-tools.prompt.md) |
 | F11 | Management Studio Functionalities | Phase 5 | `planned` | [impl-f11-management-studio.prompt.md](impl-f11-management-studio.prompt.md) |
 
@@ -52,6 +57,10 @@
 | F02: Config File Intelligence | `planned` |
 | F03: Secure Credential Management | `planned` |
 | F12: conf.json Support & Full-File Sesam Formatter | `implemented` |
+| F13: Go to Rule Definition | `implemented` |
+| F14: Cross-file Dataset Navigation | `implemented` |
+| F16: Pipe DAG Tree Views | `implemented` |
+| F17: System Pipes View | `implemented` |
 
 ### Phase 2: Testing & Diff Loop
 
@@ -72,7 +81,7 @@
 | Feature | Status |
 |---|---|
 | F09: Copilot Agent Participant | `planned` |
-| F07: Pipe Graph Enhancements | `planned` |
+| F07/F15: Interactive Pipe Graph (canvas) | `planned` |
 | F08: Connector Development Tools | `planned` |
 
 ### Phase 5: Management Studio Functionalities (Long-term)

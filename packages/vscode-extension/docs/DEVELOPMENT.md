@@ -20,7 +20,7 @@
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) v20+
-- [Yarn](https://classic.yarnpkg.com/) v1.x (`npm install -g yarn`)
+- [pnpm](https://pnpm.io/) v9+ (`npm install -g pnpm`)
 - [VS Code](https://code.visualstudio.com/) v1.90+
 - [@vscode/vsce](https://github.com/microsoft/vscode-vsce) (included as a dev dependency)
 
@@ -31,7 +31,7 @@
 ```bash
 git clone https://github.com/bouvet/dtl-extension.git
 cd dtl-extension
-yarn install
+pnpm install
 ```
 
 ---
@@ -50,18 +50,28 @@ yarn install
 ├── client/
 │   ├── tsconfig.json                   # TypeScript config for the extension host (targets VS Code API, no emit — Vite handles bundling)
 │   └── src/
-│       ├── extension.ts                # Extension entry point: activates the LSP client, registers the sidebar tree view and the preview command
+│       ├── extension.ts                # Extension entry point: activates the LSP client, registers sidebar tree views and preview command
 │       ├── graph/
-│       │   └── PipeGraphProvider.ts    # TreeDataProvider that scans the workspace for pipe/system JSON configs and exposes DTL hop relationships in the "Pipe Graph" sidebar panel
+│       │   ├── pipe-dag-builder.ts     # Pure functions: workspace scan, FullPipeInfo/DagIndex data types, buildDagIndex, buildSystemIndex
+│       │   ├── dag-tree-item.ts        # Shared DagTreeItem class and makeItem factory used by Lineage and Dependents views
+│       │   ├── PipeLineageProvider.ts  # TreeDataProvider: upstream ancestry of the active pipe (Pipe Lineage sidebar)
+│       │   ├── PipeDependentsProvider.ts # TreeDataProvider: downstream consumers of the active pipe (Pipe Dependents sidebar)
+│       │   └── SystemPipesProvider.ts  # TreeDataProvider: dual-mode source/sink pipes ↔ systems view (System Pipes sidebar)
 │       └── preview/
 │           └── PreviewPanel.ts         # WebviewPanel that renders a three-pane DTL live preview (editable input entity → transform rules → computed output entity), calling dtl-evaluator directly inside the extension host
 │
 ├── server/
 │   ├── tsconfig.json                   # TypeScript config for the language server (targets Node 20, no emit — Vite handles bundling)
 │   └── src/
-│       ├── server.ts                   # LSP server entry point: wires up completions, hover documentation, diagnostics, and document formatting handlers via vscode-languageserver
+│       ├── server.ts                   # LSP server entry point: wires up completions, hover documentation, diagnostics, formatting, and cross-file navigation handlers
 │       ├── dtl-parser.ts               # Lightweight positional parser: tokenises document text and produces a list of DtlCall nodes (function name + argument count + source ranges) without relying on JSON.parse, so source positions are preserved
-│       └── dtl-validator.ts            # Diagnostic producer: consumes DtlCall nodes from the parser and emits LSP Diagnostic objects for unknown functions, wrong argument counts, transforms used as expressions, and unknown variable prefixes
+│       ├── dtl-validator.ts            # Diagnostic producer: consumes DtlCall nodes from the parser and emits LSP Diagnostic objects for unknown functions, wrong argument counts, transforms used as expressions, and unknown variable prefixes
+│       └── utils/
+│           ├── workspace-index.ts      # Workspace-wide index of all pipe/system configs — file URIs, _id values, dataset outputs; rebuilt on file change
+│           ├── definition.utils.ts     # Go to Definition for rule names (intra-file) and dataset IDs (cross-file)
+│           ├── document-links.utils.ts # Document link provider: turns dataset IDs into clickable Ctrl+Click links
+│           ├── reference-detection.utils.ts # Detects dataset ID references in source.dataset and hops.datasets
+│           └── cross-references.utils.ts    # Find All References: locates all pipes that reference a given dataset ID
 │
 ├── src/
 │   └── shared/
@@ -76,9 +86,17 @@ yarn install
 │   └── dtl.code-snippets.json          # VS Code snippet definitions for common DTL patterns (pipe skeleton, add/copy/filter transforms, hops template, etc.)
 │
 ├── tests/
-│   ├── evaluator.test.ts               # Unit tests for dtl-evaluator: covers all supported transforms and expressions, discard/filter behaviour, and error handling
-│   ├── parser.test.ts                  # Unit tests for dtl-parser: verifies correct extraction of function names, argument counts, and source positions from both .dtl and pipe JSON formats
-│   └── validator.test.ts               # Unit tests for dtl-validator: checks that correct diagnostics (unknown function, wrong arg count, transform-as-expression, unknown variable) are produced for various inputs
+│   ├── evaluator.test.ts               # Unit tests for dtl-evaluator
+│   ├── formatter.test.ts               # Unit tests for config-formatter
+│   ├── parser.test.ts                  # Unit tests for dtl-parser
+│   ├── registry.test.ts                # Unit tests for dtl-registry
+│   ├── validator.test.ts               # Unit tests for dtl-validator
+│   ├── server.utils.test.ts            # Unit tests for server utility helpers
+│   ├── definition.utils.test.ts        # Unit tests for definition / Go to Definition utils
+│   ├── document-links.test.ts          # Unit tests for document link provider
+│   ├── reference-detection.test.ts     # Unit tests for dataset reference detection
+│   ├── cross-references.test.ts        # Unit tests for Find All References utils
+│   └── pipe-dag-builder.test.ts        # Unit tests for DAG builder (lineage, dependents, system index)
 │
 └── docs/
     └── DEVELOPMENT.md                  # This file — developer setup, workflow, testing, packaging, and publishing guide
@@ -91,8 +109,8 @@ yarn install
 ### 1. Build (one-off)
 
 ```bash
-yarn build        # production build
-yarn build:dev    # development build (unminified, with source maps)
+pnpm build        # production build
+pnpm build:dev    # development build (unminified, with source maps)
 ```
 
 Outputs go to `dist/client/extension.js` and `dist/server/server.js`.
@@ -100,7 +118,7 @@ Outputs go to `dist/client/extension.js` and `dist/server/server.js`.
 ### 2. Watch mode
 
 ```bash
-yarn watch
+pnpm run watch
 ```
 
 Starts Vite in watch mode for both the client and server bundles. Rebuilds automatically on every file save.
@@ -108,7 +126,7 @@ Starts Vite in watch mode for both the client and server bundles. Rebuilds autom
 ### 3. Type-check only (no emit)
 
 ```bash
-yarn compile
+pnpm run compile
 ```
 
 Runs `tsc --noEmit` over both the client and server `tsconfig.json` files. Useful for catching type errors without a full build.
@@ -120,7 +138,7 @@ Runs `tsc --noEmit` over both the client and server `tsconfig.json` files. Usefu
 1. Open the repo root in VS Code.
 2. Run a build (or start watch mode):
    ```bash
-   yarn build:dev
+   pnpm build:dev
    ```
 3. Press **F5** (or go to **Run > Start Debugging**).  
    This launches the **Extension Development Host** — a second VS Code window with the extension loaded from the local `dist/` folder.
@@ -151,7 +169,7 @@ Runs `tsc --noEmit` over both the client and server `tsconfig.json` files. Usefu
 To create an installable `.vsix` file locally:
 
 ```bash
-yarn package
+pnpm run package
 ```
 
 This runs `vsce package`, which first triggers the `vscode:prepublish` script (`yarn build`) and then produces a `.vsix` archive in the project root (e.g. `dtl-language-support-0.1.0.vsix`).
@@ -201,8 +219,8 @@ npx vsce publish major   # bumps major version (e.g. 0.1.0 → 1.0.0)
 - [ ] Update `version` in `package.json`
 - [ ] Update `CHANGELOG.md` (if present)
 - [ ] Confirm `README.md` renders correctly (it becomes the marketplace page)
-- [ ] Run `yarn compile` to confirm no type errors
-- [ ] Run a clean `yarn build` and smoke-test with F5
+- [ ] Run `pnpm run compile` to confirm no type errors
+- [ ] Run a clean `pnpm build` and smoke-test with F5
 
 ---
 

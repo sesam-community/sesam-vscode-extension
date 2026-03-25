@@ -235,6 +235,22 @@ export const findKeyOffset = (text: string, key: string, fromOffset = 0): number
   return m ? fromOffset + m.index : -1;
 };
 
+/** Convert a zero-based character offset in `text` to an LSP Position. */
+export const offsetToPosition = (text: string, offset: number): Position => {
+  const clamped = Math.min(offset, text.length);
+  let line = 0;
+  let character = 0;
+  for (let i = 0; i < clamped; i++) {
+    if (text[i] === "\n") {
+      line++;
+      character = 0;
+    } else {
+      character++;
+    }
+  }
+  return Position.create(line, character);
+};
+
 export const buildDocumentSymbols = (
   document: TextDocument,
   text: string,

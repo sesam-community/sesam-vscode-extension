@@ -269,7 +269,7 @@ function collectHopDatasets(arr: unknown[], out: Set<string>): void {
     // Recurse into nested arrays
     for (const child of item) {
       if (Array.isArray(child)) {
-        collectHopDatasets(child as unknown[], out);
+        collectHopDatasets([child] as unknown[], out);
       }
     }
   }

@@ -3,10 +3,14 @@
  * Implements LSP features: completions, hover, diagnostics, and document formatting.
  */
 
+import * as fs from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import {
   createConnection,
   TextDocuments,
   ProposedFeatures,
+  InitializeParams,
   InitializeResult,
   TextDocumentSyncKind,
   CompletionItem,
@@ -22,6 +26,10 @@ import {
   Diagnostic,
   DocumentSymbol,
   DocumentSymbolParams,
+  DocumentLink,
+  DocumentLinkParams,
+  FileChangeType,
+  WorkspaceFolder,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
@@ -32,7 +40,7 @@ import {
 } from "../../src/shared/dtl-registry";
 import { formatSesamJson } from "../../src/shared/config-formatter";
 import { parseDtlText } from "./dtl-parser";
-import { validateCalls, ValidatorOptions } from "./dtl-validator";
+import { validateCalls } from "./dtl-validator";
 import { defaultSettings } from "./constants";
 import {
   isSourceTypeContext,
@@ -46,6 +54,7 @@ import {
   getWordAtPosition,
   buildFunctionMarkdown,
   buildDocumentSymbols,
+  offsetToPosition,
 } from "./utils/server.utils";
 import {
   findApplyRuleReference,
@@ -53,8 +62,17 @@ import {
   findRuleKeyAtOffset,
   findAllApplyReferences,
 } from "./utils/definition.utils";
+import { workspaceIndex } from "./utils/workspace-index";
+import {
+  findDatasetReference,
+  findSystemReference,
+  findIdAtOffset,
+} from "./utils/reference-detection.utils";
+import { collectDocumentLinks } from "./utils/document-links.utils";
+import { findAllCrossReferences } from "./utils/cross-references.utils";
 
 import type { DtlSettings } from "./server.types";
+import type { ValidatorOptions } from "../../types/dtl-validator.types";
 
 // ---------------------------------------------------------------------------
 // Connection & document store
@@ -65,7 +83,10 @@ const documents = new TextDocuments(TextDocument);
 // ---------------------------------------------------------------------------
 // Initialization
 // ---------------------------------------------------------------------------
-connection.onInitialize((): InitializeResult => {
+let workspaceFolders: WorkspaceFolder[] = [];
+
+connection.onInitialize((params: InitializeParams): InitializeResult => {
+  workspaceFolders = params.workspaceFolders ?? [];
   return {
     capabilities: {
       textDocumentSync: {
@@ -82,8 +103,30 @@ connection.onInitialize((): InitializeResult => {
       referencesProvider: true,
       documentFormattingProvider: true,
       documentSymbolProvider: true,
+      documentLinkProvider: { resolveProvider: false },
     },
   };
+});
+
+connection.onInitialized(() => {
+  workspaceIndex.scanWorkspace(workspaceFolders);
+});
+
+connection.onDidChangeWatchedFiles((params) => {
+  for (const change of params.changes) {
+    const uri = change.uri;
+    if (change.type === FileChangeType.Deleted) {
+      workspaceIndex.removeFile(uri);
+    } else {
+      try {
+        const fsPath = fileURLToPath(uri);
+        const text = fs.readFileSync(fsPath, "utf-8");
+        workspaceIndex.updateFile(uri, text);
+      } catch {
+        // File temporarily inaccessible — skip
+      }
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -317,20 +360,51 @@ connection.onDefinition((params: TextDocumentPositionParams): Location | null =>
   const text = document.getText();
   const offset = document.offsetAt(params.position);
 
+  // 1. Same-file: apply/apply-hops rule reference
   const ref = findApplyRuleReference(text, offset);
-  if (!ref) {
-    return null;
+  if (ref) {
+    const def = findRuleDefinition(text, ref.ruleName, offset);
+    if (def) {
+      return Location.create(
+        params.textDocument.uri,
+        Range.create(document.positionAt(def.keyStart), document.positionAt(def.keyEnd)),
+      );
+    }
   }
 
-  const def = findRuleDefinition(text, ref.ruleName, offset);
-  if (!def) {
-    return null;
+  // 2. Cross-file: dataset reference → pipe file
+  const dsRef = findDatasetReference(text, offset);
+  if (dsRef) {
+    const entry = workspaceIndex.pipeIndex.get(dsRef.name);
+    if (entry) {
+      const targetText = workspaceIndex.fileTexts.get(entry.uri) ?? "";
+      return Location.create(
+        entry.uri,
+        Range.create(
+          offsetToPosition(targetText, entry.idOffset),
+          offsetToPosition(targetText, entry.idOffset + dsRef.name.length),
+        ),
+      );
+    }
   }
 
-  return Location.create(
-    params.textDocument.uri,
-    Range.create(document.positionAt(def.keyStart), document.positionAt(def.keyEnd)),
-  );
+  // 3. Cross-file: system reference → system file
+  const sysRef = findSystemReference(text, offset);
+  if (sysRef) {
+    const entry = workspaceIndex.systemIndex.get(sysRef.name);
+    if (entry) {
+      const targetText = workspaceIndex.fileTexts.get(entry.uri) ?? "";
+      return Location.create(
+        entry.uri,
+        Range.create(
+          offsetToPosition(targetText, entry.idOffset),
+          offsetToPosition(targetText, entry.idOffset + sysRef.name.length),
+        ),
+      );
+    }
+  }
+
+  return null;
 });
 
 // ---------------------------------------------------------------------------
@@ -350,6 +424,32 @@ connection.onReferences((params: ReferenceParams): Location[] | null => {
   const ruleName = keyHit?.ruleName ?? applyHit?.ruleName ?? null;
 
   if (!ruleName) {
+    // Cross-file: cursor on pipe/system _id value → find all files referencing it
+    const idHit = findIdAtOffset(text, offset);
+    if (idHit) {
+      const crossRefs = findAllCrossReferences(idHit.name, workspaceIndex.fileTexts);
+      const locations: Location[] = crossRefs.map(({ uri, nameStart, nameEnd }) => {
+        const refText = workspaceIndex.fileTexts.get(uri) ?? "";
+        return Location.create(
+          uri,
+          Range.create(offsetToPosition(refText, nameStart), offsetToPosition(refText, nameEnd)),
+        );
+      });
+
+      if (params.context.includeDeclaration) {
+        locations.push(
+          Location.create(
+            document.uri,
+            Range.create(
+              document.positionAt(idHit.range.start),
+              document.positionAt(idHit.range.end),
+            ),
+          ),
+        );
+      }
+
+      return locations.length > 0 ? locations : null;
+    }
     return null;
   }
 
@@ -374,6 +474,21 @@ connection.onReferences((params: ReferenceParams): Location[] | null => {
   }
 
   return locations.length > 0 ? locations : null;
+});
+
+// ---------------------------------------------------------------------------
+// Document Links
+// ---------------------------------------------------------------------------
+connection.onDocumentLinks((params: DocumentLinkParams): DocumentLink[] => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return [];
+  }
+  return collectDocumentLinks(
+    document.getText(),
+    workspaceIndex.pipeIndex,
+    workspaceIndex.systemIndex,
+  );
 });
 
 // ---------------------------------------------------------------------------
