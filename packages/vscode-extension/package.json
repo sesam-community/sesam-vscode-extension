@@ -150,6 +150,11 @@
           "id": "sesamPipeDependents",
           "name": "Pipe Dependents",
           "when": "workspaceFolderCount > 0"
+        },
+        {
+          "id": "sesamSystemPipes",
+          "name": "System Pipes",
+          "when": "workspaceFolderCount > 0"
         }
       ]
     },

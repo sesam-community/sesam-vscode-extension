@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildDagIndex,
+  buildSystemIndex,
   collectHopDatasets,
   extractFullPipeInfo,
   extractSourceDatasets,
@@ -16,15 +17,22 @@ import type { FullPipeInfo } from "../client/src/graph/pipe-dag-builder";
 function makePipe(
   id: string,
   sourceDataset: string | null,
-  opts: { sourceType?: string; hopDatasets?: string[] } = {},
+  opts: {
+    sourceType?: string;
+    hopDatasets?: string[];
+    sourceSystem?: string;
+    sinkSystem?: string;
+  } = {},
 ): FullPipeInfo {
-  const { sourceType, hopDatasets = [] } = opts;
+  const { sourceType, hopDatasets = [], sourceSystem = null, sinkSystem = null } = opts;
   return {
     id,
     fileUri: `file:///pipes/${id}.json`,
     kind: "pipe",
     sourceDatasets: sourceDataset ? [sourceDataset] : [],
     sourceType: sourceType ?? (sourceDataset ? "dataset" : "http_endpoint"),
+    sourceSystem,
+    sinkSystem,
     hopDatasets,
     ruleNames: [],
   };
@@ -240,6 +248,8 @@ describe("buildDagIndex", () => {
         kind: "system",
         sourceDatasets: [],
         sourceType: "",
+        sourceSystem: null,
+        sinkSystem: null,
         hopDatasets: [],
         ruleNames: [],
       },
@@ -279,6 +289,8 @@ describe("buildDagIndex", () => {
       kind: "pipe",
       sourceDatasets: ["x", "y", "z"],
       sourceType: "merge",
+      sourceSystem: null,
+      sinkSystem: null,
       hopDatasets: [],
       ruleNames: [],
     };
@@ -293,5 +305,122 @@ describe("buildDagIndex", () => {
     expect(index.byId.size).toBe(0);
     expect(index.sourceDependents.size).toBe(0);
     expect(index.hopConsumers.size).toBe(0);
+  });
+
+  it("sourceSystemPipes reverse map is correct", () => {
+    const pipes = [
+      makePipe("collect-a", null, { sourceSystem: "my-system" }),
+      makePipe("collect-b", null, { sourceSystem: "my-system" }),
+      makePipe("collect-c", null, { sourceSystem: "other-system" }),
+    ];
+    const index = buildDagIndex(pipes);
+    expect(index.sourceSystemPipes.get("my-system")?.sort()).toEqual(["collect-a", "collect-b"]);
+    expect(index.sourceSystemPipes.get("other-system")).toEqual(["collect-c"]);
+  });
+
+  it("sinkSystemPipes reverse map is correct", () => {
+    const pipes = [
+      makePipe("share-a", "upstream", { sinkSystem: "crm" }),
+      makePipe("share-b", "upstream", { sinkSystem: "crm" }),
+    ];
+    const index = buildDagIndex(pipes);
+    expect(index.sinkSystemPipes.get("crm")?.sort()).toEqual(["share-a", "share-b"]);
+  });
+
+  it("pipe with neither source nor sink system leaves maps empty", () => {
+    const index = buildDagIndex([makePipe("p", "ds")]);
+    expect(index.sourceSystemPipes.size).toBe(0);
+    expect(index.sinkSystemPipes.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractFullPipeInfo — system fields
+// ---------------------------------------------------------------------------
+
+describe("extractFullPipeInfo — system fields", () => {
+  const uri = "file:///pipes/my-pipe.json";
+
+  it("extracts sourceSystem from source.system", () => {
+    const info = extractFullPipeInfo(
+      { _id: "p", type: "pipe", source: { type: "rest", system: "my-rest" } },
+      uri,
+    );
+    expect(info?.sourceSystem).toBe("my-rest");
+    expect(info?.sinkSystem).toBeNull();
+  });
+
+  it("extracts sinkSystem from sink.system", () => {
+    const info = extractFullPipeInfo(
+      {
+        _id: "p",
+        type: "pipe",
+        source: { type: "dataset", dataset: "x" },
+        sink: { type: "rest", system: "target-system" },
+      },
+      uri,
+    );
+    expect(info?.sinkSystem).toBe("target-system");
+    expect(info?.sourceSystem).toBeNull();
+  });
+
+  it("both sourceSystem and sinkSystem can be set at once", () => {
+    const info = extractFullPipeInfo(
+      {
+        _id: "p",
+        type: "pipe",
+        source: { type: "sql", system: "oracle" },
+        sink: { type: "rest", system: "crm" },
+      },
+      uri,
+    );
+    expect(info?.sourceSystem).toBe("oracle");
+    expect(info?.sinkSystem).toBe("crm");
+  });
+
+  it("both fields are null for a pure dataset pipe", () => {
+    const info = extractFullPipeInfo(
+      { _id: "p", type: "pipe", source: { type: "dataset", dataset: "x" } },
+      uri,
+    );
+    expect(info?.sourceSystem).toBeNull();
+    expect(info?.sinkSystem).toBeNull();
+  });
+
+  it("system config stores root type in sourceType", () => {
+    const info = extractFullPipeInfo({ _id: "s", type: "system:rest" }, "file:///systems/s.json");
+    expect(info?.kind).toBe("system");
+    expect(info?.sourceType).toBe("system:rest");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildSystemIndex
+// ---------------------------------------------------------------------------
+
+describe("buildSystemIndex", () => {
+  it("indexes only system kind entries", () => {
+    const infos: FullPipeInfo[] = [
+      makePipe("p", null),
+      {
+        id: "my-rest",
+        fileUri: "file:///systems/my-rest.json",
+        kind: "system",
+        sourceDatasets: [],
+        sourceType: "system:rest",
+        sourceSystem: null,
+        sinkSystem: null,
+        hopDatasets: [],
+        ruleNames: [],
+      },
+    ];
+    const map = buildSystemIndex(infos);
+    expect(map.has("p")).toBe(false);
+    expect(map.has("my-rest")).toBe(true);
+    expect(map.get("my-rest")?.systemType).toBe("system:rest");
+  });
+
+  it("empty input produces empty map", () => {
+    expect(buildSystemIndex([]).size).toBe(0);
   });
 });
