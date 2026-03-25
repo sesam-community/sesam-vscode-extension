@@ -301,6 +301,29 @@ class DtlWalker {
       return;
     }
 
+    // If the first element is itself an array, this is an inline transform block
+    // (e.g. the then/else branch of an "if" call). Walk all elements as DTL calls
+    // rather than recording the block itself as a call with a missing function name.
+    if (Array.isArray(arr[0])) {
+      const blockStart = this.findNextArrayStart();
+
+      if (blockStart === -1) {
+        return;
+      }
+
+      const blockEnd = this.findMatchingClose(blockStart);
+      this.scanPos = blockStart + 1;
+
+      for (const elem of arr) {
+        if (Array.isArray(elem)) {
+          this.walkDtlArray(elem as unknown[], false, calls, errors);
+        }
+      }
+
+      this.scanPos = blockEnd + 1;
+      return;
+    }
+
     const firstName = typeof arr[0] === "string" ? (arr[0] as string) : null;
     const argCount = arr.length - 1;
     const firstStringArg = typeof arr[1] === "string" ? (arr[1] as string) : null;

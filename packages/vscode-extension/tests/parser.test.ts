@@ -275,6 +275,57 @@ describe("parseDtlText — firstStringArg and stringArgs", () => {
   });
 });
 
+describe("parseDtlText — inline transform blocks (array-of-arrays argument)", () => {
+  it("does not emit a missing-function-name call for an inline transform block argument", () => {
+    const text = JSON.stringify({
+      transform: {
+        type: "dtl",
+        rules: {
+          default: [
+            [
+              "if",
+              ["is-not-empty", "_S.name"],
+              [
+                ["add", "x", 1],
+                ["add", "y", 2],
+              ],
+            ],
+          ],
+        },
+      },
+    });
+    const { calls } = parseDtlText(text, "json");
+
+    expect(calls.every((c) => c.functionName !== null)).toBe(true);
+  });
+
+  it("walks all calls inside an inline transform block, including the first element", () => {
+    const text = JSON.stringify({
+      transform: {
+        type: "dtl",
+        rules: {
+          default: [
+            [
+              "if",
+              ["is-not-empty", "_S.name"],
+              [
+                ["add", "first", 1],
+                ["add", "second", 2],
+              ],
+            ],
+          ],
+        },
+      },
+    });
+    const { calls } = parseDtlText(text, "json");
+    const names = calls.map((c) => c.functionName);
+
+    expect(names).toContain("if");
+    expect(names).toContain("is-not-empty");
+    expect(names.filter((n) => n === "add")).toHaveLength(2);
+  });
+});
+
 describe("parseDtlText — structuralErrors (rule-not-array)", () => {
   it("records a structural error for a non-array item in a rules list", () => {
     const text = JSON.stringify({
