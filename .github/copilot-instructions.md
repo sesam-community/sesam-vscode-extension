@@ -52,6 +52,7 @@ packages/
 - Trigger characters: `"`, `[`, `_`, `.`, `:`
 - `config-formatter.ts` is imported by **both** client and server — do not add VS Code API dependencies to it
 - `dtl-registry.ts` is the single source of truth for all DTL functions — add new functions there
+- In `dtl-registry.ts`, each category has its own `PascalCase` array named `<Category>Fns` (e.g. `TransformFns`, `BooleanLogicFns`) declared `as const satisfies readonly DtlFunction[]`. The module-level `FUNCTIONS` array combines them all via spread.
 
 ## Development Commands
 

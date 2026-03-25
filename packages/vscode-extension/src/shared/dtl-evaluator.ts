@@ -18,6 +18,8 @@ export type {
   EvalResult,
 } from "../../types/dtl-evaluator.types";
 
+import { DTL_VARIABLES } from "./dtl-registry";
+
 import type {
   DtlObject,
   DtlValue,
@@ -248,27 +250,56 @@ const evalExpr = (expr: unknown, ctx: EvalContext): DtlValue => {
   return null;
 };
 
+// Variable name constants — single source of truth from the registry
+const VAR_S = "_S" satisfies keyof typeof DTL_VARIABLES;
+const VAR_T = "_T" satisfies keyof typeof DTL_VARIABLES;
+const VAR_P = "_P" satisfies keyof typeof DTL_VARIABLES;
+const VAR_R = "_R" satisfies keyof typeof DTL_VARIABLES;
+const VAR_B = "_B" satisfies keyof typeof DTL_VARIABLES;
+const VAR_CURRENT = "_" satisfies keyof typeof DTL_VARIABLES;
+
 const evalStringExpr = (str: string, ctx: EvalContext): DtlValue => {
-  // _S.property or _S (whole source entity)
-  if (str === "_S") {
+  if (str === VAR_S) {
     return ctx.source as unknown as DtlValue;
   }
-  if (str.startsWith("_S.")) {
-    return getProp(ctx.source, str.slice(3));
+  if (str.startsWith(`${VAR_S}.`)) {
+    return getProp(ctx.source, str.slice(VAR_S.length + 1));
   }
-  // _T.property
-  if (str === "_T") {
+
+  if (str === VAR_T) {
     return ctx.target as unknown as DtlValue;
   }
-  if (str.startsWith("_T.")) {
-    return getProp(ctx.target, str.slice(3));
+  if (str.startsWith(`${VAR_T}.`)) {
+    return getProp(ctx.target, str.slice(VAR_T.length + 1));
   }
-  // _P — parent (not supported in preview)
-  if (str === "_P" || str.startsWith("_P.")) {
-    return getProp(ctx.parent ?? ({} as DtlObject), str.startsWith("_P.") ? str.slice(3) : "");
+
+  if (str === VAR_P) {
+    return (ctx.parent ?? null) as unknown as DtlValue;
   }
-  // _ — current value
-  if (str === "_") {
+  if (str.startsWith(`${VAR_P}.`)) {
+    return getProp(ctx.parent ?? ({} as DtlObject), str.slice(VAR_P.length + 1));
+  }
+
+  // _R = root context (contains _S and _T); at top-level in preview, equivalent to { _S, _T }
+  if (str === VAR_R) {
+    return { [VAR_S]: ctx.source, [VAR_T]: ctx.target } as unknown as DtlValue;
+  }
+  if (str.startsWith(`${VAR_R}.`)) {
+    return getProp(
+      { [VAR_S]: ctx.source, [VAR_T]: ctx.target } as DtlObject,
+      str.slice(VAR_R.length + 1),
+    );
+  }
+
+  // _B = HTTP request context — not available in preview
+  if (str === VAR_B || str.startsWith(`${VAR_B}.`)) {
+    ctx.warnings.push(
+      `⚠ "${VAR_B}" (HTTP request context) is not available in preview — returning null.`,
+    );
+    return null;
+  }
+
+  if (str === VAR_CURRENT) {
     return ctx.current ?? null;
   }
 

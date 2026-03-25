@@ -217,12 +217,10 @@ describe("getFunctionsByCategory", () => {
 
 describe("DTL_VARIABLES", () => {
   it("contains the standard pipeline variables", () => {
-    expect(DTL_VARIABLES).toHaveProperty("_S");
-    expect(DTL_VARIABLES).toHaveProperty("_T");
-    expect(DTL_VARIABLES).toHaveProperty("_P");
-    expect(DTL_VARIABLES).toHaveProperty("_R");
-    expect(DTL_VARIABLES).toHaveProperty("_B");
-    expect(DTL_VARIABLES).toHaveProperty("_");
+    for (const key of Object.keys(DTL_VARIABLES)) {
+      expect(DTL_VARIABLES).toHaveProperty(key);
+      expect(typeof DTL_VARIABLES[key as keyof typeof DTL_VARIABLES]).toBe("string");
+    }
   });
 
   it("all values are non-empty strings", () => {

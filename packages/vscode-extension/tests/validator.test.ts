@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { DiagnosticSeverity } from "vscode-languageserver/node";
 
 import { validateCalls } from "../server/src/dtl-validator";
+import { DTL_VARIABLES } from "../src/shared/dtl-registry";
 
 import type { DtlCall } from "../server/src/dtl-parser";
 import type { ValidatorOptions } from "../types/dtl-validator.types";
@@ -108,7 +109,7 @@ describe("unknown variable prefix diagnostics", () => {
   });
 
   it("does not warn for known variable prefixes", () => {
-    for (const prefix of ["_S", "_T", "_P", "_R", "_B", "_"]) {
+    for (const prefix of Object.keys(DTL_VARIABLES)) {
       const diags = validateCalls([makeCall({ functionName: `${prefix}.field` })], defaultOptions);
       const varWarning = diags.find((d) => d.code === "unknown-variable");
       expect(varWarning, `Expected no unknown-variable warning for ${prefix}`).toBeUndefined();

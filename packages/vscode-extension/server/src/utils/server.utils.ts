@@ -364,17 +364,16 @@ export const buildDocumentSymbols = (
       });
 
       const namePos = document.positionAt(start);
-      const bodyRange =
-        callSymbols.length > 0
-          ? Range.create(namePos, callSymbols[callSymbols.length - 1].range.end)
-          : Range.create(namePos, document.positionAt(start + name.length + 2));
+      // range = full allocated region so VS Code cursor-tracking finds the deepest
+      // symbol containing the cursor. selectionRange == range (containment satisfied).
+      const fullRange = Range.create(namePos, document.positionAt(end));
 
       return DocumentSymbol.create(
         name,
         `${callSymbols.length} rule${callSymbols.length !== 1 ? "s" : ""}`,
         SymbolKind.Module,
-        bodyRange,
-        bodyRange,
+        fullRange,
+        fullRange,
         callSymbols,
       );
     });
