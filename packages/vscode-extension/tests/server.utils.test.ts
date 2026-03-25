@@ -692,6 +692,60 @@ describe("buildDocumentSymbols — mock fixtures", () => {
     expect(callNames).toContain("merge");
   });
 
+  it("difi: call symbol ranges contain their cursor positions (outline follow-cursor)", () => {
+    // Verify that VS Code Outline cursor tracking works: every ancestor symbol's range
+    // must contain the cursor, and the leaf call symbol's range must too.
+    const text = loadMock("pipes/difi-enhetsregisteret-classification-enrich.json");
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    const doc = makeDoc(text);
+    const symbols = buildDocumentSymbols(doc, text, obj);
+
+    // Helper: does range contain pos (LSP 0-indexed)?
+    const contains = (
+      range: {
+        start: { line: number; character: number };
+        end: { line: number; character: number };
+      },
+      pos: { line: number; character: number },
+    ): boolean => {
+      if (pos.line < range.start.line || pos.line > range.end.line) {
+        return false;
+      }
+
+      if (pos.line === range.start.line && pos.character < range.start.character) {
+        return false;
+      }
+
+      if (pos.line === range.end.line && pos.character > range.end.character) {
+        return false;
+      }
+
+      return true;
+    };
+
+    // Line 25 (1-indexed) = line 24 (0-indexed LSP): '        ["add", "_$last-modified",'
+    // [ is at character 8, cursor on "add" is at character 10.
+    const cursor = { line: 24, character: 10 };
+
+    const transformSym = symbols.find((s) => s.name === "transform")!;
+    expect(contains(transformSym.range, cursor)).toBe(true);
+
+    const rulesSym = transformSym.children!.find((c) => c.name === "rules")!;
+    expect(contains(rulesSym.range, cursor)).toBe(true);
+
+    const defaultRule = rulesSym.children!.find((c) => c.name === "default")!;
+    expect(contains(defaultRule.range, cursor)).toBe(true);
+
+    // Find the specific "add" call at line 24
+    const addAtLine24 = defaultRule.children!.find(
+      (c) => c.name === "add" && c.range.start.line === 24,
+    );
+    expect(addAtLine24).toBeDefined();
+    expect(addAtLine24!.range.start.line).toBe(24);
+    expect(addAtLine24!.range.start.character).toBe(8);
+    expect(contains(addAtLine24!.range, cursor)).toBe(true);
+  });
+
   it("wikidata-classification-collect.json: 3-step array transform, only DTL steps labelled", () => {
     const text = loadMock("pipes/wikidata-classification-collect.json");
     const obj = JSON.parse(text) as Record<string, unknown>;
