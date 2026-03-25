@@ -16,9 +16,9 @@ export type { DtlCategory, DtlFunction, DtlFunctionKind, DtlParam };
 const BASE_DOC_URL = "https://docs.sesam.io/hub/dtl";
 
 // ---------------------------------------------------------------------------
-// Registry entries
+// Category arrays
 // ---------------------------------------------------------------------------
-const FUNCTIONS: DtlFunction[] = [
+const TRANSFORM_FNS: DtlFunction[] = [
   // ─── TRANSFORMS ─────────────────────────────────────────────────────────
   {
     name: "add",
@@ -354,7 +354,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
   },
+];
 
+const BOOLEAN_LOGIC_FNS: DtlFunction[] = [
   // ─── BOOLEAN LOGIC ───────────────────────────────────────────────────────
   {
     name: "and",
@@ -417,7 +419,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-boolean-logic.html`,
   },
+];
 
+const BOOLEAN_FNS: DtlFunction[] = [
   // ─── BOOLEANS ────────────────────────────────────────────────────────────
   {
     name: "boolean",
@@ -441,7 +445,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-booleans.html`,
   },
+];
 
+const BYTES_FNS: DtlFunction[] = [
   // ─── BYTES ───────────────────────────────────────────────────────────────
   {
     name: "base64-encode",
@@ -487,7 +493,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-bytes.html`,
   },
+];
 
+const COMPARISON_FNS: DtlFunction[] = [
   // ─── COMPARISONS ─────────────────────────────────────────────────────────
   {
     name: "eq",
@@ -573,7 +581,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-comparisons.html`,
   },
+];
 
+const CONDITIONAL_FNS: DtlFunction[] = [
   // ─── CONDITIONALS ────────────────────────────────────────────────────────
   {
     name: "coalesce",
@@ -597,7 +607,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: null,
     docUrl: `${BASE_DOC_URL}/dtl-functions-conditionals.html`,
   },
+];
 
+const DATE_TIME_FNS: DtlFunction[] = [
   // ─── DATE AND TIME ───────────────────────────────────────────────────────
   {
     name: "now",
@@ -716,7 +728,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-date-and-time.html`,
   },
+];
 
+const DICTIONARY_FNS: DtlFunction[] = [
   // ─── DICTIONARIES ────────────────────────────────────────────────────────
   {
     name: "dict",
@@ -868,7 +882,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-dictionaries.html`,
   },
+];
 
+const ENCRYPTION_FNS: DtlFunction[] = [
   // ─── ENCRYPTION ──────────────────────────────────────────────────────────
   {
     name: "encrypt",
@@ -948,7 +964,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-encryption.html`,
   },
+];
 
+const HOPS_FNS: DtlFunction[] = [
   // ─── HOPS ────────────────────────────────────────────────────────────────
   {
     name: "hops",
@@ -980,7 +998,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-hops.html`,
   },
+];
 
+const JSON_FNS: DtlFunction[] = [
   // ─── JSON ────────────────────────────────────────────────────────────────
   {
     name: "json",
@@ -1026,7 +1046,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-json.html`,
   },
+];
 
+const LIST_FNS: DtlFunction[] = [
   // ─── LISTS ───────────────────────────────────────────────────────────────
   {
     name: "list",
@@ -1437,7 +1459,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-lists.html`,
   },
+];
 
+const MATH_FNS: DtlFunction[] = [
   // ─── MATH ────────────────────────────────────────────────────────────────
   {
     name: "+",
@@ -1626,7 +1650,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-math.html`,
   },
+];
 
+const MISC_FNS: DtlFunction[] = [
   // ─── MISC ────────────────────────────────────────────────────────────────
   {
     name: "hash128",
@@ -1686,7 +1712,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-misc.html`,
   },
+];
 
+const NI_FNS: DtlFunction[] = [
   // ─── NAMESPACED IDENTIFIERS ──────────────────────────────────────────────
   {
     name: "ni",
@@ -1776,7 +1804,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: null,
     docUrl: "https://docs.sesam.io/hub/deprecations.html#ni-expand",
   },
+];
 
+const NULL_FNS: DtlFunction[] = [
   // ─── NULLS ───────────────────────────────────────────────────────────────
   {
     name: "is-null",
@@ -1814,7 +1844,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-nulls.html`,
   },
+];
 
+const NUMBER_FNS: DtlFunction[] = [
   // ─── NUMBERS ─────────────────────────────────────────────────────────────
   {
     name: "integer",
@@ -1893,7 +1925,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-numbers.html`,
   },
+];
 
+const PHONENUMBER_FNS: DtlFunction[] = [
   // ─── PHONENUMBERS ────────────────────────────────────────────────────────
   {
     name: "phonenumber-parse",
@@ -1926,7 +1960,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-phonenumbers.html`,
   },
+];
 
+const SET_FNS: DtlFunction[] = [
   // ─── SETS ────────────────────────────────────────────────────────────────
   {
     name: "union",
@@ -1984,7 +2020,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 2,
     docUrl: `${BASE_DOC_URL}/dtl-functions-sets.html`,
   },
+];
 
+const STRING_FNS: DtlFunction[] = [
   // ─── STRINGS ─────────────────────────────────────────────────────────────
   {
     name: "concat",
@@ -2195,7 +2233,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 3,
     docUrl: `${BASE_DOC_URL}/dtl-functions-strings.html`,
   },
+];
 
+const URI_FNS: DtlFunction[] = [
   // ─── URIs ────────────────────────────────────────────────────────────────
   {
     name: "uri",
@@ -2241,7 +2281,9 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-uris.html`,
   },
+];
 
+const UUID_FNS: DtlFunction[] = [
   // ─── UUIDs ───────────────────────────────────────────────────────────────
   {
     name: "uuid",
@@ -2265,6 +2307,34 @@ const FUNCTIONS: DtlFunction[] = [
     maxArgs: 1,
     docUrl: `${BASE_DOC_URL}/dtl-functions-uuids.html`,
   },
+];
+
+// ---------------------------------------------------------------------------
+// Combined registry
+// ---------------------------------------------------------------------------
+const FUNCTIONS: DtlFunction[] = [
+  ...TRANSFORM_FNS,
+  ...BOOLEAN_LOGIC_FNS,
+  ...BOOLEAN_FNS,
+  ...BYTES_FNS,
+  ...COMPARISON_FNS,
+  ...CONDITIONAL_FNS,
+  ...DATE_TIME_FNS,
+  ...DICTIONARY_FNS,
+  ...ENCRYPTION_FNS,
+  ...HOPS_FNS,
+  ...JSON_FNS,
+  ...LIST_FNS,
+  ...MATH_FNS,
+  ...MISC_FNS,
+  ...NI_FNS,
+  ...NULL_FNS,
+  ...NUMBER_FNS,
+  ...PHONENUMBER_FNS,
+  ...SET_FNS,
+  ...STRING_FNS,
+  ...URI_FNS,
+  ...UUID_FNS,
 ];
 
 // ---------------------------------------------------------------------------
