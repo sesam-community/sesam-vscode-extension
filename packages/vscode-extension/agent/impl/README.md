@@ -30,6 +30,7 @@
 | F16 | Pipe DAG Tree Views (Lineage + Dependents) | — | `implemented` | [pipe-dag-tree.prompt.md](../plans/pipe-dag-tree.prompt.md) |
 | F17 | System Pipes View | — | `implemented` | [system-pipes-view.prompt.md](../plans/system-pipes-view.prompt.md) |
 | F18 | Dataset Alias Support (highlight + hover + rename) | — | `done` | [dataset-alias-support.prompt.md](../plans/dataset-alias-support.prompt.md) |
+| F19 | DTL Syntax Linting | Phase 1 | `planned` | [impl-f19-syntax-linting.prompt.md](impl-f19-syntax-linting.prompt.md) |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
 | F04 | Node-Connected Live Preview | Phase 3 | `planned` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
@@ -62,6 +63,7 @@
 | F14: Cross-file Dataset Navigation | `implemented` |
 | F16: Pipe DAG Tree Views | `implemented` |
 | F17: System Pipes View | `implemented` |
+| F19: DTL Syntax Linting | `planned` |
 
 ### Phase 2: Testing & Diff Loop
 
