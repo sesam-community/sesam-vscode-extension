@@ -18,7 +18,12 @@ import {
 
 import { formatSesamJson } from "../../src/shared/config-formatter";
 import { PipeGraphProvider } from "./graph/PipeGraphProvider";
+import { buildDagIndex, extractFullPipeInfo } from "./graph/pipe-dag-builder";
+import { PipeDependentsProvider } from "./graph/PipeDependentsProvider";
+import { PipeLineageProvider } from "./graph/PipeLineageProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
+
+import type { DagIndex, FullPipeInfo } from "./graph/pipe-dag-builder";
 
 let client: LanguageClient;
 
@@ -80,17 +85,74 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(treeView);
 
+  // ── Pipe DAG Views (Lineage + Dependents) ───────────────────────────────
+  const dagRef: { current: DagIndex | null } = { current: null };
+  const lineageProvider = new PipeLineageProvider(dagRef);
+  const dependentsProvider = new PipeDependentsProvider(dagRef);
+
+  const lineageView = vscode.window.createTreeView("sesamPipeLineage", {
+    treeDataProvider: lineageProvider,
+    showCollapseAll: true,
+  });
+  const dependentsView = vscode.window.createTreeView("sesamPipeDependents", {
+    treeDataProvider: dependentsProvider,
+    showCollapseAll: true,
+  });
+  context.subscriptions.push(lineageView, dependentsView);
+
+  // Sync active pipe ID to both DAG views
+  const syncActivePipe = (editor: vscode.TextEditor | undefined): void => {
+    const id = getActivePipeId(editor);
+    lineageProvider.setCurrentPipe(id);
+    dependentsProvider.setCurrentPipe(id);
+  };
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(syncActivePipe));
+  syncActivePipe(vscode.window.activeTextEditor);
+
+  // Initial DAG scan
+  void buildDagFromWorkspace().then((index) => {
+    dagRef.current = index;
+    lineageProvider.refresh();
+    dependentsProvider.refresh();
+  });
+
+  const rescanDag = (): void => {
+    void buildDagFromWorkspace().then((index) => {
+      dagRef.current = index;
+      lineageProvider.refresh();
+      dependentsProvider.refresh();
+    });
+  };
+
   // Watch for file changes to update the graph
   const watcher = vscode.workspace.createFileSystemWatcher("**/{pipes,systems}/**/*.json");
-  watcher.onDidCreate(() => graphProvider.refresh());
-  watcher.onDidChange(() => graphProvider.refresh());
-  watcher.onDidDelete(() => graphProvider.refresh());
+  watcher.onDidCreate(() => {
+    graphProvider.refresh();
+    rescanDag();
+  });
+  watcher.onDidChange(() => {
+    graphProvider.refresh();
+    rescanDag();
+  });
+  watcher.onDidDelete(() => {
+    graphProvider.refresh();
+    rescanDag();
+  });
   context.subscriptions.push(watcher);
 
   const confWatcher = vscode.workspace.createFileSystemWatcher("**/*.conf.{json,pipe,system}");
-  confWatcher.onDidCreate(() => graphProvider.refresh());
-  confWatcher.onDidChange(() => graphProvider.refresh());
-  confWatcher.onDidDelete(() => graphProvider.refresh());
+  confWatcher.onDidCreate(() => {
+    graphProvider.refresh();
+    rescanDag();
+  });
+  confWatcher.onDidChange(() => {
+    graphProvider.refresh();
+    rescanDag();
+  });
+  confWatcher.onDidDelete(() => {
+    graphProvider.refresh();
+    rescanDag();
+  });
   context.subscriptions.push(confWatcher);
 
   // ── Commands ──────────────────────────────────────────────────────────────
@@ -98,6 +160,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("dtl.refreshGraph", () => {
       graphProvider.refresh();
       vscode.window.setStatusBarMessage("DTL: Graph refreshed", 2000);
+    }),
+
+    vscode.commands.registerCommand("dtl.refreshDag", () => {
+      rescanDag();
+      vscode.window.setStatusBarMessage("Sesam: DAG refreshed", 2000);
     }),
 
     vscode.commands.registerCommand("dtl.previewPipe", () => {
@@ -438,4 +505,52 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 export function deactivate(): Thenable<void> | undefined {
   return client?.stop();
+}
+
+// ---------------------------------------------------------------------------
+// DAG helpers (module-level so they don't close over extension context)
+// ---------------------------------------------------------------------------
+
+/** Extract the _id from the currently open document (if it is a pipe config). */
+function getActivePipeId(editor: vscode.TextEditor | undefined): string | undefined {
+  if (!editor) {
+    return undefined;
+  }
+  const doc = editor.document;
+  if (
+    doc.languageId !== "sesam-config" &&
+    doc.languageId !== "json" &&
+    !doc.fileName.endsWith(".conf.pipe") &&
+    !doc.fileName.endsWith(".conf.json")
+  ) {
+    return undefined;
+  }
+  try {
+    const obj = JSON.parse(doc.getText()) as Record<string, unknown>;
+    return typeof obj["_id"] === "string" ? obj["_id"] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Scan all workspace JSON/conf files, extract pipe info, and build the DagIndex. */
+async function buildDagFromWorkspace(): Promise<DagIndex> {
+  const files = await vscode.workspace.findFiles(
+    "**/*.{json,conf.pipe,conf.system,conf.json}",
+    "**/node_modules/**",
+  );
+  const infos = (
+    await Promise.all(
+      files.map(async (uri) => {
+        try {
+          const raw = await vscode.workspace.fs.readFile(uri);
+          const text = Buffer.from(raw).toString("utf-8");
+          return extractFullPipeInfo(JSON.parse(text) as unknown, uri.toString());
+        } catch {
+          return null;
+        }
+      }),
+    )
+  ).filter((x): x is FullPipeInfo => x !== null);
+  return buildDagIndex(infos);
 }

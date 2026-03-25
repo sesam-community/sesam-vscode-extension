@@ -101,6 +101,11 @@
         "command": "sesam.formatDocument",
         "title": "Sesam: Format Document",
         "icon": "$(symbol-misc)"
+      },
+      {
+        "command": "dtl.refreshDag",
+        "title": "Sesam: Refresh Pipe DAG",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -134,6 +139,16 @@
         {
           "id": "dtlGraphExplorer",
           "name": "Pipe Graph",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "id": "sesamPipeLineage",
+          "name": "Pipe Lineage",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "id": "sesamPipeDependents",
+          "name": "Pipe Dependents",
           "when": "workspaceFolderCount > 0"
         }
       ]
