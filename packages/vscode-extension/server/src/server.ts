@@ -30,6 +30,9 @@ import {
   DocumentLinkParams,
   FileChangeType,
   WorkspaceFolder,
+  RenameParams,
+  PrepareRenameParams,
+  WorkspaceEdit,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
@@ -70,6 +73,12 @@ import {
 } from "./utils/reference-detection.utils";
 import { collectDocumentLinks } from "./utils/document-links.utils";
 import { findAllCrossReferences } from "./utils/cross-references.utils";
+import {
+  findAliasAtOffset,
+  findAliasUsageAtOffset,
+  collectAliasRanges,
+  offsetRangeToLsp,
+} from "./utils/alias-rename.utils";
 
 import type { DtlSettings } from "./server.types";
 import type { ValidatorOptions } from "../../types/dtl-validator.types";
@@ -104,6 +113,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
       documentFormattingProvider: true,
       documentSymbolProvider: true,
       documentLinkProvider: { resolveProvider: false },
+      renameProvider: { prepareProvider: true },
     },
   };
 });
@@ -254,11 +264,28 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
 // ---------------------------------------------------------------------------
 connection.onHover((params: TextDocumentPositionParams): Hover | null => {
   const document = documents.get(params.textDocument.uri);
+
   if (!document) {
     return null;
   }
 
+  const text = document.getText();
+  const offset = document.offsetAt(params.position);
+
+  // Alias hover — check before word-based lookup
+  const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
+
+  if (aliasHit) {
+    return {
+      contents: {
+        kind: MarkupKind.Markdown,
+        value: `**${aliasHit.alias}** — alias for dataset \`${aliasHit.datasetId}\``,
+      },
+    };
+  }
+
   const word = getWordAtPosition(document, params.position);
+
   if (!word) {
     return null;
   }
@@ -412,12 +439,23 @@ connection.onDefinition((params: TextDocumentPositionParams): Location | null =>
 // ---------------------------------------------------------------------------
 connection.onReferences((params: ReferenceParams): Location[] | null => {
   const document = documents.get(params.textDocument.uri);
+
   if (!document) {
     return null;
   }
 
   const text = document.getText();
   const offset = document.offsetAt(params.position);
+
+  // Alias references
+  const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
+
+  if (aliasHit) {
+    const aliasRanges = collectAliasRanges(text, aliasHit.alias);
+    return aliasRanges.map((r) =>
+      Location.create(params.textDocument.uri, offsetRangeToLsp(document, r)),
+    );
+  }
 
   const keyHit = findRuleKeyAtOffset(text, offset);
   const applyHit = keyHit ? null : findApplyRuleReference(text, offset);
@@ -489,6 +527,58 @@ connection.onDocumentLinks((params: DocumentLinkParams): DocumentLink[] => {
     workspaceIndex.pipeIndex,
     workspaceIndex.systemIndex,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Rename (dataset alias)
+// ---------------------------------------------------------------------------
+connection.onPrepareRename(
+  (params: PrepareRenameParams): { range: Range; placeholder: string } | null => {
+    const document = documents.get(params.textDocument.uri);
+
+    if (!document) {
+      return null;
+    }
+
+    const text = document.getText();
+    const offset = document.offsetAt(params.position);
+    const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
+
+    if (!aliasHit) {
+      return null;
+    }
+
+    return {
+      range: Range.create(
+        document.positionAt(aliasHit.aliasStart),
+        document.positionAt(aliasHit.aliasEnd),
+      ),
+      placeholder: aliasHit.alias,
+    };
+  },
+);
+
+connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
+  const document = documents.get(params.textDocument.uri);
+
+  if (!document) {
+    return null;
+  }
+
+  const text = document.getText();
+  const offset = document.offsetAt(params.position);
+  const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
+
+  if (!aliasHit) {
+    return null;
+  }
+
+  const aliasRanges = collectAliasRanges(text, aliasHit.alias);
+  const edits = aliasRanges.map((r) =>
+    TextEdit.replace(offsetRangeToLsp(document, r), params.newName),
+  );
+
+  return { changes: { [params.textDocument.uri]: edits } };
 });
 
 // ---------------------------------------------------------------------------

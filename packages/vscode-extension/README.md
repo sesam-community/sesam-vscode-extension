@@ -36,34 +36,60 @@ The long-term goal is to make this extension the single tool Sesam developers ne
 ## Features
 
 ### Syntax Highlighting
-- All ~160 built-in functions highlighted by category (string, math, datetime, NI, …).
+
+- All ~160 built-in DTL functions highlighted by category (string, math, datetime, NI, …).
 - Built-in variables `_S`, `_T`, `_P`, `_R`, `_B`, `_` highlighted with property-path continuation.
 - Reserved entity fields (`_id`, `_deleted`, `_filtered`, …) distinguished from regular keys.
-- **JSON injection**: DTL variables and function names are highlighted inside `.json` pipe config files.
+- Dataset alias tokens in `"datasets"` arrays coloured distinctly from the dataset ID.
+- **DTL injection**: function names and variables are highlighted inside `.json` and `.conf.json` pipe configs.
+
+---
 
 ### Auto-Completion
+
 - Function name completions triggered after `["` inside any array context.
 - Variable completions (`_S`, `_T`, `_P`, `_R`, `_B`, `_`) triggered after `_`.
 - Reserved entity field completions for `_id`, `_deleted`, etc.
 - **Source type completions** inside `"source": { "type": "…" }` — all 18 Sesam source types with descriptions.
+- **System type completions** at root level — all supported system types with descriptions.
+
+---
 
 ### Hover Documentation
-- Hover over any function name, variable, or reserved field to see its **signature**, description, parameter list, and a link to the official Sesam docs.
+
+Hover over any of the following to see its **signature**, description, parameter list, and a link to the official Sesam docs:
+
+- DTL function names
+- Built-in variables (`_S`, `_T`, …)
+- Reserved entity fields
+- Dataset alias tokens — shows which dataset the alias stands for
+
+---
 
 ### Diagnostics (Linting)
-- **Unknown function** — error when a function name is not in the DTL registry.
-- **Too few / too many arguments** — warnings with the expected argument count.
-- **Transform used as expression** — warning when a top-level-only transform (e.g. `add`) is nested inside another expression.
-- **Unknown variable** — warning for `_X.` prefixes where X is not a known built-in variable.
+
+| Diagnostic | Severity |
+|---|---|
+| Unknown function name | Error |
+| Too few / too many arguments | Warning |
+| Transform used as an expression | Warning |
+| Unknown variable prefix (`_X.`) | Warning |
+
+---
 
 ### Formatter
+
 Format any Sesam config file with **Shift+Alt+F** (or **Format Document**). The formatter:
+
 - Preserves insertion key order — keys are never re-sorted.
 - Renders DTL rule arrays compactly (one rule per line) so diff output stays readable.
 - Pretty-prints top-level config objects with standard indentation.
-- Works on `.conf.pipe`, `.conf.system`, and `.conf.json` files; also triggers automatically on save.
+- Works on `.conf.json` files and triggers automatically on save.
+
+---
 
 ### Code Snippets
+
 30+ snippets covering all common patterns. Type the prefix and press Tab:
 
 | Prefix | Inserts |
@@ -86,6 +112,8 @@ Format any Sesam config file with **Shift+Alt+F** (or **Format Document**). The 
 | `dtl-rules` | Transform rules block |
 | … | And many more |
 
+---
+
 ### Go to Rule Definition
 
 Navigate between `apply`/`apply-hops` call sites and their rule definitions without leaving the editor.
@@ -97,96 +125,101 @@ Navigate between `apply`/`apply-hops` call sites and their rule definitions with
 | **Find All References** | Right-click a rule definition key → **Find All References** |
 | **Peek References** | `Shift+Alt+F12` on the rule definition key |
 
-Example — Ctrl+Click on `"based-on"` in `["apply", "based-on", "_S."]` jumps directly to the `"based-on": […]` rule definition in the same file.
-
-> **Note:** Rule definitions are always local to the transform block of a single config file.
+> Rule definitions are always local to the transform block of a single config file.
 
 ---
 
 ### Cross-file Navigation
 
-Navigate between pipe/system config files by clicking on **dataset IDs** in source and hop references.
+Navigate between pipe and system config files by clicking on dataset and system IDs.
 
 | Action | How to invoke |
 |---|---|
-| **Go to Definition** | `F12` or `Ctrl+Click` on a dataset ID in `"source": { "dataset": "…" }`, inside a `hops.datasets` array, or on a `"system"` value anywhere in the config |
-| **Peek Definition** | `Alt+F12` on a dataset ID or system ID |
-| **Document Links** | Dataset IDs in sources and hops, and system IDs (including in `"type": "rest"` transform steps), become underlined clickable links |
+| **Go to Definition** | `F12` or `Ctrl+Click` on a dataset ID in `"source"`, a `hops.datasets` array, or a `"system"` value |
+| **Peek Definition** | `Alt+F12` on a dataset or system ID |
+| **Document Links** | Dataset IDs in sources and hops, and system IDs (including `"type": "rest"` transform steps), appear as underlined clickable links |
 | **Find All References** | Right-click a pipe's `_id` value → **Find All References** — lists all pipes that source or hop-join this dataset |
 
-The language server maintains a live workspace index of all config files. The index updates automatically on file create, change, or delete.
+The language server maintains a live workspace index of all config files, updated automatically on create, change, or delete.
+
+---
+
+### Dataset Alias Support
+
+In Sesam pipe configs, entries in `"datasets"` arrays can use the syntax `"dataset-id alias"` to declare a local shorthand. The extension provides full IDE support for these aliases:
+
+| Feature | Description |
+|---|---|
+| **Highlight** | The alias token is coloured distinctly from the dataset ID |
+| **Hover** | Hovering any alias (declaration or usage) shows the full dataset ID it stands for |
+| **Rename** | Press `F2` on any alias token to rename it everywhere in the file — declaration and all uses updated atomically |
+| **Find All References** | Right-click an alias → **Find All References** — lists the declaration plus all prefixed (`alias.field`) and bare (`"alias"`) usages |
 
 ---
 
 ### Pipe Lineage
 
-A sidebar panel that shows the **upstream ancestry** of the pipe open in the active editor.
+A sidebar panel showing the **upstream ancestry** of the pipe open in the active editor.
 
 - Each node is the pipe that produces the dataset the active pipe reads from.
 - Hop-joined datasets appear under a collapsible **Joins** group.
-- Recursively expands ancestors up to a depth of 8; cycles shown as `(cycle)`.
+- Recursively expands ancestors up to a depth of 8; cycles are shown as `(cycle)`.
 - Clicking a node opens the corresponding config file.
-- Updates automatically when you switch files or when files change; use **Sesam: Refresh Pipe DAG** to force a rescan.
+- Updates automatically when you switch files or files change; use **Sesam: Refresh Pipe DAG** to force a rescan.
 
 ---
 
 ### Pipe Dependents
 
-A sidebar panel that shows **downstream consumers** of the pipe open in the active editor.
+A sidebar panel showing **downstream consumers** of the pipe open in the active editor.
 
 - Lists all pipes that read the active pipe's output dataset as their primary source.
 - A **Hop consumers** group lists pipes that join the dataset in their hops block.
-- Recursively expands descendants with the same cycle-guard and depth limit as Pipe Lineage.
+- Same cycle-guard and depth limit as Pipe Lineage.
 
 ---
 
 ### System Pipes
 
-A sidebar panel with a **dual-mode** view:
+A sidebar panel with a **dual-mode** view depending on the active file:
 
-| Active file | What is shown |
+| Active file | Groups shown |
 |---|---|
-| A **system** config | **Source pipes** (pipes that pull from this system) + **Sink pipes** (pipes that push to this system) |
-| A **pipe** config | **Source systems** (systems the pipe reads from) + **Sink systems** (systems the pipe writes to) |
+| A **system** config | Source pipes · Sink pipes · Transform pipes |
+| A **pipe** config | Source systems · Sink systems · Transform systems |
 
 Each group shows a count, and every item is a clickable link that opens the relevant config file.
 
 ---
 
-### New Sesam Config File
-Create a new `*.conf.json` pipe or system config from a template — no copy-pasting boilerplate.
-
-**3 ways to invoke:** Explorer right-click → **DTL: New Sesam Config File** | Command Palette (`Ctrl+Shift+P`) → `DTL: New Sesam Config File` | assign a custom keybinding to `dtl.newConfFile`.
-
-**Wizard steps:**
-
-1. **Pick a template:**
-
-   | Template | Generated file |
-   |---|---|
-   | Simple pipe | `{ "_id": "…", "type": "pipe", "source": { … } }` — then choose source type |
-   | Pipe with DTL transform | Pipe + source stub + `transform.rules.default` block with a starter `copy` rule |
-   | System | `{ "_id": "…", "type": "system:<type>" }` — then choose system type |
-
-2. **Choose source type** *(Pipe templates)* — pick from all 18 Sesam source types with descriptions: `binary`, `conditional`, `csv`, `dataset`, `embedded`, `empty`, `http_endpoint`, `json`, `kafka`, `ldap`, `merge`, `merge_datasets`, `rdf`, `rest`, `sdshare`, `sparql`, `sql`, `union_datasets`. Key fields are pre-populated as `"<placeholder>"` strings ready to fill in.
-
-   **Choose system type** *(System only)* — pick from all supported types: `elasticsearch`, `kafka`, `ldap`, `microservice`, `mssql`, `mysql`, `oracle`, `postgresql`, `rest`, `smtp`, `solr`, `twilio`, `url`.
-
-3. **Enter `_id`** — used as both the config `_id` and the filename (`<id>.conf.json`). Validated: non-empty, no `/`.
-
-The file is written to the folder you right-clicked (or the active editor's folder, or workspace root) and opened immediately. Run **Format Document** (`Shift+Alt+F`) after creation to apply the Sesam formatter.
-
----
-
 ### Pipe Preview
+
 A live preview panel that evaluates DTL transforms against a sample input entity — without needing a running Sesam node.
 
-1. Open a pipe config `.json` file.
+1. Open a pipe config file.
 2. Run **DTL: Preview Pipe** from the Command Palette (`Ctrl+Shift+P`).
 3. Edit the **Input Entity** and press **▶ Evaluate** (or `Ctrl+Enter`).
 4. The **Output Entity** updates instantly.
 
-> **Note:** Functions that require a live Sesam node (e.g. `hops`, `apply-hops`, `lookup-entity`, encryption, UUID) will show a warning and return `null` rather than throwing.
+> Functions that require a live Sesam node (e.g. `hops`, `apply-hops`, `lookup-entity`, encryption, UUID) return `null` with a warning rather than throwing.
+
+---
+
+### New Sesam Config File
+
+Create a new `*.conf.json` pipe or system config from a template — no copy-pasting boilerplate.
+
+**3 ways to invoke:** Explorer right-click → **DTL: New Sesam Config File** · Command Palette (`Ctrl+Shift+P`) → `DTL: New Sesam Config File` · custom keybinding to `dtl.newConfFile`.
+
+**Wizard steps:**
+
+1. **Pick a template** — Simple pipe · Pipe with DTL transform · System
+2. **Choose a type:**
+   - *Pipe* — pick from 18 source types: `binary`, `conditional`, `csv`, `dataset`, `embedded`, `empty`, `http_endpoint`, `json`, `kafka`, `ldap`, `merge`, `merge_datasets`, `rdf`, `rest`, `sdshare`, `sparql`, `sql`, `union_datasets`
+   - *System* — pick from 13 system types: `elasticsearch`, `kafka`, `ldap`, `microservice`, `mssql`, `mysql`, `oracle`, `postgresql`, `rest`, `smtp`, `solr`, `twilio`, `url`
+3. **Enter `_id`** — used as both the config `_id` and the filename (`<id>.conf.json`)
+
+The file is written to the target folder and opened immediately.
 
 ---
 
