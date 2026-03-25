@@ -177,6 +177,14 @@ describe("extractFullPipeInfo", () => {
     expect(info?.kind).toBe("system");
   });
 
+  it("sets kind=system for colon-prefixed system types like :system:elasticsearch", () => {
+    const info = extractFullPipeInfo(
+      { _id: "es", type: ":system:elasticsearch" },
+      "file:///systems/es.json",
+    );
+    expect(info?.kind).toBe("system");
+  });
+
   it("extracts sourceDatasets from dataset source", () => {
     const info = extractFullPipeInfo(
       { _id: "p", type: "pipe", source: { type: "dataset", dataset: "upstream" } },

@@ -90,7 +90,7 @@ export type DagItemPayload =
  *  - merge_datasets / union_datasets → source.datasets (plain string array)
  *  - merge       → source.datasets (optional "id alias" items) or source.sources[]
  */
-export function extractSourceDatasets(source: Record<string, unknown>): string[] {
+export const extractSourceDatasets = (source: Record<string, unknown>): string[] => {
   const type = typeof source["type"] === "string" ? source["type"] : "";
 
   if (type === "dataset") {
@@ -138,14 +138,14 @@ export function extractSourceDatasets(source: Record<string, unknown>): string[]
   }
 
   return [];
-}
+};
 
 // ---------------------------------------------------------------------------
 // Hop dataset extraction
 // ---------------------------------------------------------------------------
 
 /** Recursively collect dataset names from ["hops",...] / ["apply-hops",...] in a DTL array. */
-export function collectHopDatasets(arr: unknown[], out: Set<string>): void {
+export const collectHopDatasets = (arr: unknown[], out: Set<string>): void => {
   for (const item of arr) {
     if (!Array.isArray(item)) {
       continue;
@@ -174,14 +174,14 @@ export function collectHopDatasets(arr: unknown[], out: Set<string>): void {
       }
     }
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // Config parsing
 // ---------------------------------------------------------------------------
 
 /** Parse a raw JSON object into a FullPipeInfo, or null if not a valid config. */
-export function extractFullPipeInfo(parsed: unknown, fileUri: string): FullPipeInfo | null {
+export const extractFullPipeInfo = (parsed: unknown, fileUri: string): FullPipeInfo | null => {
   if (typeof parsed !== "object" || parsed === null) {
     return null;
   }
@@ -192,7 +192,7 @@ export function extractFullPipeInfo(parsed: unknown, fileUri: string): FullPipeI
   }
 
   const rootType = typeof obj["type"] === "string" ? obj["type"] : "pipe";
-  const kind: "pipe" | "system" = rootType.startsWith("system") ? "system" : "pipe";
+  const kind: "pipe" | "system" = rootType.includes("system") ? "system" : "pipe";
 
   const sourceRaw = obj["source"];
   let sourceDatasets: string[] = [];
@@ -269,14 +269,14 @@ export function extractFullPipeInfo(parsed: unknown, fileUri: string): FullPipeI
     hopDatasets: [...hopDatasets],
     ruleNames,
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Index building
 // ---------------------------------------------------------------------------
 
 /** Build a DagIndex from a flat list of parsed FullPipeInfo values. Pure function. */
-export function buildDagIndex(pipes: FullPipeInfo[]): DagIndex {
+export const buildDagIndex = (pipes: FullPipeInfo[]): DagIndex => {
   const byId = new Map<string, FullPipeInfo>();
   const sourceDependents = new Map<string, string[]>();
   const hopConsumers = new Map<string, string[]>();
@@ -326,10 +326,10 @@ export function buildDagIndex(pipes: FullPipeInfo[]): DagIndex {
     sinkSystemPipes,
     transformSystemPipes,
   };
-}
+};
 
 /** Build a system id → SystemEntry map from a list of all parsed configs. Pure function. */
-export function buildSystemIndex(infos: FullPipeInfo[]): Map<string, SystemEntry> {
+export const buildSystemIndex = (infos: FullPipeInfo[]): Map<string, SystemEntry> => {
   const map = new Map<string, SystemEntry>();
   for (const info of infos) {
     if (info.kind === "system") {
@@ -341,4 +341,4 @@ export function buildSystemIndex(infos: FullPipeInfo[]): Map<string, SystemEntry
     }
   }
   return map;
-}
+};

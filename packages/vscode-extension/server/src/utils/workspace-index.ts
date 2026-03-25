@@ -89,7 +89,7 @@ const indexFileText = (uri: string, text: string): void => {
 
   _fileIds.set(uri, id);
   const entry: IndexEntry = { uri, idOffset };
-  if (type === "system") {
+  if (type.includes("system")) {
     _systemIndex.set(id, entry);
   } else {
     _pipeIndex.set(id, entry);
