@@ -23,7 +23,10 @@ correct property names at the correct nesting level.
 
 | Scenario | What is suggested |
 |---|---|
-| Typing `"` at the root of a pipe config | `_id`, `type`, `source`, `transform`, `sink`, `metadata`, … |
+| Typing `"` at the root of a **pipe** config (`.conf.pipe`) | `_id`, `type`, `source`, `transform`, `sink`, `pump`, … |
+| Typing `"` at the root of a **system** config (`.conf.system`) | `_id`, `type` — system-oriented subset |
+| Typing `"` at the root of `node-metadata.conf.json` | `_id`, `type`, `pipe_defaults`, `system_defaults`, … |
+| Typing `"` at the root of an unknown `.conf.json` | Combined superset, no narrowing |
 | Typing `"` inside a `"source": { … }` block | `type`, then type-specific props once `type` is set |
 | Typing `"` inside a `"transform": { … }` block | `type`, then `rules` (dtl), `system`, `operation`, … |
 | Typing `"` inside a `"sink": { … }` block | `type`, then dataset/sql/rest-specific props |
@@ -86,15 +89,34 @@ After determining `depth` and `path`, collect the keys that already appear at th
 level by scanning the prefix for `"key"\s*:` patterns at the correct depth. Exclude those from
 the suggestion list.
 
+### File-type detection
+
+The `onCompletion` handler receives `params.textDocument.uri` (e.g.
+`file:///workspace/pipes/my-pipe.conf.pipe`). Use it to derive the **config file type** before
+building root-level completions:
+
+```ts
+type ConfigFileType = "pipe" | "system" | "node-metadata" | "unknown";
+
+const getConfigFileType = (uri: string): ConfigFileType => {
+  if (uri.endsWith(".conf.pipe")) return "pipe";
+  if (uri.endsWith(".conf.system")) return "system";
+  if (uri.endsWith("node-metadata.conf.json")) return "node-metadata";
+  return "unknown";
+};
+```
+
+Pass `fileType` into `buildPropCompletions(path, fileType)` so the root-level property table
+(depth = 1, path = []) is selected accordingly. Nested object completion (`source`, `transform`,
+`sink`) is the same regardless of file type and does not need the file-type parameter.
+
 ---
 
 ## Property Data
 
-### Root-level pipe / system properties (depth = 1)
+### Root-level — pipe config (`.conf.pipe`, depth = 1)
 
-The suggestions shown at depth = 1 are the same regardless of whether the file is a pipe or
-system config, because the file type is not always unambiguously knowable from text alone.
-Required fields are sorted first.
+Required fields sorted first.
 
 | Key | Value type | Sort | Notes |
 |---|---|---|---|
@@ -116,6 +138,45 @@ Required fields are sorted first.
 | `expose_entity_id` | `boolean` | `1_13` | Optional |
 | `merge_existing_namespaces` | `boolean` | `1_14` | Optional |
 | `infer_pipe_entity_types` | `boolean` | `1_15` | Optional |
+
+### Root-level — system config (`.conf.system`, depth = 1)
+
+Systems have a minimal root schema — most configuration lives inside system-specific properties
+that are `type`-dependent. Only the universally applicable fields are offered here; type-specific
+system properties are deferred to Phase C.
+
+| Key | Value type | Sort | Notes |
+|---|---|---|
+|---|---|
+| `_id` | `string` | `0_01` | Required; unique system identifier |
+| `type` | `string` | `0_02` | Required; must be a `system:*` value |
+| `metadata` | `object` | `1_01` | Optional; arbitrary metadata |
+| `description` | `string` | `1_02` | Optional; human-readable description |
+| `comment` | `string` | `1_03` | Optional; internal note |
+
+### Root-level — `node-metadata.conf.json` (depth = 1)
+
+`node-metadata.conf.json` is a special singleton file that stores node-level configuration
+applied across all pipes and systems. It has a completely different schema from a pipe or
+system config.
+
+| Key | Value type | Sort | Notes |
+|---|---|---|---|
+| `_id` | `string` | `0_01` | Required; typically `"node"` |
+| `type` | `string` | `0_02` | Required; `"metadata:node"` |
+| `pipe_defaults` | `object` | `0_03` | Default settings applied to every pipe |
+| `system_defaults` | `object` | `0_04` | Default settings applied to every system |
+| `global_defaults` | `object` | `1_01` | Global defaults for both |
+| `feature_flags` | `object` | `1_02` | Enable/disable experimental features |
+| `namespaces` | `object` | `1_03` | Namespace configuration |
+| `metadata` | `object` | `1_04` | Node-level metadata tags |
+| `description` | `string` | `1_05` | Optional description |
+| `comment` | `string` | `1_06` | Optional internal note |
+
+#### `pipe_defaults` / `system_defaults` sub-object properties (path = `["pipe_defaults"]` etc.)
+
+These objects accept the same keys as a pipe / system root respectively — re-use the same
+property tables but with a `depth = 2` path match on `"pipe_defaults"` or `"system_defaults"`.
 
 ### Source sub-object properties (path = `["source"]`)
 
@@ -193,17 +254,20 @@ independent of type (Phase B); type-specific properties come in Phase C.
 **Scope:**
 - Add `isPropKeyContext(prefix)` predicate to `server.utils.ts`
 - Add `getPropKeyContext(prefix)` scanner to `server.utils.ts` (returns `{ depth, path }`)
-- Add `buildPropCompletions(path)` builder to `server.utils.ts`
+- Add `getConfigFileType(uri)` helper to `server.utils.ts`
+- Add `buildPropCompletions(path, fileType)` builder to `server.utils.ts`
 - Wire into `onCompletion` handler in `server.ts` (new branch before existing checks, but after
   checking it's not a value context)
-- Return root-level properties when `depth === 1 && path.length === 0`
+- Return file-type-appropriate root properties when `depth === 1 && path.length === 0`
 - Return source/transform/sink properties when `depth === 2 && path[0] === "source"` etc.
 
 **Not in Phase A**: filtering of already-present keys; type-aware narrowing.
 
 **Acceptance criteria:**
-- Typing `"` in empty root object `{}` offers `_id`, `type`, `source`, …
-- Typing `"` inside `"source": {}` offers `type`, `dataset`, `system`, …
+- Typing `"` in empty root `{}` in a `.conf.pipe` file offers `_id`, `type`, `source`, …
+- Typing `"` in empty root `{}` in a `.conf.system` file offers `_id`, `type` (no `source`/`sink`)
+- Typing `"` in `node-metadata.conf.json` root offers `_id`, `type`, `pipe_defaults`, …
+- Typing `"` inside `"source": {}` (any file type) offers `type`, `dataset`, `system`, …
 - Existing value completions (source type, system type, functions) still work
 
 ---
@@ -218,6 +282,25 @@ independent of type (Phase B); type-specific properties come in Phase C.
 **Acceptance criteria:**
 - A root object with `"_id": "x"` already present → `_id` not offered again
 - A `source` object with `"type": "dataset"` → `type` not offered again
+
+---
+
+### Phase D — File-type-aware narrowing (extend Phase A)
+
+> Phase D is already folded into Phase A above (via `getConfigFileType`). It is listed separately
+> to make the design decision explicit and to allow it to be deferred if needed.
+
+**Scope:**
+- Implement `getConfigFileType(uri)` in `server.utils.ts`
+- Pass `fileType` through `buildPropCompletions` and switch on it for depth-1 suggestions
+- Add `node-metadata` property table
+- Wire `pipe_defaults` / `system_defaults` nested path to re-use pipe/system root tables
+
+**Acceptance criteria:**
+- `.conf.pipe` → `source`, `transform`, `sink`, `pump` offered at root
+- `.conf.system` → no `source`, `sink`, `pump` at root
+- `node-metadata.conf.json` → `pipe_defaults`, `system_defaults`, `feature_flags` at root; no `source`
+- Unknown `.conf.json` → combined superset at root (fallback)
 
 ---
 
@@ -240,8 +323,8 @@ independent of type (Phase B); type-specific properties come in Phase C.
 
 | File | Change |
 |---|---|
-| `server/src/utils/server.utils.ts` | Add `isPropKeyContext`, `getPropKeyContext`, `extractPresentKeys`, `extractTypeValue`, `buildPropCompletions` |
-| `server/src/server.ts` | New branch in `onCompletion` calling `isPropKeyContext` |
+| `server/src/utils/server.utils.ts` | Add `isPropKeyContext`, `getPropKeyContext`, `getConfigFileType`, `extractPresentKeys`, `extractTypeValue`, `buildPropCompletions` |
+| `server/src/server.ts` | New branch in `onCompletion` calling `isPropKeyContext`; pass `uri` to builder |
 | `tests/config-prop-completions.test.ts` | New test file |
 | `agent/impl/README.md` | Add F21 row |
 
@@ -252,16 +335,18 @@ additive and purely completion-side.
 
 ## Test Cases
 
-### Phase A
+### Phase A + D (file-type-aware root, no filtering)
 
-| Input prefix | Expected items include | Expected items exclude |
-|---|---|---|
-| `{` + `"` | `_id`, `type`, `source`, `transform`, `sink` | DTL function names |
-| `{"_id":"x",` + `"` | `type`, `source`, `transform` | DTL function names |
-| `{"source":{` + `"` | `type`, `dataset`, `system` | `_id`, `pump` |
-| `{"transform":{` + `"` | `type`, `rules`, `system` | `_id`, `batch_size` |
-| `{"sink":{` + `"` | `type`, `dataset`, `system` | `_id`, `source` |
-| `{"source":{"type":"` + cursor | source value completions, NOT prop completions | prop keys |
+| URI suffix | Input prefix | Expected items include | Expected items exclude |
+|---|---|---|---|
+| `.conf.pipe` | `{` + `"` | `_id`, `type`, `source`, `transform`, `sink`, `pump` | DTL function names |
+| `.conf.system` | `{` + `"` | `_id`, `type`, `metadata` | `source`, `sink`, `pump`, `transform` |
+| `node-metadata.conf.json` | `{` + `"` | `_id`, `type`, `pipe_defaults`, `system_defaults`, `feature_flags` | `source`, `sink`, `pump` |
+| `.conf.pipe` | `{"_id":"x",` + `"` | `type`, `source`, `transform` | DTL function names |
+| any | `{"source":{` + `"` | `type`, `dataset`, `system` | `_id`, `pump` |
+| any | `{"transform":{` + `"` | `type`, `rules`, `system` | `_id`, `batch_size` |
+| any | `{"sink":{` + `"` | `type`, `dataset`, `system` | `_id`, `source` |
+| any | `{"source":{"type":"` + cursor | source value completions, NOT prop completions | prop keys |
 
 ### Phase B
 
@@ -283,9 +368,12 @@ additive and purely completion-side.
 
 ## Priority & Notes
 
-- **Phase A** is the immediate deliverable — it provides the most value with the lowest complexity.
+- **Phases A + D** should be implemented together — file-type detection is cheap (single URI check)
+  and makes the feature immediately useful without the noise of irrelevant suggestions.
 - **Phase B** (filter present keys) makes the feature feel polished and avoids noise.
 - **Phase C** (type narrowing) is a follow-on; the feature is already useful without it.
+- **`node-metadata.conf.json`** is a singleton (only one per Sesam workspace) but warrants its own
+  completion schema because its root properties are entirely different from pipe/system configs.
 - No new VS Code contribution points are needed — completions work through the existing LSP
   provider already registered in `server.ts`.
 - The `{` character should be added to `triggerCharacters` in `onInitialize` so that typing `{`
