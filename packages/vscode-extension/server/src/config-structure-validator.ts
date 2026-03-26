@@ -230,13 +230,19 @@ const validateOne = (
 
   const isPipe = typeVal === "pipe";
   const isSystem = typeVal.startsWith("system:");
+  const isMetadata = typeVal === "metadata";
+
+  // Service metadata config (node-metadata.conf.json) — no pipe/system rules apply.
+  if (isMetadata) {
+    return;
+  }
 
   if (!isPipe && !isSystem) {
     const typeRange = keyValueRange(text, "type", fromOffset, fallback);
     out.push({
       range: typeRange,
       severity: DiagnosticSeverity.Warning,
-      message: `Unknown config type "${typeVal}". Expected "pipe" or "system:<type>" (e.g. "system:rest").`,
+      message: `Unknown config type "${typeVal}". Expected "pipe", "system:<type>" (e.g. "system:rest"), or "metadata".`,
       source: "sesam",
       code: "invalid-type",
     });

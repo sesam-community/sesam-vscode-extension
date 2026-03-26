@@ -276,13 +276,16 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
   // Use a wider window so we can detect "source": { "type": context
   const prefix = text.slice(Math.max(0, offset - 2000), offset);
 
+  const fileType = getConfigFileType(params.textDocument.uri);
+
   // Source type completion: inside "source": { "type": "..."
   if (isSourceTypeContext(prefix)) {
     return buildSourceTypeCompletions();
   }
 
   // System type completion: root-level "type": "system:..."
-  if (isSystemTypeContext(prefix)) {
+  // Not applicable for node-metadata.conf.json
+  if (isSystemTypeContext(prefix) && fileType !== "node-metadata") {
     return buildSystemTypeCompletions();
   }
 
@@ -301,7 +304,6 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     const ctx = getPropKeyContext(prefix);
 
     if (ctx) {
-      const fileType = getConfigFileType(params.textDocument.uri);
       return buildPropCompletions(ctx.path, fileType, ctx.presentKeys);
     }
   }
