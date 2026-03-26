@@ -1,6 +1,6 @@
 # F21: Config Property Completions
 
-> **Status**: `planned`
+> **Status**: `phase A+B+D implemented`
 > **Rollout Phase**: Phase 1 – MVP
 > **Depends on**: F19 (Phase E — config structure validation data already in `constants.ts`)
 > **Tracking**: [README.md](README.md)

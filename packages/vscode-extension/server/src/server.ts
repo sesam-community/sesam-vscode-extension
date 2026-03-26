@@ -54,10 +54,14 @@ import {
   isSystemTypeContext,
   isVariableContext,
   isFunctionNameContext,
+  isPropKeyContext,
+  getPropKeyContext,
+  getConfigFileType,
   buildSystemTypeCompletions,
   buildSourceTypeCompletions,
   buildFunctionCompletions,
   buildVariableCompletions,
+  buildPropCompletions,
   getWordAtPosition,
   buildFunctionMarkdown,
   buildDocumentSymbols,
@@ -108,7 +112,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
         save: { includeText: false },
       },
       completionProvider: {
-        triggerCharacters: ['"', "[", "_", ".", ":"],
+        triggerCharacters: ['"', "[", "_", ".", ":", "{"],
         resolveProvider: false,
       },
       hoverProvider: true,
@@ -290,6 +294,16 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
   // Function name completion: cursor is after an opening "[" (possibly with a quote)
   if (isFunctionNameContext(prefix)) {
     return buildFunctionCompletions();
+  }
+
+  // Property key completion: cursor is at a JSON object key position
+  if (isPropKeyContext(prefix)) {
+    const ctx = getPropKeyContext(prefix);
+
+    if (ctx) {
+      const fileType = getConfigFileType(params.textDocument.uri);
+      return buildPropCompletions(ctx.path, fileType, ctx.presentKeys);
+    }
   }
 
   return [];
