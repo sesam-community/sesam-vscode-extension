@@ -2,6 +2,7 @@
 
 > **Status**: `planned`
 > **Rollout Phase**: Phase 4 - AI & Visual Polish
+> **Depends on**: [F20 — Language Model Tools API](impl-f20-lm-tools-api.prompt.md) (`planned`)
 > **Tracking**: [README.md](README.md)
 
 ---
