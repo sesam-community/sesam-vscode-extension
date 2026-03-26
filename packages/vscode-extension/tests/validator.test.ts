@@ -295,4 +295,29 @@ describe("transform-in-expression diagnostics", () => {
     });
     expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
   });
+
+  it("does not emit an error for 'if' nested as an expression argument", () => {
+    // ["merge", ["if", cond, dict1, dict2]] — "if" produces a value here
+    const diags = validateCalls(
+      [makeCall({ functionName: "if", isTopLevel: false, argCount: 3 })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
+  });
+
+  it("does not emit an error for 'case' nested as an expression argument", () => {
+    const diags = validateCalls(
+      [makeCall({ functionName: "case", isTopLevel: false, argCount: 2 })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
+  });
+
+  it("does not emit an error for 'case-eq' nested as an expression argument", () => {
+    const diags = validateCalls(
+      [makeCall({ functionName: "case-eq", isTopLevel: false, argCount: 3 })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
+  });
 });

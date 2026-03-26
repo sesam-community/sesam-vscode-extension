@@ -11,6 +11,11 @@ import type { ValidatorOptions } from "../../types/dtl-validator.types";
 
 const VALID_VARIABLE_PREFIXES = new Set(Object.keys(DTL_VARIABLES));
 
+// Functions that are dual-natured: valid both as top-level transform statements AND as
+// nested expressions that return values (e.g. ["merge", ["if", cond, dict1, dict2]]).
+// Excluded from the transform-in-expression Phase C check to avoid false positives.
+const DUAL_NATURE_FNS = new Set(["if", "case", "case-eq"]);
+
 const toRange = (
   start: { line: number; character: number },
   end: { line: number; character: number },
@@ -75,7 +80,17 @@ export const validateCalls = (calls: DtlCall[], options: ValidatorOptions): Diag
     }
 
     // --- Phase C: transform function used as a nested expression argument
-    if (options.validateTransformInExpression && !isTopLevel && dtlFn.kind === "transform") {
+    // "if", "case", and "case-eq" are dual-natured in Sesam DTL: they act as conditional
+    // transform statements at top-level AND as conditional expressions that return values
+    // when nested (e.g. ["merge", ["if", cond, then-dict, else-dict]] or
+    // ["map", ["if", cond, value, null], ...]). Flagging them produces false positives,
+    // so they are excluded from this check.
+    if (
+      options.validateTransformInExpression &&
+      !isTopLevel &&
+      dtlFn.kind === "transform" &&
+      !DUAL_NATURE_FNS.has(functionName)
+    ) {
       const diagRange = nameRange
         ? toRange(nameRange.start, nameRange.end)
         : toRange(range.start, range.end);
