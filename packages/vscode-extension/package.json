@@ -101,6 +101,11 @@
         "command": "dtl.refreshDag",
         "title": "Sesam: Refresh Pipe DAG",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "sesam.clearErrors",
+        "title": "Sesam: Clear Errors",
+        "icon": "$(clear-all)"
       }
     ],
     "menus": {
@@ -126,6 +131,17 @@
         {
           "command": "sesam.formatDocument",
           "when": "editorLangId == sesam-config"
+        },
+        {
+          "command": "sesam.clearErrors",
+          "when": "workspaceFolderCount > 0"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "sesam.clearErrors",
+          "when": "view == sesamErrorsList",
+          "group": "navigation"
         }
       ]
     },

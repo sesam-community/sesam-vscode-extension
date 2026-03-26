@@ -181,6 +181,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // ── Commands ──────────────────────────────────────────────────────────────
   context.subscriptions.push(
+    vscode.commands.registerCommand("sesam.clearErrors", () => {
+      diagnosticsStore.clear();
+      _onDiagnosticsChanged.fire();
+    }),
+
     vscode.commands.registerCommand("dtl.refreshDag", () => {
       rescanDag();
       vscode.window.setStatusBarMessage("Sesam: DAG refreshed", 2000);
