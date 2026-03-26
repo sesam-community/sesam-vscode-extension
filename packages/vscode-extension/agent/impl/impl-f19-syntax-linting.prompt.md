@@ -3,6 +3,7 @@
 > **Status**: `implemented`
 > **Rollout Phase**: Phase 1 - MVP
 > **Depends on**: none (enhances existing `dtl-parser.ts` / `dtl-validator.ts` pipeline)
+> **Implemented phases**: A, B, C, D, E
 > **Tracking**: [README.md](README.md)
 
 ---
@@ -260,6 +261,7 @@ validate: {
   dtlStructure: true,       // Phase B
   transformInExpression: true,  // Phase C
   pathExpressions: false,   // Phase D — off by default (noisy)
+  configStructure: true,    // Phase E
 }
 ```
 
@@ -275,8 +277,9 @@ Wire these through `ValidatorOptions` in `dtl-validator.types.ts`.
 | `server/src/dtl-validator.ts` | Add Phase C check (`transform-in-expression`); add `undefined-rule` check |
 | `server/src/dtl-structure-validator.ts` *(new)* | Phase B structural checks: `rule-not-array`, `missing-function-name` |
 | `server/src/dtl-path-validator.ts` *(new)* | Phase D path expression checks |
+| `server/src/config-structure-validator.ts` *(new)* | Phase E required-field checks for pipe/system configs |
 | `server/src/server.ts` | Convert `parseError` → Diagnostic; call new validators; merge into `sendDiagnostics` |
-| `server/src/server.types.ts` | Add `jsonSyntax`, `dtlStructure`, `transformInExpression`, `pathExpressions` to `DtlSettings.validate` |
+| `server/src/server.types.ts` | Add `jsonSyntax`, `dtlStructure`, `transformInExpression`, `pathExpressions`, `configStructure` to `DtlSettings.validate` |
 | `server/src/constants.ts` | Update `defaultSettings` with new validation flags |
 | `types/dtl-validator.types.ts` | Add new flags to `ValidatorOptions` |
 | `tests/validator.test.ts` | Add tests for Phases C–D |
@@ -319,12 +322,25 @@ Wire these through `ValidatorOptions` in `dtl-validator.types.ts`.
 | `"_S.name"` | no diagnostic |
 | `"_S."` (self-reference) | no diagnostic |
 
+### Phase E
+
+| Input | Expected |
+|---|---|
+| `{ "type": "pipe", "source": {} }` — missing `_id` | `missing-id` error |
+| `{ "_id": "x" }` — missing `type` | `missing-type` error |
+| `{ "_id": "x", "type": "pipe" }` — missing `source` | `missing-source` error |
+| `{ "_id": "x", "type": "system:rest" }` | no diagnostic |
+| `{ "_id": "x", "type": "pipe", "source": {} }` | no diagnostic |
+| `{ "_id": "x", "type": "unknown" }` | `invalid-type` warning |
+
 ---
 
 ## Priority
 
-Implement in order: **Phase A → B → C → D**.
+Implement in order: **Phase A → B → C → D → E**.
 
 Phase A gives the highest user-visible value (catches the user's exact reported bug) with minimal
 code change. Phases B and C are high-value and build directly on the existing `DtlCall` structure.
 Phase D is lower-priority and can ship as a follow-up PR.
+Phase E validates the top-level pipe/system config shape against the mandatory properties defined
+in the Sesam service configuration docs (`_id`, `type`, and `source` for pipes).

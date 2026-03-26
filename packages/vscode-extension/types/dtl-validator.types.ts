@@ -6,6 +6,8 @@ export interface ValidatorOptions {
   validateDtlStructure: boolean;
   validateTransformInExpression: boolean;
   validatePathExpressions: boolean;
+  /** Phase E: missing _id / type / source on pipe and system configs */
+  validateConfigStructure: boolean;
   /** Rule names declared in the current document, used for apply/apply-hops validation */
   ruleNames: Set<string>;
 }

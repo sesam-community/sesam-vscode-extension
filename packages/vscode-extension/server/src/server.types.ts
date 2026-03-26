@@ -16,6 +16,8 @@ export interface DtlSettings {
     transformInExpression: boolean;
     /** Phase D: malformed path expressions (off by default — can be noisy) */
     pathExpressions: boolean;
+    /** Phase E: missing _id / type / source on pipe and system configs */
+    configStructure: boolean;
   };
 }
 

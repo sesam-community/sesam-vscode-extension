@@ -13,6 +13,7 @@ export const defaultSettings: DtlSettings = {
     dtlStructure: true,
     transformInExpression: true,
     pathExpressions: false,
+    configStructure: true,
   },
 };
 

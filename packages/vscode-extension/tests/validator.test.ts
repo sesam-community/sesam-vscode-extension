@@ -19,6 +19,7 @@ const defaultOptions: ValidatorOptions = {
   validateDtlStructure: true,
   validateTransformInExpression: true,
   validatePathExpressions: false,
+  validateConfigStructure: false,
   ruleNames: new Set(),
 };
 

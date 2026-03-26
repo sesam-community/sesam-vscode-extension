@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { DiagnosticSeverity } from "vscode-languageserver/node";
 
 import { validateStructure } from "../server/src/dtl-structure-validator";
+import { validateConfigStructure } from "../server/src/config-structure-validator";
 
 import type { DtlCall, StructuralError, DtlRange } from "../server/src/dtl-parser";
 import type { ValidatorOptions } from "../types/dtl-validator.types";
@@ -23,6 +24,7 @@ const defaultOptions: ValidatorOptions = {
   validateDtlStructure: true,
   validateTransformInExpression: true,
   validatePathExpressions: false,
+  validateConfigStructure: false,
   ruleNames: new Set(["default", "order"]),
 };
 
@@ -143,6 +145,109 @@ describe("undefined-rule diagnostics", () => {
       [makeStructuralError("rule-not-array")],
       { ...defaultOptions, validateDtlStructure: false },
     );
+    expect(diags).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase E — config structure validation (pipe / system required fields)
+// ---------------------------------------------------------------------------
+
+const configOptions = { ...defaultOptions, validateConfigStructure: true };
+
+const pipeJson = (overrides: Record<string, unknown> = {}): string =>
+  JSON.stringify({ _id: "my-pipe", type: "pipe", source: { type: "dataset" }, ...overrides });
+
+const systemJson = (overrides: Record<string, unknown> = {}): string =>
+  JSON.stringify({ _id: "my-system", type: "system:rest", ...overrides });
+
+describe("validateConfigStructure — pipe", () => {
+  it("emits no diagnostics for a valid minimal pipe config", () => {
+    const diags = validateConfigStructure(pipeJson(), configOptions);
+    expect(diags).toHaveLength(0);
+  });
+
+  it("emits missing-id when _id is absent", () => {
+    const text = JSON.stringify({ type: "pipe", source: { type: "dataset" } });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "missing-id")).toBeDefined();
+    expect(diags.find((d) => d.code === "missing-id")!.severity).toBe(DiagnosticSeverity.Error);
+  });
+
+  it("emits missing-id when _id is an empty string", () => {
+    const text = pipeJson({ _id: "" });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "missing-id")).toBeDefined();
+  });
+
+  it("emits missing-type when type is absent", () => {
+    const text = JSON.stringify({ _id: "x", source: { type: "dataset" } });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "missing-type")).toBeDefined();
+    expect(diags.find((d) => d.code === "missing-type")!.severity).toBe(DiagnosticSeverity.Error);
+  });
+
+  it("emits missing-source when source is absent from a pipe", () => {
+    const text = JSON.stringify({ _id: "my-pipe", type: "pipe" });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "missing-source")).toBeDefined();
+    expect(diags.find((d) => d.code === "missing-source")!.severity).toBe(DiagnosticSeverity.Error);
+  });
+
+  it("emits invalid-type for an unrecognised type value", () => {
+    const text = JSON.stringify({ _id: "x", type: "unknown-thing" });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "invalid-type")).toBeDefined();
+    expect(diags.find((d) => d.code === "invalid-type")!.severity).toBe(DiagnosticSeverity.Warning);
+  });
+});
+
+describe("validateConfigStructure — system", () => {
+  it("emits no diagnostics for a valid minimal system config", () => {
+    const diags = validateConfigStructure(systemJson(), configOptions);
+    expect(diags).toHaveLength(0);
+  });
+
+  it("emits missing-id when _id is absent from a system config", () => {
+    const text = JSON.stringify({ type: "system:rest" });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "missing-id")).toBeDefined();
+  });
+
+  it("does not emit missing-source for a valid system config", () => {
+    const diags = validateConfigStructure(systemJson(), configOptions);
+    expect(diags.find((d) => d.code === "missing-source")).toBeUndefined();
+  });
+});
+
+describe("validateConfigStructure — array of configs", () => {
+  it("validates each config in an array independently", () => {
+    const text = JSON.stringify([
+      { _id: "pipe-a", type: "pipe", source: { type: "dataset" } },
+      { type: "pipe", source: { type: "dataset" } }, // missing _id
+      { _id: "sys-a", type: "system:rest" },
+    ]);
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.filter((d) => d.code === "missing-id")).toHaveLength(1);
+  });
+
+  it("emits no diagnostics for an array of valid configs", () => {
+    const text = JSON.stringify([
+      { _id: "pipe-a", type: "pipe", source: { type: "dataset" } },
+      { _id: "sys-a", type: "system:rest" },
+    ]);
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags).toHaveLength(0);
+  });
+});
+
+describe("validateConfigStructure — disabled", () => {
+  it("emits no diagnostics when validateConfigStructure is false", () => {
+    const text = JSON.stringify({ type: "pipe" }); // missing _id and source
+    const diags = validateConfigStructure(text, {
+      ...configOptions,
+      validateConfigStructure: false,
+    });
     expect(diags).toHaveLength(0);
   });
 });

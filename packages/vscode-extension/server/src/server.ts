@@ -47,6 +47,7 @@ import { parseDtlText } from "./dtl-parser";
 import { validateCalls } from "./dtl-validator";
 import { validateStructure } from "./dtl-structure-validator";
 import { validatePathStrings } from "./dtl-path-validator";
+import { validateConfigStructure } from "./config-structure-validator";
 import { defaultSettings } from "./constants";
 import {
   isSourceTypeContext,
@@ -209,6 +210,7 @@ async function validateDocument(document: TextDocument): Promise<void> {
     validateDtlStructure: settings.validate?.dtlStructure ?? true,
     validateTransformInExpression: settings.validate?.transformInExpression ?? true,
     validatePathExpressions: settings.validate?.pathExpressions ?? false,
+    validateConfigStructure: settings.validate?.configStructure ?? true,
     ruleNames: parseResult.ruleNames,
   };
 
@@ -235,6 +237,7 @@ async function validateDocument(document: TextDocument): Promise<void> {
     );
     diagnostics.push(...validateCalls(parseResult.calls, validatorOptions));
     diagnostics.push(...validatePathStrings(parseResult.calls, validatorOptions));
+    diagnostics.push(...validateConfigStructure(text, validatorOptions));
   }
 
   const nodeDiags = nodeValidationDiagnostics.get(document.uri) ?? [];
