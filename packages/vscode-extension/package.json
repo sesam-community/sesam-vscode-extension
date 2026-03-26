@@ -129,6 +129,15 @@
         }
       ]
     },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "sesamErrors",
+          "title": "Sesam",
+          "icon": "$(error)"
+        }
+      ]
+    },
     "views": {
       "explorer": [
         {
@@ -144,6 +153,13 @@
         {
           "id": "sesamSystemPipes",
           "name": "System Pipes",
+          "when": "workspaceFolderCount > 0"
+        }
+      ],
+      "sesamErrors": [
+        {
+          "id": "sesamErrorsList",
+          "name": "Sesam",
           "when": "workspaceFolderCount > 0"
         }
       ]

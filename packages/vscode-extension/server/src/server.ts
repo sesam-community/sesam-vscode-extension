@@ -289,6 +289,17 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     return buildSystemTypeCompletions();
   }
 
+  // Property key completion: cursor is at a JSON object key position.
+  // Checked before variable context so that keys starting with "_" (like "_id")
+  // get prop completions rather than DTL variable completions.
+  if (isPropKeyContext(prefix)) {
+    const ctx = getPropKeyContext(prefix);
+
+    if (ctx) {
+      return buildPropCompletions(ctx.path, fileType, ctx.presentKeys, ctx.hasOpenQuote);
+    }
+  }
+
   // Variable completion: triggered after "_" or inside a string starting with "_"
   if (isVariableContext(prefix)) {
     return buildVariableCompletions();
@@ -297,15 +308,6 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
   // Function name completion: cursor is after an opening "[" (possibly with a quote)
   if (isFunctionNameContext(prefix)) {
     return buildFunctionCompletions();
-  }
-
-  // Property key completion: cursor is at a JSON object key position
-  if (isPropKeyContext(prefix)) {
-    const ctx = getPropKeyContext(prefix);
-
-    if (ctx) {
-      return buildPropCompletions(ctx.path, fileType, ctx.presentKeys);
-    }
   }
 
   return [];

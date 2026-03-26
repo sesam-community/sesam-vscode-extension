@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { CompletionItemKind } from "vscode-languageserver/node";
+import { CompletionItemKind, InsertTextFormat } from "vscode-languageserver/node";
 
 import {
   isPropKeyContext,
@@ -22,8 +22,20 @@ describe("isPropKeyContext", () => {
     expect(isPropKeyContext('{"_id":"x","')).toBe(true);
   });
 
-  it("returns true for partial key typed so far", () => {
+  it("returns true for partial key typed so far (quoted)", () => {
     expect(isPropKeyContext('{"_i')).toBe(true);
+  });
+
+  it("returns true for unquoted word after opening brace", () => {
+    expect(isPropKeyContext("{_id")).toBe(true);
+  });
+
+  it("returns true for unquoted word after comma", () => {
+    expect(isPropKeyContext('{"_id":"x",type')).toBe(true);
+  });
+
+  it("returns true for unquoted word with whitespace after brace", () => {
+    expect(isPropKeyContext("{\n  source")).toBe(true);
   });
 
   it("returns false when cursor is inside a value string", () => {
@@ -124,6 +136,35 @@ describe("getPropKeyContext", () => {
     expect(ctx!.presentKeys.has("type")).toBe(true);
     // root key "source" should NOT appear in nested presentKeys
     expect(ctx!.presentKeys.has("source")).toBe(false);
+  });
+
+  it("returns hasOpenQuote: true when opening quote is present", () => {
+    const ctx = getPropKeyContext('{"_i');
+    expect(ctx).not.toBeNull();
+    expect(ctx!.hasOpenQuote).toBe(true);
+  });
+
+  it("returns hasOpenQuote: false for unquoted word after brace", () => {
+    const ctx = getPropKeyContext("{source");
+    expect(ctx).not.toBeNull();
+    expect(ctx!.hasOpenQuote).toBe(false);
+  });
+
+  it("returns hasOpenQuote: false for unquoted word after comma", () => {
+    const ctx = getPropKeyContext('{"_id":"x",type');
+    expect(ctx).not.toBeNull();
+    expect(ctx!.hasOpenQuote).toBe(false);
+  });
+
+  it("returns correct path for unquoted nested key", () => {
+    const ctx = getPropKeyContext('{"source":{type');
+    expect(ctx).not.toBeNull();
+    expect(ctx!.path).toEqual(["source"]);
+    expect(ctx!.hasOpenQuote).toBe(false);
+  });
+
+  it("returns null for unquoted word when not preceded by { or ,", () => {
+    expect(getPropKeyContext("type")).toBeNull();
   });
 });
 
@@ -317,5 +358,72 @@ describe("buildPropCompletions — filters present keys", () => {
 describe("buildPropCompletions — unknown path", () => {
   it("returns [] for deeply nested unknown path", () => {
     expect(buildPropCompletions(["source", "headers"], "pipe", new Set())).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Snippet insertText
+// ---------------------------------------------------------------------------
+
+describe("buildPropCompletions — snippet insertText (hasOpenQuote=true)", () => {
+  const empty = new Set<string>();
+
+  it('string prop produces key": "$0" snippet', () => {
+    const items = buildPropCompletions([], "pipe", empty, true);
+    const id = items.find((i) => i.label === "_id")!;
+    expect(id.insertText).toBe('_id": "$0"');
+    expect(id.insertTextFormat).toBe(InsertTextFormat.Snippet);
+  });
+
+  it('object prop produces key": {$0} snippet', () => {
+    const items = buildPropCompletions([], "pipe", empty, true);
+    const src = items.find((i) => i.label === "source")!;
+    expect(src.insertText).toBe('source": {$0}');
+  });
+
+  it('boolean prop produces key": ${0|true,false|} snippet', () => {
+    const items = buildPropCompletions([], "pipe", empty, true);
+    const ns = items.find((i) => i.label === "namespaces")!;
+    expect(ns.insertText).toBe('namespaces": ${0|true,false|}');
+  });
+
+  it('integer prop produces key": $0 snippet (no quotes)', () => {
+    const items = buildPropCompletions([], "pipe", empty, true);
+    const bs = items.find((i) => i.label === "batch_size")!;
+    expect(bs.insertText).toBe('batch_size": $0');
+  });
+
+  it('array prop produces key": [$0] snippet', () => {
+    const items = buildPropCompletions(["source"], "pipe", empty, true);
+    const ent = items.find((i) => i.label === "entities")!;
+    expect(ent.insertText).toBe('entities": [$0]');
+  });
+});
+
+describe("buildPropCompletions — snippet insertText (hasOpenQuote=false)", () => {
+  const empty = new Set<string>();
+
+  it('string prop produces "key": "$0" snippet', () => {
+    const items = buildPropCompletions([], "pipe", empty, false);
+    const id = items.find((i) => i.label === "_id")!;
+    expect(id.insertText).toBe('"_id": "$0"');
+    expect(id.insertTextFormat).toBe(InsertTextFormat.Snippet);
+  });
+
+  it('object prop produces "key": {$0} snippet', () => {
+    const items = buildPropCompletions([], "pipe", empty, false);
+    const src = items.find((i) => i.label === "source")!;
+    expect(src.insertText).toBe('"source": {$0}');
+  });
+
+  it('boolean prop produces "key": ${0|true,false|} snippet', () => {
+    const items = buildPropCompletions([], "pipe", empty, false);
+    const ns = items.find((i) => i.label === "namespaces")!;
+    expect(ns.insertText).toBe('"namespaces": ${0|true,false|}');
+  });
+
+  it("filterText is always just the key label", () => {
+    const items = buildPropCompletions([], "pipe", empty, false);
+    expect(items.every((i) => i.filterText === i.label)).toBe(true);
   });
 });
