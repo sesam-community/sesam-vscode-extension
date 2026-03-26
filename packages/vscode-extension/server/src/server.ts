@@ -584,7 +584,7 @@ connection.onDocumentLinks((params: DocumentLinkParams): DocumentLink[] => {
 });
 
 // ---------------------------------------------------------------------------
-// Rename (dataset alias)
+// Rename (dataset alias and DTL rule name)
 // ---------------------------------------------------------------------------
 connection.onPrepareRename(
   (params: PrepareRenameParams): { range: Range; placeholder: string } | null => {
@@ -596,6 +596,32 @@ connection.onPrepareRename(
 
     const text = document.getText();
     const offset = document.offsetAt(params.position);
+
+    // Try rule key first, then apply-reference, then alias.
+    const ruleKeyHit = findRuleKeyAtOffset(text, offset);
+
+    if (ruleKeyHit) {
+      return {
+        range: Range.create(
+          document.positionAt(ruleKeyHit.keyRange.start),
+          document.positionAt(ruleKeyHit.keyRange.end),
+        ),
+        placeholder: ruleKeyHit.ruleName,
+      };
+    }
+
+    const applyHit = findApplyRuleReference(text, offset);
+
+    if (applyHit) {
+      return {
+        range: Range.create(
+          document.positionAt(applyHit.nameRange.start),
+          document.positionAt(applyHit.nameRange.end),
+        ),
+        placeholder: applyHit.ruleName,
+      };
+    }
+
     const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
 
     if (!aliasHit) {
@@ -621,6 +647,34 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
 
   const text = document.getText();
   const offset = document.offsetAt(params.position);
+
+  // Rule rename: find the rule name (from key or apply-ref), then rename all occurrences.
+  const ruleKeyHit = findRuleKeyAtOffset(text, offset);
+  const applyHit = !ruleKeyHit ? findApplyRuleReference(text, offset) : null;
+  const ruleName = ruleKeyHit?.ruleName ?? applyHit?.ruleName ?? null;
+
+  if (ruleName !== null) {
+    const ruleDef = findRuleDefinition(text, ruleName, offset);
+    const applyRefs = findAllApplyReferences(text, ruleName);
+
+    const allRanges: Array<{ start: number; end: number }> = [];
+
+    if (ruleDef) {
+      allRanges.push({ start: ruleDef.keyStart, end: ruleDef.keyEnd });
+    }
+
+    allRanges.push(...applyRefs);
+
+    const edits = allRanges.map((r) =>
+      TextEdit.replace(
+        Range.create(document.positionAt(r.start), document.positionAt(r.end)),
+        params.newName,
+      ),
+    );
+
+    return { changes: { [params.textDocument.uri]: edits } };
+  }
+
   const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
 
   if (!aliasHit) {

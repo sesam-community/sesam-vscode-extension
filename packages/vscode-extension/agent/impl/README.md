@@ -24,7 +24,7 @@
 | F02 | Config File Intelligence | Phase 1 | `planned` | [impl-f02-config-file-intelligence.prompt.md](impl-f02-config-file-intelligence.prompt.md) |
 | F03 | Secure Credential Management | Phase 1 | `planned` | [impl-f03-credential-management.prompt.md](impl-f03-credential-management.prompt.md) |
 | F12 | Sesam Config File Extensions & Formatter | Phase 1 | `implemented` | [impl-f12-conf-json-formatter.prompt.md](impl-f12-conf-json-formatter.prompt.md) |
-| F13 | Go to Rule Definition | — | `implemented` | [go-to-rule-definition.prompt.md](../plans/go-to-rule-definition.prompt.md) |
+| F13 | Go to Rule Definition + Find All References + Rename Rule | — | `implemented` | [go-to-rule-definition.prompt.md](../plans/go-to-rule-definition.prompt.md) |
 | F14 | Cross-file Dataset Navigation | — | `implemented` | [cross-file-navigation.prompt.md](../plans/cross-file-navigation.prompt.md) |
 | F15 | Interactive Pipe Graph (canvas / webview) | Phase 4 | `planned` | [interactive-pipe-graph.prompt.md](../plans/interactive-pipe-graph.prompt.md) |
 | F16 | Pipe DAG Tree Views (Lineage + Dependents) | — | `implemented` | [pipe-dag-tree.prompt.md](../plans/pipe-dag-tree.prompt.md) |

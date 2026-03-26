@@ -1,6 +1,6 @@
 # F13: Go to Rule Definition + Find All References
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 1 - MVP
 > **Tracking**: [README.md](../impl/README.md)
 
@@ -294,7 +294,66 @@ connection.onReferences(params => {
 
 ---
 
-## Future extensions
+## Phase E — Rename Rule (implemented)
 
-1. **Rename Symbol** — rename a rule key and all its `apply`/`apply-hops` references atomically.
-   Would use `connection.onRenameRequest()` + `connection.onPrepareRename()`.
+### Summary
+
+Pressing **F2** on a rule key or any `apply`/`apply-hops` reference renames the rule and all
+its usages in the file atomically.
+
+### API
+
+`renameProvider: { prepareProvider: true }` was already declared in `onInitialize`.
+
+### Data flow
+
+```
+User presses F2 on a rule name (key or apply arg)
+  → VS Code sends textDocument/prepareRename { position }
+  → Handler:
+     1. findRuleKeyAtOffset(text, offset)  → rule key hit?
+     2. findApplyRuleReference(text, offset)  → apply arg hit?
+     3. Either: return { range, placeholder: ruleName }
+     4. Falls through to alias rename if neither
+  → VS Code prompts user for new name
+  → VS Code sends textDocument/rename { position, newName }
+  → Handler:
+     1. Resolve ruleName from key or apply-ref at cursor
+     2. findRuleDefinition(text, ruleName, offset)  → key range
+     3. findAllApplyReferences(text, ruleName)  → all apply/apply-hops ranges
+     4. Build TextEdit[] replacing all occurrences
+     5. Return WorkspaceEdit { changes: { [uri]: edits } }
+```
+
+### Implementation
+
+**File**: `server/src/server.ts` — `connection.onPrepareRename` and `connection.onRenameRequest`
+
+Priority order inside each handler:
+1. Rule key (`findRuleKeyAtOffset`) — cursor on definition
+2. Apply reference (`findApplyRuleReference`) — cursor on call site
+3. Dataset alias (existing behaviour) — unchanged fallback
+
+No changes to `definition.utils.ts` needed; all required helpers (`findRuleKeyAtOffset`,
+`findApplyRuleReference`, `findRuleDefinition`, `findAllApplyReferences`) already existed
+from Phases A–C.
+
+### Tests
+
+**File**: `tests/rule-rename.test.ts`
+
+- `findRuleKeyAtOffset` — detects cursor on `"default"` and `"enrich"` keys
+- `findApplyRuleReference` — detects cursor in `apply` and `apply-hops` first arg
+- `findAllApplyReferences` — finds both `apply` and `apply-hops` refs; returns `[]` for rule with no calls
+- `findRuleDefinition` — locates key offsets; returns `null` for unknown rule
+- Full rename simulation — `"enrich"` → `"augment"` updates definition + both call sites; `"default"` → `"main"` updates key only (no apply refs)
+
+### Verification
+
+1. `pnpm test` — 507 tests pass
+2. **Manual (F5 Extension Host)**:
+   - F2 on a rule key → rename input pre-filled with rule name → all `apply`/`apply-hops` calls updated
+   - F2 on an `apply` arg → same behaviour from the call site
+   - F2 on a dataset alias → alias rename still works (unchanged)
+   - F2 on an unrelated string → no rename offered (correct)
+
