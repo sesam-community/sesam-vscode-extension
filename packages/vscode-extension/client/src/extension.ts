@@ -188,7 +188,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       const tabSize = typeof editor.options.tabSize === "number" ? editor.options.tabSize : 2;
-      const formatted = formatSesamJson(parsed, tabSize);
+      const reorderKeys =
+        vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+      const formatted = formatSesamJson(parsed, tabSize, { reorderKeys });
       if (formatted === text) {
         return;
       }
@@ -481,7 +483,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       const editor = vscode.window.visibleTextEditors.find((e) => e.document === event.document);
       const tabSize = typeof editor?.options.tabSize === "number" ? editor.options.tabSize : 2;
-      const formatted = formatSesamJson(parsed, tabSize);
+      const reorderKeys =
+        vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+      const formatted = formatSesamJson(parsed, tabSize, { reorderKeys });
       if (formatted === text) {
         return;
       }

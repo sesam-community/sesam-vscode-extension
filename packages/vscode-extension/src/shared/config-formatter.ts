@@ -23,19 +23,105 @@ export const sortObjectKeysRecursively = (obj: unknown): unknown => {
   if (typeof obj !== "object" || obj === null) {
     return obj;
   }
+
   if (Array.isArray(obj)) {
     return obj.map(sortObjectKeysRecursively);
   }
+
   const sorted: Record<string, unknown> = {};
   for (const key of Object.keys(obj as Record<string, unknown>).sort()) {
     sorted[key] = sortObjectKeysRecursively((obj as Record<string, unknown>)[key]);
   }
+
   return sorted;
 };
 
-export const formatSesamJson = (value: unknown, tabSize: number): string => {
+// ---------------------------------------------------------------------------
+// Canonical key ordering
+// ---------------------------------------------------------------------------
+
+const PIPE_KEY_ORDER: readonly string[] = [
+  "_id",
+  "type",
+  "source",
+  "transform",
+  "sink",
+  "pump",
+  "name",
+  "description",
+  "comment",
+  "metadata",
+];
+
+const SYSTEM_KEY_ORDER: readonly string[] = [
+  "_id",
+  "type",
+  "name",
+  "description",
+  "comment",
+  "metadata",
+];
+
+type ConfigKind = "pipe" | "system" | "unknown";
+
+const detectKind = (obj: Record<string, unknown>): ConfigKind => {
+  const t = obj["type"];
+
+  if (t === "pipe") {
+    return "pipe";
+  }
+
+  if (typeof t === "string" && t.startsWith("system:")) {
+    return "system";
+  }
+
+  return "unknown";
+};
+
+export const reorderConfigKeys = (obj: Record<string, unknown>): Record<string, unknown> => {
+  const kind = detectKind(obj);
+  const order = kind === "pipe" ? PIPE_KEY_ORDER : kind === "system" ? SYSTEM_KEY_ORDER : null;
+
+  if (order === null) {
+    return obj;
+  }
+
+  const allKeys = Object.keys(obj);
+  const canonical = order.filter((k) => allKeys.includes(k));
+  const rest = allKeys.filter((k) => !order.includes(k)).sort();
+  const reordered: Record<string, unknown> = {};
+
+  for (const k of [...canonical, ...rest]) {
+    reordered[k] = obj[k];
+  }
+
+  return reordered;
+};
+
+const applyReorder = (value: unknown): unknown => {
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(applyReorder);
+  }
+
+  return reorderConfigKeys(value as Record<string, unknown>);
+};
+
+export interface FormatOptions {
+  reorderKeys?: boolean;
+}
+
+export const formatSesamJson = (
+  value: unknown,
+  tabSize: number,
+  options?: FormatOptions,
+): string => {
+  const input = options?.reorderKeys === true ? applyReorder(value) : value;
   const indentation = " ".repeat(tabSize);
-  const compact = JSON.stringify(value, null, 0);
+  const compact = JSON.stringify(input, null, 0);
 
   let output = "";
   let indent = 0;

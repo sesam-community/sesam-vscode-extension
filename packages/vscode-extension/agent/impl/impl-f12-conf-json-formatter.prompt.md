@@ -1,6 +1,6 @@
 # F12: Sesam Config File Extensions & Formatter
 
-> **Status**: `implemented`
+> **Status**: `implemented` (Phases A–F)
 > **Rollout Phase**: Phase 1 - MVP (core DTL editing improvement)
 > **Depends on**: none (standalone enhancement to existing DTL LSP)
 > **Tracking**: [README.md](README.md)
@@ -77,9 +77,153 @@ files.
 
 ---
 
-## Background
+## Phase F — Canonical key ordering on save
 
-When sesam-py downloads configs from a node it writes them as `<pipe-id>.conf.json` files. These are
+### Motivation
+
+The Sesam docs show a consistent key ordering in their prototype examples:
+
+**Pipe**:
+```json
+{
+  "_id",
+  "name",
+  "description",
+  "comment",
+  "type",
+  "source",
+  "transform",
+  "sink",
+  "pump",
+  "metadata"
+}
+```
+
+**System**:
+```json
+{
+  "_id",
+  "type",
+  "name",
+  "description",
+  "comment",
+  "worker_threads",
+  "permissions",
+  "metadata"
+}
+```
+
+The docs do **not** mandate a sort order — the prototypes are illustrative. However, applying a
+consistent canonical order on save makes diffs cleaner and files easier to scan.
+
+The current formatter already preserves insertion order (by design). This phase adds an optional
+reordering step that, when enabled, reorders root-level keys of pipe and system config objects to
+match the doc prototype order before the rest of the formatting is applied.
+
+---
+
+### Canonical key orders
+
+#### Pipe config (`"type": "pipe"`)
+
+| Position | Key | Notes |
+|---|---|---|
+| 1 | `_id` | Required |
+| 2 | `type` | Required |
+| 3 | `source` | Required |
+| 4 | `transform` | Optional |
+| 5 | `sink` | Optional |
+| 6 | `pump` | Optional |
+| 7 | `name` | Optional, human label |
+| 8 | `description` | Optional |
+| 9 | `comment` | Optional |
+| 10 | `metadata` | Optional |
+| 11+ | all others | Alphabetical among themselves |
+
+#### System config (`"type"` starts with `"system:"`)
+
+| Position | Key | Notes |
+|---|---|---|
+| 1 | `_id` | Required |
+| 2 | `type` | Required |
+| 3 | `name` | Optional |
+| 4 | `description` | Optional |
+| 5 | `comment` | Optional |
+| 6 | `metadata` | Optional |
+| 7+ | all others | Alphabetical among themselves |
+
+Keys not in the canonical list are placed after the canonical keys, sorted alphabetically among
+themselves. This is forward-compatible: unknown keys are never lost or reordered destructively.
+
+---
+
+### Design
+
+**Where**: `src/shared/config-formatter.ts` — add an optional `reorderKeys: boolean` parameter to
+`formatSesamJson` (default `false` for backward compatibility).
+
+```ts
+export const formatSesamJson = (
+  value: unknown,
+  tabSize: number,
+  options?: { reorderKeys?: boolean },
+): string => { … };
+```
+
+When `reorderKeys` is true:
+1. If `value` is an **object** with a `type` property → determine config kind (pipe / system) and
+   reorder its top-level keys according to the canonical list before formatting.
+2. If `value` is an **array** of config objects → apply step 1 to each element.
+3. Nested objects (`source`, `transform`, `sink`, `pump`) are **not** reordered — only the root
+   level.
+
+The reordering is a pure function: `reorderConfigKeys(obj, kind) → Record<string, unknown>`.
+
+**When applied**: only when the formatter is invoked on save (`onWillSaveTextDocument`) or via the
+`Sesam: Format Document` command, not during LSP `onDocumentFormatting` (which is triggered by
+editor "Format Document" / language-specific formatters — preserving order there avoids surprises).
+
+**Setting**: controlled by a new VS Code setting `dtl.format.reorderKeys` (`boolean`, default `true`).
+
+---
+
+### Files touched
+
+| File | Change |
+|---|---|
+| `src/shared/config-formatter.ts` | Add `reorderConfigKeys()` helper; add `options.reorderKeys` param to `formatSesamJson` |
+| `server/src/server.types.ts` | Add `format: { reorderKeys: boolean }` to `DtlSettings` |
+| `server/src/constants.ts` | Add `format: { reorderKeys: false }` to `defaultSettings` |
+| `client/src/extension.ts` | Pass `reorderKeys: settings.format?.reorderKeys` when calling `formatSesamJson` on save |
+| `package.json` | Add `dtl.format.reorderKeys` contribution point |
+| `tests/formatter.test.ts` | New test cases for reorder behaviour |
+
+---
+
+### Test cases
+
+| Input | Expected after reorder |
+|---|---|
+| Pipe with `source` before `_id` | `_id`, `type`, `source` in that order at root |
+| Pipe with `pump` before `source` | `source` moved before `pump` |
+| System with `metadata` before `type` | `_id`, `type`, `metadata` order |
+| Unknown keys at root | Placed after canonical keys, alphabetically sorted |
+| Nested `source` object | Internal key order unchanged |
+| Array of pipe configs | Each element reordered independently |
+| `reorderKeys: false` (default) | Key order unchanged (existing behaviour) |
+
+---
+
+### Acceptance criteria
+
+- `formatSesamJson(pipe, 2, { reorderKeys: true })` → `_id` first, `type` second, `source` third
+- Existing tests still pass (no `reorderKeys` → no change to current behaviour)
+- On save with `dtl.format.reorderKeys: true` → file keys reordered
+- On save with `dtl.format.reorderKeys: false` (default) → no reorder (current behaviour preserved)
+
+---
+
+## Background configs from a node it writes them as `<pipe-id>.conf.json` files. These are
 standard Sesam pipe config objects (not pure DTL arrays) with this shape:
 
 ```json

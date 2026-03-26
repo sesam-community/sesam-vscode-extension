@@ -182,6 +182,11 @@
           "default": true,
           "description": "Report incorrect argument counts as warnings."
         },
+        "dtl.format.reorderKeys": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When saving a Sesam config file, reorder root-level keys to the canonical order documented by Sesam (`_id`, `type`, `source`, `transform`, `sink`, `pump`, …). Unknown keys are placed last, alphabetically. Set to `false` to preserve your original key order."
+        },
         "dtl.graph.scanDepth": {
           "type": "number",
           "default": 3,
