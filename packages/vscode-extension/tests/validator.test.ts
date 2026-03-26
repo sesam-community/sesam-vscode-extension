@@ -15,6 +15,12 @@ const defaultOptions: ValidatorOptions = {
   maxProblems: 100,
   validateUnknownFunctions: true,
   validateArgCount: true,
+  validateJsonSyntax: true,
+  validateDtlStructure: true,
+  validateTransformInExpression: true,
+  validatePathExpressions: false,
+  validateConfigStructure: false,
+  ruleNames: new Set(),
 };
 
 function makeCall(overrides: Partial<DtlCall>): DtlCall {
@@ -22,6 +28,8 @@ function makeCall(overrides: Partial<DtlCall>): DtlCall {
     functionName: "add",
     argCount: 2,
     isTopLevel: true,
+    firstStringArg: null,
+    stringArgs: [],
     range: {
       start: { offset: 0, line: 0, character: 0 },
       end: { offset: 20, line: 0, character: 20 },
@@ -244,5 +252,73 @@ describe("multiple calls", () => {
     expect(diags.map((d) => d.code)).toEqual(
       expect.arrayContaining(["unknown-function", "too-few-args"]),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase C — transform-in-expression
+// ---------------------------------------------------------------------------
+
+describe("transform-in-expression diagnostics", () => {
+  it("emits an error when a transform function appears as a nested argument", () => {
+    // "add" is kind: "transform" and isTopLevel is false
+    const diags = validateCalls(
+      [makeCall({ functionName: "add", isTopLevel: false })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeDefined();
+    expect(diags.find((d) => d.code === "transform-in-expression")!.severity).toBe(
+      DiagnosticSeverity.Error,
+    );
+  });
+
+  it("does not emit an error when a transform function is at top level", () => {
+    const diags = validateCalls(
+      [makeCall({ functionName: "add", isTopLevel: true })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
+  });
+
+  it("does not emit an error when an expression function appears nested", () => {
+    // "upper" is kind: "expression" — nesting is fine
+    const diags = validateCalls(
+      [makeCall({ functionName: "upper", isTopLevel: false, argCount: 1 })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
+  });
+
+  it("skips transform-in-expression check when validateTransformInExpression is false", () => {
+    const diags = validateCalls([makeCall({ functionName: "add", isTopLevel: false })], {
+      ...defaultOptions,
+      validateTransformInExpression: false,
+    });
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
+  });
+
+  it("does not emit an error for 'if' nested as an expression argument", () => {
+    // ["merge", ["if", cond, dict1, dict2]] — "if" produces a value here
+    const diags = validateCalls(
+      [makeCall({ functionName: "if", isTopLevel: false, argCount: 3 })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
+  });
+
+  it("does not emit an error for 'case' nested as an expression argument", () => {
+    const diags = validateCalls(
+      [makeCall({ functionName: "case", isTopLevel: false, argCount: 2 })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
+  });
+
+  it("does not emit an error for 'case-eq' nested as an expression argument", () => {
+    const diags = validateCalls(
+      [makeCall({ functionName: "case-eq", isTopLevel: false, argCount: 3 })],
+      defaultOptions,
+    );
+    expect(diags.find((d) => d.code === "transform-in-expression")).toBeUndefined();
   });
 });

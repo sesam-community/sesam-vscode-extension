@@ -24,6 +24,7 @@ import {
   Location,
   ReferenceParams,
   Diagnostic,
+  DiagnosticSeverity,
   DocumentSymbol,
   DocumentSymbolParams,
   DocumentLink,
@@ -44,6 +45,9 @@ import {
 import { formatSesamJson } from "../../src/shared/config-formatter";
 import { parseDtlText } from "./dtl-parser";
 import { validateCalls } from "./dtl-validator";
+import { validateStructure } from "./dtl-structure-validator";
+import { validatePathStrings } from "./dtl-path-validator";
+import { validateConfigStructure } from "./config-structure-validator";
 import { defaultSettings } from "./constants";
 import {
   isSourceTypeContext,
@@ -193,21 +197,53 @@ async function validateDocument(document: TextDocument): Promise<void> {
     return;
   }
 
+  const text = document.getText();
   const ext = "json";
-  const parseResult = parseDtlText(document.getText(), ext);
+  const parseResult = parseDtlText(text, ext);
+  const diagnostics: Diagnostic[] = [];
 
   const validatorOptions: ValidatorOptions = {
     maxProblems: settings.maxNumberOfProblems ?? defaultSettings.maxNumberOfProblems,
     validateUnknownFunctions: settings.validate?.unknownFunctions ?? true,
     validateArgCount: settings.validate?.argCount ?? true,
+    validateJsonSyntax: settings.validate?.jsonSyntax ?? true,
+    validateDtlStructure: settings.validate?.dtlStructure ?? true,
+    validateTransformInExpression: settings.validate?.transformInExpression ?? true,
+    validatePathExpressions: settings.validate?.pathExpressions ?? false,
+    validateConfigStructure: settings.validate?.configStructure ?? true,
+    ruleNames: parseResult.ruleNames,
   };
 
-  const localDiagnostics: Diagnostic[] = validateCalls(parseResult.calls, validatorOptions);
+  // Phase A: JSON parse error
+  if (parseResult.parseError !== null && validatorOptions.validateJsonSyntax) {
+    const offset = parseResult.parseError.offset;
+    const pos = offset >= 0 ? offsetToPosition(text, offset) : { line: 0, character: 0 };
+    diagnostics.push({
+      range: Range.create(
+        pos.line,
+        pos.character,
+        pos.line,
+        Math.max(pos.character + 1, pos.character),
+      ),
+      severity: DiagnosticSeverity.Error,
+      message: `Invalid JSON: ${parseResult.parseError.message}`,
+      source: "dtl",
+      code: "invalid-json",
+    });
+  } else {
+    // Only run semantic checks when JSON is valid
+    diagnostics.push(
+      ...validateStructure(parseResult.calls, parseResult.structuralErrors, validatorOptions),
+    );
+    diagnostics.push(...validateCalls(parseResult.calls, validatorOptions));
+    diagnostics.push(...validatePathStrings(parseResult.calls, validatorOptions));
+    diagnostics.push(...validateConfigStructure(text, validatorOptions));
+  }
 
   const nodeDiags = nodeValidationDiagnostics.get(document.uri) ?? [];
   connection.sendDiagnostics({
     uri: document.uri,
-    diagnostics: [...localDiagnostics, ...nodeDiags],
+    diagnostics: [...diagnostics, ...nodeDiags],
   });
 }
 

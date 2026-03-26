@@ -8,6 +8,16 @@ export interface DtlSettings {
     enabled: boolean;
     unknownFunctions: boolean;
     argCount: boolean;
+    /** Phase A: surface JSON parse errors */
+    jsonSyntax: boolean;
+    /** Phase B: rule-not-array, missing-function-name, undefined-rule */
+    dtlStructure: boolean;
+    /** Phase C: transform function used as nested expression argument */
+    transformInExpression: boolean;
+    /** Phase D: malformed path expressions (off by default — can be noisy) */
+    pathExpressions: boolean;
+    /** Phase E: missing _id / type / source on pipe and system configs */
+    configStructure: boolean;
   };
 }
 

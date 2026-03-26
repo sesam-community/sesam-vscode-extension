@@ -276,12 +276,23 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 
 ```json
 [
-  ["add", "_T.full_name", ["concat", ["list", "_S.first_name", " ", "_S.last_name"]]],
-  ["add", "_T.is_active", ["eq", "_S.status", "active"]],
-  ["add", "_T.score",     ["if", ["gt", "_S.score", 100], 100, "_S.score"]],
-  ["copy", "*"],
-  ["remove", "_T.internal_notes"],
-  ["filter", ["eq", "_S.type", "person"]]
+  ["add", "_T.full_name", 
+    ["concat", 
+      ["list", "_S.first_name", " ", "_S.last_name"]
+    ]
+  ], 
+  ["add", "_T.is_active", 
+    ["eq", "_S.status", "active"]
+  ], 
+  ["add", "_T.score", 
+    ["if", 
+      ["gt", "_S.score", 100], 100, "_S.score"]
+  ], 
+  ["copy", "*"], 
+  ["remove", "_T.internal_notes"], 
+  ["filter", 
+    ["eq", "_S.type", "person"]
+  ]
 ]
 ```
 

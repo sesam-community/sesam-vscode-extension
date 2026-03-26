@@ -5,7 +5,16 @@ import type { DtlSettings, SystemTypeInfo, SourceTypeInfo } from "./server.types
 // ---------------------------------------------------------------------------
 export const defaultSettings: DtlSettings = {
   maxNumberOfProblems: 100,
-  validate: { enabled: true, unknownFunctions: true, argCount: true },
+  validate: {
+    enabled: true,
+    unknownFunctions: true,
+    argCount: true,
+    jsonSyntax: true,
+    dtlStructure: true,
+    transformInExpression: true,
+    pathExpressions: false,
+    configStructure: true,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -184,3 +193,42 @@ export const PIPE_SOURCE_TYPES: SourceTypeInfo[] = [
     doc: "Reads RDF data (Turtle, N-Triples, RDF/XML, …) from a URL.\n\nRequired: `url`",
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Transform-type valid values
+// Docs: https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-transforms.html
+// ---------------------------------------------------------------------------
+export const TRANSFORM_TYPES: ReadonlySet<string> = new Set([
+  "dtl",
+  "http",
+  "rest",
+  "conditional",
+  "emit_children",
+  "json_schema_validation",
+  "rdf",
+  "template",
+  "xml",
+]);
+
+// ---------------------------------------------------------------------------
+// Sink-type valid values
+// Docs: https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sinks.html
+// ---------------------------------------------------------------------------
+export const SINK_TYPES: ReadonlySet<string> = new Set([
+  "dataset",
+  "sql",
+  "rest",
+  "conditional",
+  "csv_endpoint",
+  "elasticsearch",
+  "email",
+  "http_endpoint",
+  "json",
+  "kafka",
+  "null",
+  "sdshare",
+  "sms",
+  "solr",
+  "sparql",
+  "xml_endpoint",
+]);
