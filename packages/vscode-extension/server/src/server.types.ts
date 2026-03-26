@@ -19,6 +19,10 @@ export interface DtlSettings {
     /** Phase E: missing _id / type / source on pipe and system configs */
     configStructure: boolean;
   };
+  format: {
+    /** Phase F: reorder root-level keys to canonical order on save */
+    reorderKeys: boolean;
+  };
 }
 
 export interface SesamSettings {

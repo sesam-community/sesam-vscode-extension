@@ -2,6 +2,7 @@ import {
   DiagnosticSeverity,
   CompletionItem,
   CompletionItemKind,
+  InsertTextFormat,
   MarkupKind,
   DocumentSymbol,
   SymbolKind,
@@ -98,6 +99,555 @@ export const isVariableContext = (prefix: string): boolean => {
 
 export const isFunctionNameContext = (prefix: string): boolean => {
   return /\[\s*"[^"]*$/.test(prefix) || /\[\s*$/.test(prefix);
+};
+
+// A cursor is at a property key position when the most recent non-whitespace
+// character (outside strings) before the opening " is { or ,
+// Also detects unquoted keys being typed (no opening ").
+export const isPropKeyContext = (prefix: string): boolean => {
+  return /[{,]\s*"[^"]*$/.test(prefix) || /[{,]\s*[a-zA-Z_][a-zA-Z0-9_]*$/.test(prefix);
+};
+
+// ---------------------------------------------------------------------------
+// Config file type
+// ---------------------------------------------------------------------------
+export type ConfigFileType = "pipe" | "system" | "node-metadata" | "unknown";
+
+export const getConfigFileType = (uri: string): ConfigFileType => {
+  if (uri.endsWith(".conf.pipe")) {
+    return "pipe";
+  }
+
+  if (uri.endsWith(".conf.system")) {
+    return "system";
+  }
+
+  if (uri.endsWith("node-metadata.conf.json")) {
+    return "node-metadata";
+  }
+
+  return "unknown";
+};
+
+// ---------------------------------------------------------------------------
+// Property schema data
+// ---------------------------------------------------------------------------
+interface PropInfo {
+  label: string;
+  detail: string;
+  sortText: string;
+  /** Snippet for the value portion, e.g. '"$0"' (default), '{$0}', '[$0]', '$0' */
+  valueSnippet?: string;
+}
+
+const PIPE_ROOT_PROPS: readonly PropInfo[] = [
+  { label: "_id", detail: "string — unique pipe identifier (required)", sortText: "0_01" },
+  { label: "type", detail: 'string — must be "pipe" (required)', sortText: "0_02" },
+  {
+    label: "source",
+    detail: "object — data source (required)",
+    sortText: "0_03",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "transform",
+    detail: "object | array — DTL transform (optional)",
+    sortText: "1_01",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "sink",
+    detail: "object — data sink (optional)",
+    sortText: "1_02",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "pump",
+    detail: "object — scheduling config (optional)",
+    sortText: "1_03",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "metadata",
+    detail: "object — arbitrary metadata (optional)",
+    sortText: "1_04",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "description",
+    detail: "string — human-readable description (optional)",
+    sortText: "1_05",
+  },
+  { label: "comment", detail: "string — internal note (optional)", sortText: "1_06" },
+  {
+    label: "namespaces",
+    detail: "boolean — enable namespacing (optional)",
+    sortText: "1_07",
+    valueSnippet: "${0|true,false|}",
+  },
+  {
+    label: "add_namespaces",
+    detail: "boolean (optional)",
+    sortText: "1_08",
+    valueSnippet: "${0|true,false|}",
+  },
+  {
+    label: "remove_namespaces",
+    detail: "boolean (optional)",
+    sortText: "1_09",
+    valueSnippet: "${0|true,false|}",
+  },
+  { label: "batch_size", detail: "integer (optional)", sortText: "1_10", valueSnippet: "$0" },
+  {
+    label: "checkpoint_interval",
+    detail: "integer (optional)",
+    sortText: "1_11",
+    valueSnippet: "$0",
+  },
+  { label: "compaction", detail: "object (optional)", sortText: "1_12", valueSnippet: "{$0}" },
+  {
+    label: "expose_entity_id",
+    detail: "boolean (optional)",
+    sortText: "1_13",
+    valueSnippet: "${0|true,false|}",
+  },
+  {
+    label: "merge_existing_namespaces",
+    detail: "boolean (optional)",
+    sortText: "1_14",
+    valueSnippet: "${0|true,false|}",
+  },
+  {
+    label: "infer_pipe_entity_types",
+    detail: "boolean (optional)",
+    sortText: "1_15",
+    valueSnippet: "${0|true,false|}",
+  },
+];
+
+const SYSTEM_ROOT_PROPS: readonly PropInfo[] = [
+  { label: "_id", detail: "string — unique system identifier (required)", sortText: "0_01" },
+  { label: "type", detail: 'string — must be "system:*" (required)', sortText: "0_02" },
+  {
+    label: "metadata",
+    detail: "object — arbitrary metadata (optional)",
+    sortText: "1_01",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "description",
+    detail: "string — human-readable description (optional)",
+    sortText: "1_02",
+  },
+  { label: "comment", detail: "string — internal note (optional)", sortText: "1_03" },
+];
+
+const NODE_METADATA_ROOT_PROPS: readonly PropInfo[] = [
+  { label: "_id", detail: 'string — typically "node" (required)', sortText: "0_01" },
+  { label: "type", detail: 'string — must be "metadata:node" (required)', sortText: "0_02" },
+  {
+    label: "pipe_defaults",
+    detail: "object — default settings for all pipes (optional)",
+    sortText: "0_03",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "system_defaults",
+    detail: "object — default settings for all systems (optional)",
+    sortText: "0_04",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "global_defaults",
+    detail: "object — defaults for both pipes and systems (optional)",
+    sortText: "1_01",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "feature_flags",
+    detail: "object — enable/disable experimental features (optional)",
+    sortText: "1_02",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "namespaces",
+    detail: "object — namespace configuration (optional)",
+    sortText: "1_03",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "metadata",
+    detail: "object — node-level metadata tags (optional)",
+    sortText: "1_04",
+    valueSnippet: "{$0}",
+  },
+  { label: "description", detail: "string (optional)", sortText: "1_05" },
+  { label: "comment", detail: "string (optional)", sortText: "1_06" },
+];
+
+// Combined superset for unknown .conf.json files
+const UNKNOWN_ROOT_PROPS: readonly PropInfo[] = [
+  ...PIPE_ROOT_PROPS,
+  ...SYSTEM_ROOT_PROPS.filter((p) => !PIPE_ROOT_PROPS.some((q) => q.label === p.label)),
+];
+
+const SOURCE_PROPS: readonly PropInfo[] = [
+  { label: "type", detail: "string — source type (required)", sortText: "0_01" },
+  { label: "dataset", detail: "string — dataset name (dataset source)", sortText: "1_01" },
+  { label: "system", detail: "string — system id (sql/rest/json/ldap/kafka)", sortText: "1_02" },
+  { label: "table", detail: "string — table name (sql source)", sortText: "1_03" },
+  { label: "query", detail: "string — SQL query (sql source)", sortText: "1_04" },
+  { label: "url", detail: "string — URL (json/http_endpoint source)", sortText: "1_05" },
+  { label: "operation", detail: "string — operation (rest/kafka source)", sortText: "1_06" },
+  {
+    label: "headers",
+    detail: "object — HTTP headers (optional)",
+    sortText: "1_07",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "params",
+    detail: "object — query parameters (optional)",
+    sortText: "1_08",
+    valueSnippet: "{$0}",
+  },
+  {
+    label: "entities",
+    detail: "array — inline entities (embedded source)",
+    sortText: "1_09",
+    valueSnippet: "[$0]",
+  },
+  {
+    label: "datasets",
+    detail: "array — datasets list (union_datasets/merge)",
+    sortText: "1_10",
+    valueSnippet: "[$0]",
+  },
+  {
+    label: "since_property_name",
+    detail: "string — REST since-tracking (optional)",
+    sortText: "1_11",
+  },
+  {
+    label: "since_default",
+    detail: "string — REST since-tracking default (optional)",
+    sortText: "1_12",
+  },
+  {
+    label: "completeness",
+    detail: "boolean — completeness tracking (optional)",
+    sortText: "1_13",
+    valueSnippet: "${0|true,false|}",
+  },
+  {
+    label: "supports_signalling",
+    detail: "boolean — signalling support (optional)",
+    sortText: "1_14",
+    valueSnippet: "${0|true,false|}",
+  },
+];
+
+const TRANSFORM_PROPS: readonly PropInfo[] = [
+  { label: "type", detail: "string — transform type (required)", sortText: "0_01" },
+  {
+    label: "rules",
+    detail: "object — DTL rules (dtl transform)",
+    sortText: "0_02",
+    valueSnippet: "{$0}",
+  },
+  { label: "system", detail: "string — system id (http/rest transform)", sortText: "1_01" },
+  { label: "operation", detail: "string — operation name (http/rest transform)", sortText: "1_02" },
+  {
+    label: "transform",
+    detail: "array — sub-transforms (conditional)",
+    sortText: "1_03",
+    valueSnippet: "[$0]",
+  },
+  {
+    label: "condition",
+    detail: "array — condition expression (conditional)",
+    sortText: "1_04",
+    valueSnippet: "[$0]",
+  },
+  {
+    label: "side_effects",
+    detail: "boolean — allow side effects (optional)",
+    sortText: "1_05",
+    valueSnippet: "${0|true,false|}",
+  },
+  {
+    label: "xml_config",
+    detail: "object — XML configuration (xml transform)",
+    sortText: "1_06",
+    valueSnippet: "{$0}",
+  },
+  { label: "template", detail: "string — template string (template transform)", sortText: "1_07" },
+];
+
+const SINK_PROPS: readonly PropInfo[] = [
+  { label: "type", detail: "string — sink type (required)", sortText: "0_01" },
+  { label: "dataset", detail: "string — target dataset (dataset sink)", sortText: "1_01" },
+  { label: "system", detail: "string — system id (sql/rest/elasticsearch)", sortText: "1_02" },
+  { label: "table", detail: "string — table name (sql sink)", sortText: "1_03" },
+  { label: "operation", detail: "string — operation name (rest sink)", sortText: "1_04" },
+  {
+    label: "primary_key",
+    detail: "array — primary key columns (sql sink)",
+    sortText: "1_05",
+    valueSnippet: "[$0]",
+  },
+  {
+    label: "batch_size",
+    detail: "integer — batch size (sql sink)",
+    sortText: "1_06",
+    valueSnippet: "$0",
+  },
+  {
+    label: "set_initial_offset",
+    detail: "string — initial offset (dataset sink)",
+    sortText: "1_07",
+  },
+  {
+    label: "deletion_tracking",
+    detail: "boolean — track deletions (dataset sink)",
+    sortText: "1_08",
+    valueSnippet: "${0|true,false|}",
+  },
+  {
+    label: "enable_optimistic_locking",
+    detail: "boolean — optimistic locking (dataset sink)",
+    sortText: "1_09",
+    valueSnippet: "${0|true,false|}",
+  },
+  {
+    label: "side_effects",
+    detail: "boolean — allow side effects (optional)",
+    sortText: "1_10",
+    valueSnippet: "${0|true,false|}",
+  },
+];
+
+const PUMP_PROPS: readonly PropInfo[] = [
+  { label: "mode", detail: 'string — "scheduled" or "manual"', sortText: "0_01" },
+  {
+    label: "schedule_interval",
+    detail: "integer — seconds between runs (optional)",
+    sortText: "1_01",
+    valueSnippet: "$0",
+  },
+  { label: "cron_expression", detail: "string — cron schedule (optional)", sortText: "1_02" },
+  {
+    label: "run_at_startup",
+    detail: "boolean — run on node start (optional)",
+    sortText: "1_03",
+    valueSnippet: "${0|true,false|}",
+  },
+  {
+    label: "max_retries",
+    detail: "integer — retries on failure (optional)",
+    sortText: "1_04",
+    valueSnippet: "$0",
+  },
+  {
+    label: "max_read_timeout_seconds",
+    detail: "integer (optional)",
+    sortText: "1_05",
+    valueSnippet: "$0",
+  },
+  {
+    label: "max_write_timeout_seconds",
+    detail: "integer (optional)",
+    sortText: "1_06",
+    valueSnippet: "$0",
+  },
+  {
+    label: "rescan_run_count",
+    detail: "integer — full rescan frequency (optional)",
+    sortText: "1_07",
+    valueSnippet: "$0",
+  },
+  {
+    label: "fallback_to_single_entities_on_error",
+    detail: "boolean (optional)",
+    sortText: "1_08",
+    valueSnippet: "${0|true,false|}",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Prefix scanner: determine key-position nesting context
+// ---------------------------------------------------------------------------
+
+/**
+ * Walk `prefix` and return the nesting path of object keys leading to the
+ * current cursor position. Returns null if the cursor is not at a key position.
+ *
+ * Example: `{"source":{"` → { path: ["source"], presentKeys: Set{} }
+ */
+export const getPropKeyContext = (
+  prefix: string,
+): { path: string[]; presentKeys: Set<string>; hasOpenQuote: boolean } | null => {
+  const hasOpenQuote = /[{,]\s*"[^"]*$/.test(prefix);
+  const hasUnquotedWord = /[{,]\s*[a-zA-Z_][a-zA-Z0-9_]*$/.test(prefix);
+
+  if (!hasOpenQuote && !hasUnquotedWord) {
+    return null;
+  }
+
+  const pathStack: string[] = [];
+  const presentsStack: Array<Set<string>> = [];
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  let isKey = false;
+  let curStr = "";
+  let lastKey = "";
+
+  for (let i = 0; i < prefix.length; i++) {
+    const c = prefix[i];
+
+    if (esc) {
+      esc = false;
+
+      if (inStr) {
+        curStr += c;
+      }
+
+      continue;
+    }
+
+    if (c === "\\" && inStr) {
+      esc = true;
+      continue;
+    }
+
+    if (c === '"') {
+      if (inStr) {
+        // Closing quote — record as present key if we're at key position
+        if (isKey && depth > 0) {
+          lastKey = curStr;
+          presentsStack[depth - 1].add(curStr);
+        }
+        inStr = false;
+        curStr = "";
+      } else {
+        inStr = true;
+        curStr = "";
+      }
+      continue;
+    }
+
+    if (inStr) {
+      curStr += c;
+      continue;
+    }
+
+    // Outside strings
+    if (c === "{") {
+      // Push the key whose value is this new object (only when already inside an object)
+      if (depth >= 1) {
+        pathStack.push(lastKey);
+      }
+      depth++;
+      presentsStack.push(new Set());
+      lastKey = "";
+      isKey = true;
+    } else if (c === "}") {
+      presentsStack.pop();
+      depth--;
+      if (depth >= 1) {
+        pathStack.pop();
+      }
+      isKey = false;
+    } else if (c === ":") {
+      isKey = false;
+    } else if (c === ",") {
+      isKey = true;
+    } else if (c === "]") {
+      isKey = false;
+    }
+  }
+
+  if (!isKey || depth === 0) {
+    return null;
+  }
+
+  // presentKeys = all fully-closed key strings at the current depth.
+  // The partial key being typed is in curStr (inStr=true) — never added to the set,
+  // so no removal is needed.
+  const currentPresentKeys = new Set(presentsStack[depth - 1] ?? []);
+
+  return { path: [...pathStack], presentKeys: currentPresentKeys, hasOpenQuote };
+};
+
+// ---------------------------------------------------------------------------
+// Prop completion builder
+// ---------------------------------------------------------------------------
+const toCompletionItem = (p: PropInfo, hasOpenQuote: boolean): CompletionItem => {
+  const valueSnippet = p.valueSnippet ?? '"$0"';
+  const insertText = hasOpenQuote
+    ? `${p.label}": ${valueSnippet}`
+    : `"${p.label}": ${valueSnippet}`;
+
+  return {
+    label: p.label,
+    kind: CompletionItemKind.Property,
+    detail: p.detail,
+    insertText,
+    insertTextFormat: InsertTextFormat.Snippet,
+    filterText: p.label,
+    sortText: p.sortText,
+  };
+};
+
+export const buildPropCompletions = (
+  path: string[],
+  fileType: ConfigFileType,
+  presentKeys: Set<string>,
+  hasOpenQuote = true,
+): CompletionItem[] => {
+  let props: readonly PropInfo[];
+
+  if (path.length === 0) {
+    // Root level — choose table by file type
+    switch (fileType) {
+      case "pipe":
+        props = PIPE_ROOT_PROPS;
+        break;
+      case "system":
+        props = SYSTEM_ROOT_PROPS;
+        break;
+      case "node-metadata":
+        props = NODE_METADATA_ROOT_PROPS;
+        break;
+      default:
+        props = UNKNOWN_ROOT_PROPS;
+    }
+  } else if (path[path.length - 1] === "source") {
+    props = SOURCE_PROPS;
+  } else if (path[path.length - 1] === "transform") {
+    props = TRANSFORM_PROPS;
+  } else if (path[path.length - 1] === "sink") {
+    props = SINK_PROPS;
+  } else if (path[path.length - 1] === "pump") {
+    props = PUMP_PROPS;
+  } else if (
+    (path[path.length - 1] === "pipe_defaults" && fileType === "node-metadata") ||
+    (path.length === 1 && path[0] === "pipe_defaults")
+  ) {
+    props = PIPE_ROOT_PROPS;
+  } else if (
+    (path[path.length - 1] === "system_defaults" && fileType === "node-metadata") ||
+    (path.length === 1 && path[0] === "system_defaults")
+  ) {
+    props = SYSTEM_ROOT_PROPS;
+  } else {
+    return [];
+  }
+
+  return props
+    .filter((p) => !presentKeys.has(p.label))
+    .map((p) => toCompletionItem(p, hasOpenQuote));
 };
 
 // ---------------------------------------------------------------------------

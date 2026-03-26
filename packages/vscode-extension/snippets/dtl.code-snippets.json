@@ -100,11 +100,7 @@
   "DTL create-child": {
     "scope": "dtl,json",
     "prefix": "create-child",
-    "body": [
-      "[\"create-child\",",
-      "  [\"apply\", \"${1:rule-id}\", \"_S.\"]",
-      "]"
-    ],
+    "body": ["[\"create-child\",", "  [\"apply\", \"${1:rule-id}\", \"_S.\"]", "]"],
     "description": "Create child entities added to $children."
   },
   "DTL comment": {
@@ -161,9 +157,7 @@
   "DTL coalesce": {
     "scope": "dtl,json",
     "prefix": "coalesce",
-    "body": [
-      "[\"coalesce\", \"_S.${1:property1}\", \"_S.${2:property2}\", ${3:null}]"
-    ],
+    "body": ["[\"coalesce\", \"_S.${1:property1}\", \"_S.${2:property2}\", ${3:null}]"],
     "description": "Return first non-null value."
   },
   "DTL if-null": {
@@ -175,9 +169,7 @@
   "DTL datetime-format": {
     "scope": "dtl,json",
     "prefix": "datetime-format",
-    "body": [
-      "[\"datetime-format\", \"${1:%Y-%m-%d}\", \"_S.${2:date-property}\"]"
-    ],
+    "body": ["[\"datetime-format\", \"${1:%Y-%m-%d}\", \"_S.${2:date-property}\"]"],
     "description": "Format a datetime value."
   },
   "DTL now": {
@@ -207,9 +199,7 @@
   "DTL make-ni": {
     "scope": "dtl,json",
     "prefix": "make-ni",
-    "body": [
-      "[\"make-ni\", \"${1:property}\", \"${2:namespace}\", \"_S.${3:id-property}\"]"
-    ],
+    "body": ["[\"make-ni\", \"${1:property}\", \"${2:namespace}\", \"_S.${3:id-property}\"]"],
     "description": "Create a namespaced identifier and add to target."
   },
   "DTL hash128": {
@@ -218,42 +208,69 @@
     "body": ["[\"hash128\", \"_S.${1:property}\"]"],
     "description": "128-bit hash of value as hex string."
   },
-  "DTL Pipe config template": {
-    "scope": "json",
-    "prefix": "dtl-pipe",
+  "Sesam Pipe": {
+    "scope": "sesam-config,json",
+    "prefix": "sesam-pipe",
     "body": [
       "{",
-      "  \"_id\": \"${1:pipe-id}\",",
-      "  \"type\": \"pipe\",",
-      "  \"source\": {",
-      "    \"type\": \"dataset\",",
-      "    \"dataset\": \"${2:source-dataset}\"",
-      "  },",
-      "  \"transform\": {",
-      "    \"type\": \"dtl\",",
-      "    \"rules\": {",
-      "      \"default\": [",
-      "        [\"copy\", \"*\"],",
-      "        [\"add\", \"${3:new-property}\", \"_S.${4:source-property}\"]",
-      "      ]",
-      "    }",
-      "  }",
+      "\t\"_id\": \"${1:pipe-id}\",",
+      "\t\"type\": \"pipe\",",
+      "\t\"source\": {",
+      "\t\t\"type\": \"${2|dataset,sql,rest,json,http_endpoint,embedded,empty|}\",",
+      "\t\t\"dataset\": \"${3:source-dataset}\"",
+      "\t}",
       "}"
     ],
-    "description": "Sesam pipe configuration template with DTL transform."
+    "description": "Sesam pipe config (source only, no transform)."
+  },
+  "Sesam Pipe with DTL transform": {
+    "scope": "sesam-config,json",
+    "prefix": "sesam-pipe-with-transform",
+    "body": [
+      "{",
+      "\t\"_id\": \"${1:pipe-id}\",",
+      "\t\"type\": \"pipe\",",
+      "\t\"source\": {",
+      "\t\t\"type\": \"${2|dataset,sql,rest,json,http_endpoint,embedded,empty|}\",",
+      "\t\t\"dataset\": \"${3:source-dataset}\"",
+      "\t},",
+      "\t\"transform\": {",
+      "\t\t\"type\": \"dtl\",",
+      "\t\t\"rules\": {",
+      "\t\t\t\"default\": [",
+      "\t\t\t\t[\"copy\", \"*\"],",
+      "\t\t\t\t[\"add\", \"${4:new-property}\", \"_S.${5:source-property}\"]",
+      "\t\t\t]",
+      "\t\t}",
+      "\t}",
+      "}"
+    ],
+    "description": "Sesam pipe config with DTL transform."
+  },
+  "Sesam System": {
+    "scope": "sesam-config,json",
+    "prefix": "sesam-system",
+    "body": [
+      "{",
+      "\t\"_id\": \"${1:system-id}\",",
+      "\t\"type\": \"${2|system:rest,system:url,system:postgresql,system:mssql,system:mysql,system:oracle,system:microservice,system:kafka,system:ldap,system:elasticsearch,system:smtp,system:solr|}\",",
+      "\t\"description\": \"${3:System description}\"",
+      "}"
+    ],
+    "description": "Sesam system config."
   },
   "DTL rules block": {
-    "scope": "json",
+    "scope": "sesam-config,json",
     "prefix": "dtl-rules",
     "body": [
       "\"transform\": {",
-      "  \"type\": \"dtl\",",
-      "  \"rules\": {",
-      "    \"default\": [",
-      "      [\"copy\", \"*\"],",
-      "      $0",
-      "    ]",
-      "  }",
+      "\t\"type\": \"dtl\",",
+      "\t\"rules\": {",
+      "\t\t\"default\": [",
+      "\t\t\t[\"copy\", \"*\"],",
+      "\t\t\t$0",
+      "\t\t]",
+      "\t}",
       "}"
     ],
     "description": "DTL transform rules block for a pipe config."

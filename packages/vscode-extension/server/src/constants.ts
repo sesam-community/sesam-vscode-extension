@@ -15,6 +15,9 @@ export const defaultSettings: DtlSettings = {
     pathExpressions: false,
     configStructure: true,
   },
+  format: {
+    reorderKeys: true,
+  },
 };
 
 // ---------------------------------------------------------------------------

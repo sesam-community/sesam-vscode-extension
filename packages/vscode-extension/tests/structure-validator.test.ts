@@ -200,6 +200,23 @@ describe("validateConfigStructure — pipe", () => {
     expect(diags.find((d) => d.code === "invalid-type")).toBeDefined();
     expect(diags.find((d) => d.code === "invalid-type")!.severity).toBe(DiagnosticSeverity.Warning);
   });
+
+  it("emits no diagnostics for a metadata config (node-metadata.conf.json)", () => {
+    const text = JSON.stringify({
+      _id: "node",
+      type: "metadata",
+      namespaced_identifiers: true,
+      global_defaults: { use_signalling_internally: true },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags).toHaveLength(0);
+  });
+
+  it("emits no diagnostics for a metadata config missing source (not a pipe)", () => {
+    const text = JSON.stringify({ _id: "node", type: "metadata" });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags).toHaveLength(0);
+  });
 });
 
 describe("validateConfigStructure — system", () => {

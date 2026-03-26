@@ -22,6 +22,7 @@ import { PipeDependentsProvider } from "./graph/PipeDependentsProvider";
 import { PipeLineageProvider } from "./graph/PipeLineageProvider";
 import { SystemPipesProvider } from "./graph/SystemPipesProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
+import { SesamErrorsProvider } from "./SesamErrorsProvider";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
 
@@ -45,6 +46,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
   };
 
+  // Diagnostics store: populated by LSP middleware so they stay out of the
+  // built-in Problems panel but are still visible in the Sesam panel view.
+  const diagnosticsStore = new Map<string, vscode.Diagnostic[]>();
+  const _onDiagnosticsChanged = new vscode.EventEmitter<void>();
+  context.subscriptions.push(_onDiagnosticsChanged);
+
   const clientOptions: LanguageClientOptions = {
     documentSelector: [
       {
@@ -64,6 +71,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       ],
     },
     traceOutputChannel: vscode.window.createOutputChannel("DTL Language Server (Trace)"),
+    middleware: {
+      handleDiagnostics(uri, diagnostics, next) {
+        // Also store in our private map so the Sesam panel can display them.
+        diagnosticsStore.set(uri, diagnostics);
+        _onDiagnosticsChanged.fire();
+        // Call next() so VS Code also gets squiggly lines, file badges, and the Problems panel.
+        next(uri, diagnostics);
+      },
+    },
   };
 
   client = new LanguageClient(
@@ -95,6 +111,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showCollapseAll: true,
   });
   context.subscriptions.push(lineageView, dependentsView, systemPipesView);
+
+  // ── Sesam Errors Panel View ───────────────────────────────────────────────
+  const errorsProvider = new SesamErrorsProvider(
+    diagnosticsStore,
+    _onDiagnosticsChanged.event,
+    context,
+  );
+  const errorsView = vscode.window.createTreeView("sesamErrorsList", {
+    treeDataProvider: errorsProvider,
+    showCollapseAll: true,
+  });
+  context.subscriptions.push(errorsView);
 
   // Sync active config to all DAG views
   const syncActivePipe = (editor: vscode.TextEditor | undefined): void => {
@@ -153,6 +181,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // ── Commands ──────────────────────────────────────────────────────────────
   context.subscriptions.push(
+    vscode.commands.registerCommand("sesam.clearErrors", () => {
+      diagnosticsStore.clear();
+      _onDiagnosticsChanged.fire();
+    }),
+
     vscode.commands.registerCommand("dtl.refreshDag", () => {
       rescanDag();
       vscode.window.setStatusBarMessage("Sesam: DAG refreshed", 2000);
@@ -188,7 +221,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       const tabSize = typeof editor.options.tabSize === "number" ? editor.options.tabSize : 2;
-      const formatted = formatSesamJson(parsed, tabSize);
+      const reorderKeys =
+        vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+      const formatted = formatSesamJson(parsed, tabSize, { reorderKeys });
       if (formatted === text) {
         return;
       }
@@ -481,7 +516,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       const editor = vscode.window.visibleTextEditors.find((e) => e.document === event.document);
       const tabSize = typeof editor?.options.tabSize === "number" ? editor.options.tabSize : 2;
-      const formatted = formatSesamJson(parsed, tabSize);
+      const reorderKeys =
+        vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+      const formatted = formatSesamJson(parsed, tabSize, { reorderKeys });
       if (formatted === text) {
         return;
       }

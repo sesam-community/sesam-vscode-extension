@@ -54,10 +54,14 @@ import {
   isSystemTypeContext,
   isVariableContext,
   isFunctionNameContext,
+  isPropKeyContext,
+  getPropKeyContext,
+  getConfigFileType,
   buildSystemTypeCompletions,
   buildSourceTypeCompletions,
   buildFunctionCompletions,
   buildVariableCompletions,
+  buildPropCompletions,
   getWordAtPosition,
   buildFunctionMarkdown,
   buildDocumentSymbols,
@@ -108,7 +112,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
         save: { includeText: false },
       },
       completionProvider: {
-        triggerCharacters: ['"', "[", "_", ".", ":"],
+        triggerCharacters: ['"', "[", "_", ".", ":", "{"],
         resolveProvider: false,
       },
       hoverProvider: true,
@@ -272,14 +276,28 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
   // Use a wider window so we can detect "source": { "type": context
   const prefix = text.slice(Math.max(0, offset - 2000), offset);
 
+  const fileType = getConfigFileType(params.textDocument.uri);
+
   // Source type completion: inside "source": { "type": "..."
   if (isSourceTypeContext(prefix)) {
     return buildSourceTypeCompletions();
   }
 
   // System type completion: root-level "type": "system:..."
-  if (isSystemTypeContext(prefix)) {
+  // Not applicable for node-metadata.conf.json
+  if (isSystemTypeContext(prefix) && fileType !== "node-metadata") {
     return buildSystemTypeCompletions();
+  }
+
+  // Property key completion: cursor is at a JSON object key position.
+  // Checked before variable context so that keys starting with "_" (like "_id")
+  // get prop completions rather than DTL variable completions.
+  if (isPropKeyContext(prefix)) {
+    const ctx = getPropKeyContext(prefix);
+
+    if (ctx) {
+      return buildPropCompletions(ctx.path, fileType, ctx.presentKeys, ctx.hasOpenQuote);
+    }
   }
 
   // Variable completion: triggered after "_" or inside a string starting with "_"
@@ -566,7 +584,7 @@ connection.onDocumentLinks((params: DocumentLinkParams): DocumentLink[] => {
 });
 
 // ---------------------------------------------------------------------------
-// Rename (dataset alias)
+// Rename (dataset alias and DTL rule name)
 // ---------------------------------------------------------------------------
 connection.onPrepareRename(
   (params: PrepareRenameParams): { range: Range; placeholder: string } | null => {
@@ -578,6 +596,32 @@ connection.onPrepareRename(
 
     const text = document.getText();
     const offset = document.offsetAt(params.position);
+
+    // Try rule key first, then apply-reference, then alias.
+    const ruleKeyHit = findRuleKeyAtOffset(text, offset);
+
+    if (ruleKeyHit) {
+      return {
+        range: Range.create(
+          document.positionAt(ruleKeyHit.keyRange.start),
+          document.positionAt(ruleKeyHit.keyRange.end),
+        ),
+        placeholder: ruleKeyHit.ruleName,
+      };
+    }
+
+    const applyHit = findApplyRuleReference(text, offset);
+
+    if (applyHit) {
+      return {
+        range: Range.create(
+          document.positionAt(applyHit.nameRange.start),
+          document.positionAt(applyHit.nameRange.end),
+        ),
+        placeholder: applyHit.ruleName,
+      };
+    }
+
     const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
 
     if (!aliasHit) {
@@ -603,6 +647,34 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
 
   const text = document.getText();
   const offset = document.offsetAt(params.position);
+
+  // Rule rename: find the rule name (from key or apply-ref), then rename all occurrences.
+  const ruleKeyHit = findRuleKeyAtOffset(text, offset);
+  const applyHit = !ruleKeyHit ? findApplyRuleReference(text, offset) : null;
+  const ruleName = ruleKeyHit?.ruleName ?? applyHit?.ruleName ?? null;
+
+  if (ruleName !== null) {
+    const ruleDef = findRuleDefinition(text, ruleName, offset);
+    const applyRefs = findAllApplyReferences(text, ruleName);
+
+    const allRanges: Array<{ start: number; end: number }> = [];
+
+    if (ruleDef) {
+      allRanges.push({ start: ruleDef.keyStart, end: ruleDef.keyEnd });
+    }
+
+    allRanges.push(...applyRefs);
+
+    const edits = allRanges.map((r) =>
+      TextEdit.replace(
+        Range.create(document.positionAt(r.start), document.positionAt(r.end)),
+        params.newName,
+      ),
+    );
+
+    return { changes: { [params.textDocument.uri]: edits } };
+  }
+
   const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
 
   if (!aliasHit) {

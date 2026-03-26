@@ -101,6 +101,11 @@
         "command": "dtl.refreshDag",
         "title": "Sesam: Refresh Pipe DAG",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "sesam.clearErrors",
+        "title": "Sesam: Clear Errors",
+        "icon": "$(clear-all)"
       }
     ],
     "menus": {
@@ -126,6 +131,26 @@
         {
           "command": "sesam.formatDocument",
           "when": "editorLangId == sesam-config"
+        },
+        {
+          "command": "sesam.clearErrors",
+          "when": "workspaceFolderCount > 0"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "sesam.clearErrors",
+          "when": "view == sesamErrorsList",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "sesamErrors",
+          "title": "Sesam",
+          "icon": "$(error)"
         }
       ]
     },
@@ -144,6 +169,13 @@
         {
           "id": "sesamSystemPipes",
           "name": "System Pipes",
+          "when": "workspaceFolderCount > 0"
+        }
+      ],
+      "sesamErrors": [
+        {
+          "id": "sesamErrorsList",
+          "name": "Sesam",
           "when": "workspaceFolderCount > 0"
         }
       ]
@@ -181,6 +213,11 @@
           "type": "boolean",
           "default": true,
           "description": "Report incorrect argument counts as warnings."
+        },
+        "dtl.format.reorderKeys": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When saving a Sesam config file, reorder root-level keys to the canonical order documented by Sesam (`_id`, `type`, `source`, `transform`, `sink`, `pump`, …). Unknown keys are placed last, alphabetically. Set to `false` to preserve your original key order."
         },
         "dtl.graph.scanDepth": {
           "type": "number",
