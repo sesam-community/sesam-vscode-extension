@@ -11,12 +11,22 @@
 ## Summary
 
 Expose the extension's DTL/Sesam validation logic as **VS Code Language Model Tools**
-(`vscode.lm.registerTool`) so any AI agent — GitHub Copilot, the planned `@sesam` participant
-(F09), or any LLM tool-calling context — can programmatically lint and query Sesam config files.
+(`vscode.lm.registerTool`) so any AI agent or model can programmatically lint and query Sesam
+config files.
 
-The tools are registered in the extension client and communicate with the existing LSP server
-(F19) via custom protocol requests. The server remains the single source of truth for all
-validation logic; no validator code is duplicated.
+The `vscode.lm.registerTool` API is **model-agnostic by design** — once tools are registered,
+they become available to _any_ LM caller that VS Code brokers, not just GitHub Copilot:
+
+| Caller | How it invokes the tools |
+|---|---|
+| **GitHub Copilot** (chat / inline) | `#sesam_lint_document` prompt reference or automatic tool selection |
+| **`@sesam` chat participant** (F09) | Explicit `vscode.lm.invokeTool()` call or passed in `tools` array |
+| **VS Code agent mode** (any model) | Model self-selects tools from the registered set |
+| **Continue.dev / Cline / Roo** or other VS Code–hosted LM extensions | Same `vscode.lm.invokeTool()` bridge |
+| **External MCP-style orchestrators** | Via VS Code's LM tool proxy when the server is connected |
+
+The tools communicate with the existing LSP server (F19) via custom protocol requests. The server
+remains the single source of truth for all validation logic; no validator code is duplicated.
 
 ---
 
@@ -144,8 +154,13 @@ This keeps the validation logic in one place (the LSP server), adds no code dupl
 automatically picks up any future improvements to the validators.
 
 ```
+  Any LM caller
+  (Copilot / @sesam / Continue / agent mode / …)
+         │
+         │  vscode.lm.invokeTool('sesam_lint_document', …)
+         ▼
 ┌─────────────────────────────────────┐        ┌──────────────────────────────────┐
-│  Extension client (extension.ts)    │        │  LSP Server (server.ts)          │
+│  Extension client (lm-tools.ts)     │        │  LSP Server (server.ts)          │
 │                                     │        │                                  │
 │  vscode.lm.registerTool(            │  IPC   │  onRequest('sesam/lintContent')  │
 │    'sesam_lint_document', {         │───────>│    parseDtlText(text)            │
@@ -155,6 +170,10 @@ automatically picks up any future improvements to the validators.
 │      }                              │        │    → LintDiagnostic[]            │
 │  })                                 │        │                                  │
 └─────────────────────────────────────┘        └──────────────────────────────────┘
+         │
+         │  JSON string result
+         ▼
+  Caller's LLM context
 ```
 
 ---
@@ -608,42 +627,83 @@ allFileUris(): IterableIterator<string> {
 
 ---
 
-### Phase D — Integration guide for `@sesam` (F09)
+### Phase D — Integration guide for all callers
 
-Once F09's `sesamChatParticipant.ts` is implemented, it can invoke the tools in two ways:
+The tools are model-agnostic. Any caller that VS Code routes LM requests through can use them.
 
-#### Method 1: Implicit (model self-selects the tool)
+---
 
-Register the tools as part of the `@sesam` participant's tool set:
+#### D1 — GitHub Copilot (built-in)
+
+Once registered, tools with `"canBeReferencedInPrompt": true` are automatically available in
+Copilot chat. Users can reference them explicitly:
+
+```
+#sesam_lint_document lint the current file and tell me what is wrong
+```
+
+Copilot will also pick them up automatically in **agent mode** when it determines they are relevant
+(no special code needed — Copilot reads the `modelDescription` field from `package.json`).
+
+---
+
+#### D2 — `@sesam` chat participant (F09)
+
+Once F09's `sesamChatParticipant.ts` is implemented, it can use the tools in two ways:
+
+**Method A — Implicit (pass tools array, let model decide):**
 
 ```ts
-import * as vscode from "vscode";
-
-const handler: vscode.ChatRequestHandler = async (request, context, stream, token) => {
+const handler: vscode.ChatRequestHandler = async (request, _context, stream, token) => {
   const tools = vscode.lm.tools.filter((t) =>
     ["sesam_lint_document", "sesam_lint_workspace"].includes(t.name),
   );
-  // Pass tools to the model; it decides when to call them
   const response = await model.sendRequest(messages, { tools }, token);
-  // Stream response handling...
+  // Stream response handling with tool call round-trips...
 };
 ```
 
-#### Method 2: Explicit invocation (force-call the lint tool)
-
-When the intent is clearly about validation (keyword detection: `lint`, `error`, `valid`, `check`):
+**Method B — Explicit invocation (intent is clearly about validation):**
 
 ```ts
 const result = await vscode.lm.invokeTool(
   "sesam_lint_document",
-  {
-    input: { uri: currentFileUri },
-    toolInvocationToken: request.toolInvocationToken,
-  },
+  { input: { uri: currentFileUri }, toolInvocationToken: request.toolInvocationToken },
   token,
 );
-// Parse result JSON and integrate into the chat response
+// Deserialise JSON result and weave into the chat response
 ```
+
+---
+
+#### D3 — VS Code agent mode (any LLM backend)
+
+VS Code 1.99+ surfaces all registered `languageModelTools` to any model running in agent mode
+(GPT-4o, Claude, Gemini, Llama, etc. via Continue.dev, Cline, Roo, or similar). No additional
+code is required in this extension — registration is sufficient.
+
+The `modelDescription` string in `package.json` is the only text the model sees when deciding
+whether to call the tool. Keep it accurate and action-oriented.
+
+---
+
+#### D4 — MCP tool proxy (future)
+
+VS Code's Language Model Tools bridge is designed to eventually map to MCP tool calls. When that
+bridge stabilises, registered tools will become callable from any MCP-compatible orchestrator
+without changes to this extension.
+
+---
+
+#### D5 — Prompt engineering notes for `modelDescription`
+
+The `modelDescription` fields in `package.json` are the primary signal for automatic tool
+selection. Guidelines:
+
+- State **when** to use the tool (e.g. *"before suggesting fixes"*, *"before uploading"*).
+- State **what it returns** (e.g. *"structured diagnostics"*, *"line and character position"*).
+- Avoid vague phrases like *"useful for validation"* — models need action triggers.
+- Do **not** mention Copilot or a specific model — descriptions must be model-neutral.
 
 ---
 
@@ -671,29 +731,40 @@ exactly as they do to the live editor diagnostics.
 
 ## VS Code Version Requirements
 
-| Feature used | Minimum VS Code |
-|---|---|
-| `vscode.lm.registerTool()` | 1.90 (May 2024) |
-| `vscode.LanguageModelToolResult` | 1.90 |
-| `vscode.lm.invokeTool()` (for F09) | 1.91 |
-| `canBeReferencedInPrompt` in `package.json` | 1.92 |
+| Feature used | Minimum VS Code | Notes |
+|---|---|---|
+| `vscode.lm.registerTool()` | 1.90 (May 2024) | Core registration |
+| `vscode.LanguageModelToolResult` | 1.90 | Return type for tool `invoke` |
+| `vscode.lm.invokeTool()` (for F09) | 1.91 | Explicit programmatic invocation |
+| `canBeReferencedInPrompt` in `package.json` | 1.92 | Enables `#tool_name` prompt references |
+| Agent mode tool routing (any model) | 1.99 | VS Code exposes tools to non-Copilot models |
 
-Target engine version in `package.json` should be `"^1.92.0"` or higher.
+Target engine version in `package.json` should be `"^1.99.0"` or higher to enable full
+cross-model tool routing. The extension degrades gracefully on older versions — tools still
+work for Copilot calls, but may not be routed to non-Copilot callers.
 
 ---
 
 ## Testing
 
+### Unit tests
+
 Add to `tests/`:
 
 | Test file | What it covers |
 |---|---|
-| `lm-tools.test.ts` (new) | Unit-test `formatDiagnostics()`, `resolveUri()`, `severityToNumber()` — pure helpers, no VS Code APIs needed |
+| `lm-tools.test.ts` (new) | `formatDiagnostics()`, `resolveUri()`, `severityToNumber()` — pure helpers, no VS Code APIs needed |
 
-Integration testing:
-- Open a `.conf.pipe` file with a known DTL error
-- Open Copilot Chat, type: `@sesam lint the current file`
-- Confirm the tool is invoked and the response lists the error with correct line number
+### Integration tests (manual)
+
+| Scenario | Steps | Expected |
+|---|---|---|
+| Copilot inline reference | Open a `.conf.pipe` with a DTL error; in Copilot Chat type `#sesam_lint_document tell me what's wrong` | Tool is invoked, response lists the error with 1-based line number |
+| Copilot agent mode | Enable agent mode; ask *"check my sesam pipe for errors"* | Copilot auto-selects `sesam_lint_document` without prompt reference |
+| Continue.dev / Cline | Enable agent mode with a non-Copilot backend; ask the same validation question | Same tool is invoked — confirms model-agnostic routing |
+| `@sesam` participant (post-F09) | In chat type `@sesam lint the current file` | Participant forwards to tool, returns structured result |
+| Inline content | Invoke via `vscode.lm.invokeTool` with `content` field (no file on disk) | Validates the string directly, no file read attempted |
+| Workspace scan | Ask *"are there any sesam errors in the whole project?"* | `sesam_lint_workspace` is invoked, returns per-file summary |
 
 ---
 
