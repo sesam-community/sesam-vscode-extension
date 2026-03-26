@@ -316,7 +316,9 @@ class DtlWalker {
 
       for (const elem of arr) {
         if (Array.isArray(elem)) {
-          this.walkDtlArray(elem as unknown[], false, calls, errors);
+          // Inline transform block elements inherit isTopLevel from the parent context
+          // (e.g. the then-branch of a top-level "if" contains top-level transforms).
+          this.walkDtlArray(elem as unknown[], isTopLevel, calls, errors);
         }
       }
 
@@ -374,7 +376,12 @@ class DtlWalker {
     // Recurse into any nested arrays (arguments that are themselves DTL calls)
     for (let i = 1; i < arr.length; i++) {
       if (Array.isArray(arr[i])) {
-        this.walkDtlArray(arr[i] as unknown[], false, calls, errors);
+        // Branch arguments of a top-level "if" or "case" inherit isTopLevel so that
+        // transform functions used as conditional branches are not mis-flagged as
+        // transform-in-expression (e.g. ["if", cond, ["add", ...]]).
+        // The condition argument (index 1 of "if") and all non-branch arguments stay false.
+        const isBranch = (firstName === "if" || firstName === "case") && i >= 2;
+        this.walkDtlArray(arr[i] as unknown[], isBranch ? isTopLevel : false, calls, errors);
       }
     }
 

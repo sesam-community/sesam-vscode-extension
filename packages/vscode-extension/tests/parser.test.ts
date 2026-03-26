@@ -324,6 +324,43 @@ describe("parseDtlText — inline transform blocks (array-of-arrays argument)", 
     expect(names).toContain("is-not-empty");
     expect(names.filter((n) => n === "add")).toHaveLength(2);
   });
+
+  it("marks a transform branch of a top-level 'if' as isTopLevel = true", () => {
+    // ["if", condition, ["add", ...]] at the top level is a conditional transform
+    // statement — the "add" branch must NOT be flagged as transform-in-expression.
+    const text = JSON.stringify({
+      transform: {
+        type: "dtl",
+        rules: {
+          default: [["if", ["is-empty", "_T.x"], ["add", "x", "fallback"]]],
+        },
+      },
+    });
+    const { calls } = parseDtlText(text, "json");
+    const addCall = calls.find((c) => c.functionName === "add");
+
+    expect(addCall).toBeDefined();
+    expect(addCall!.isTopLevel).toBe(true);
+  });
+
+  it("keeps isTopLevel = false for transform inside a nested (non-top-level) 'if'", () => {
+    // ["concat", ..., ["if", cond, ["add", ...]]] — the "if" is NOT top-level here,
+    // so "add" must still be flagged.
+    const text = JSON.stringify({
+      transform: {
+        type: "dtl",
+        rules: {
+          default: [["add", "y", ["if", ["eq", "_S.x", 1], ["add", "x", 1]]]],
+        },
+      },
+    });
+    const { calls } = parseDtlText(text, "json");
+    // There are two "add" calls: the outer top-level one and the inner branch one.
+    const innerAdd = calls.filter((c) => c.functionName === "add").find((c) => !c.isTopLevel);
+
+    expect(innerAdd).toBeDefined();
+    expect(innerAdd!.isTopLevel).toBe(false);
+  });
 });
 
 describe("parseDtlText — structuralErrors (rule-not-array)", () => {
