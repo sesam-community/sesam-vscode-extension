@@ -218,6 +218,106 @@ describe("validateConfigStructure — system", () => {
     const diags = validateConfigStructure(systemJson(), configOptions);
     expect(diags.find((d) => d.code === "missing-source")).toBeUndefined();
   });
+
+  it("emits unknown-type warning for an unknown system subtype", () => {
+    const text = JSON.stringify({ _id: "sys", type: "system:does-not-exist" });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "unknown-type")).toBeDefined();
+    expect(diags.find((d) => d.code === "unknown-type")!.severity).toBe(DiagnosticSeverity.Warning);
+  });
+
+  it("emits no unknown-type for a known system type", () => {
+    const diags = validateConfigStructure(
+      JSON.stringify({ _id: "sys", type: "system:postgresql" }),
+      configOptions,
+    );
+    expect(diags.find((d) => d.code === "unknown-type")).toBeUndefined();
+  });
+});
+
+describe("validateConfigStructure — source type", () => {
+  it("emits no unknown-type for a known source type", () => {
+    const diags = validateConfigStructure(pipeJson({ source: { type: "rest" } }), configOptions);
+    expect(diags.find((d) => d.code === "unknown-type")).toBeUndefined();
+  });
+
+  it("emits unknown-type warning for an unknown source type", () => {
+    const text = JSON.stringify({ _id: "p", type: "pipe", source: { type: "imaginary" } });
+    const diags = validateConfigStructure(text, configOptions);
+    const d = diags.find((d) => d.code === "unknown-type");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe(DiagnosticSeverity.Warning);
+    expect(d!.message).toContain("source");
+  });
+
+  it("emits no diagnostic when source.type is absent (other validators cover that)", () => {
+    const text = JSON.stringify({ _id: "p", type: "pipe", source: {} });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "unknown-type")).toBeUndefined();
+  });
+});
+
+describe("validateConfigStructure — transform type", () => {
+  it("emits no unknown-type for a known transform type", () => {
+    const text = JSON.stringify({
+      _id: "p",
+      type: "pipe",
+      source: { type: "dataset" },
+      transform: { type: "dtl", rules: { default: [] } },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "unknown-type")).toBeUndefined();
+  });
+
+  it("emits unknown-type warning for an unknown transform type", () => {
+    const text = JSON.stringify({
+      _id: "p",
+      type: "pipe",
+      source: { type: "dataset" },
+      transform: { type: "magic" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    const d = diags.find((d) => d.code === "unknown-type");
+    expect(d).toBeDefined();
+    expect(d!.message).toContain("transform");
+  });
+
+  it("validates each step in a transform array", () => {
+    const text = JSON.stringify({
+      _id: "p",
+      type: "pipe",
+      source: { type: "dataset" },
+      transform: [{ type: "dtl" }, { type: "bogus" }],
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.filter((d) => d.code === "unknown-type")).toHaveLength(1);
+  });
+});
+
+describe("validateConfigStructure — sink type", () => {
+  it("emits no unknown-type for a known sink type", () => {
+    const text = JSON.stringify({
+      _id: "p",
+      type: "pipe",
+      source: { type: "dataset" },
+      sink: { type: "dataset" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "unknown-type")).toBeUndefined();
+  });
+
+  it("emits unknown-type warning for an unknown sink type", () => {
+    const text = JSON.stringify({
+      _id: "p",
+      type: "pipe",
+      source: { type: "dataset" },
+      sink: { type: "void" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    const d = diags.find((d) => d.code === "unknown-type");
+    expect(d).toBeDefined();
+    expect(d!.message).toContain("sink");
+  });
 });
 
 describe("validateConfigStructure — array of configs", () => {

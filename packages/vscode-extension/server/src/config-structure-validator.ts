@@ -2,21 +2,41 @@
  * Config Structure Validator — Phase E
  *
  * Validates that pipe and system config JSON objects contain the minimum required
- * top-level properties as defined by the Sesam service configuration docs:
+ * top-level properties AND that `type` values on the config, source, transform,
+ * and sink are drawn from the documented allowed value sets.
  *
  *   Pipe   (_id, type = "pipe", source)
- *   System (_id, type starts with "system:")
+ *   System (_id, type = "system:<known-type>")
+ *
+ * Type checks (Warning severity — unknown types may appear in connectors):
+ *   pipe.type         must be "pipe"           (already Error in missing-type)
+ *   system.type       must be one of SYSTEM_TYPES
+ *   source.type       must be one of PIPE_SOURCE_TYPES
+ *   transform[].type  must be one of TRANSFORM_TYPES
+ *   sink.type         must be one of SINK_TYPES
  *
  * Handles both a single config object { ... } and an array of configs [{ ... }, ...].
  *
  * Docs:
- *   Pipes:   https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-pipes.html
- *   Systems: https://docs.sesam.io/hub/documentation/service-configuration/systems/configuration-systems.html
+ *   Pipes:      https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-pipes.html
+ *   Systems:    https://docs.sesam.io/hub/documentation/service-configuration/systems/configuration-systems.html
+ *   Sources:    https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sources.html
+ *   Transforms: https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-transforms.html
+ *   Sinks:      https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sinks.html
  */
 
 import { Diagnostic, DiagnosticSeverity, Range, Position } from "vscode-languageserver/node";
 
+import { SYSTEM_TYPES, PIPE_SOURCE_TYPES, TRANSFORM_TYPES, SINK_TYPES } from "./constants";
+
 import type { ValidatorOptions } from "../../types/dtl-validator.types";
+
+// ---------------------------------------------------------------------------
+// Precomputed sets (derived from constants so they stay in sync)
+// ---------------------------------------------------------------------------
+
+const KNOWN_SYSTEM_TYPES: ReadonlySet<string> = new Set(SYSTEM_TYPES.map((s) => s.label));
+const KNOWN_SOURCE_TYPES: ReadonlySet<string> = new Set(PIPE_SOURCE_TYPES.map((s) => s.label));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -58,9 +78,8 @@ const findPosition = (
 };
 
 /**
- * Return the range covering the JSON string value of a given key in `text`,
- * starting the search at `fromOffset`. Falls back to the given `fallback` range
- * when the key is not found.
+ * Return a Range covering the JSON string value of `key` within `text`,
+ * searching from `fromOffset`. Falls back to `fallback` when not found.
  */
 const keyValueRange = (text: string, key: string, fromOffset: number, fallback: Range): Range => {
   const keyHit = findPosition(text, `"${key}"`, fromOffset);
@@ -69,14 +88,12 @@ const keyValueRange = (text: string, key: string, fromOffset: number, fallback: 
     return fallback;
   }
 
-  // Advance past  "key"  :  "
   const afterColon = text.indexOf(":", keyHit.offset + key.length + 2);
 
   if (afterColon === -1) {
     return fallback;
   }
 
-  // Skip whitespace after the colon
   let valStart = afterColon + 1;
 
   while (valStart < text.length && " \t\r\n".includes(text[valStart])) {
@@ -106,15 +123,70 @@ const keyValueRange = (text: string, key: string, fromOffset: number, fallback: 
 };
 
 // ---------------------------------------------------------------------------
+// Nested type validation helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Emit a Warning diagnostic when `value` is not in `knownTypes`.
+ * `searchFrom` is the approximate text offset at which to locate the key for
+ * squiggle positioning — falls back to `fallback` range on miss.
+ */
+const checkType = (
+  text: string,
+  value: string,
+  knownTypes: ReadonlySet<string>,
+  key: string,
+  searchFrom: number,
+  fallback: Range,
+  label: string,
+  out: Diagnostic[],
+): void => {
+  if (knownTypes.has(value)) {
+    return;
+  }
+
+  const range = keyValueRange(text, key, searchFrom, fallback);
+  out.push({
+    range,
+    severity: DiagnosticSeverity.Warning,
+    message: `Unknown ${label} type "${value}". Expected one of: ${[...knownTypes].join(", ")}.`,
+    source: "sesam",
+    code: "unknown-type",
+  });
+};
+
+/**
+ * Find the text offset of an object nested under `parentKey` inside the slice
+ * starting at `fromOffset`. Returns -1 if not found.
+ */
+const findNestedObjectOffset = (text: string, parentKey: string, fromOffset: number): number => {
+  const keyHit = text.indexOf(`"${parentKey}"`, fromOffset);
+
+  if (keyHit === -1) {
+    return -1;
+  }
+
+  const colon = text.indexOf(":", keyHit + parentKey.length + 2);
+
+  if (colon === -1) {
+    return -1;
+  }
+
+  let valStart = colon + 1;
+
+  while (valStart < text.length && " \t\r\n".includes(text[valStart])) {
+    valStart++;
+  }
+
+  return valStart;
+};
+
+// ---------------------------------------------------------------------------
 // Per-object validation
 // ---------------------------------------------------------------------------
 
 type ConfigObject = Record<string, unknown>;
 
-/**
- * Validate a single config object and push diagnostics into `out`.
- * `fromOffset` is the text offset of the opening `{` of this object.
- */
 const validateOne = (
   text: string,
   obj: ConfigObject,
@@ -153,11 +225,6 @@ const validateOne = (
       code: "missing-type",
     });
 
-    if (out.length >= maxProblems) {
-      return;
-    }
-
-    // Nothing more to check without type
     return;
   }
 
@@ -179,17 +246,108 @@ const validateOne = (
     }
   }
 
-  // --- source (pipes only) ---
-  if (isPipe && !("source" in obj)) {
-    // Point to the "type" value line as a helpful anchor
-    const sourceRange = keyValueRange(text, "type", fromOffset, fallback);
-    out.push({
-      range: sourceRange,
-      severity: DiagnosticSeverity.Error,
-      message: 'Pipe config is missing required property "source".',
-      source: "sesam",
-      code: "missing-source",
-    });
+  // --- system: validate specific system subtype ---
+  if (isSystem) {
+    checkType(text, typeVal, KNOWN_SYSTEM_TYPES, "type", fromOffset, fallback, "system", out);
+
+    if (out.length >= maxProblems) {
+      return;
+    }
+  }
+
+  // --- pipe-specific checks ---
+  if (isPipe) {
+    // source: required + type check
+    if (!("source" in obj)) {
+      const sourceRange = keyValueRange(text, "type", fromOffset, fallback);
+      out.push({
+        range: sourceRange,
+        severity: DiagnosticSeverity.Error,
+        message: 'Pipe config is missing required property "source".',
+        source: "sesam",
+        code: "missing-source",
+      });
+
+      if (out.length >= maxProblems) {
+        return;
+      }
+    } else {
+      const sourceObj = obj["source"];
+
+      if (typeof sourceObj === "object" && sourceObj !== null && !Array.isArray(sourceObj)) {
+        const srcType = (sourceObj as Record<string, unknown>)["type"];
+
+        if (typeof srcType === "string" && srcType.trim() !== "") {
+          const sourceOffset = findNestedObjectOffset(text, "source", fromOffset);
+          checkType(
+            text,
+            srcType,
+            KNOWN_SOURCE_TYPES,
+            "type",
+            sourceOffset !== -1 ? sourceOffset : fromOffset,
+            fallback,
+            "source",
+            out,
+          );
+
+          if (out.length >= maxProblems) {
+            return;
+          }
+        }
+      }
+    }
+
+    // transform: may be an object or an array of objects
+    const transforms = obj["transform"];
+
+    if (transforms !== undefined && transforms !== null) {
+      const steps = Array.isArray(transforms) ? transforms : [transforms];
+
+      for (const step of steps) {
+        if (out.length >= maxProblems) {
+          break;
+        }
+
+        if (typeof step === "object" && step !== null && !Array.isArray(step)) {
+          const tType = (step as Record<string, unknown>)["type"];
+
+          if (typeof tType === "string" && tType.trim() !== "") {
+            const transformOffset = findNestedObjectOffset(text, "transform", fromOffset);
+            checkType(
+              text,
+              tType,
+              TRANSFORM_TYPES,
+              "type",
+              transformOffset !== -1 ? transformOffset : fromOffset,
+              fallback,
+              "transform",
+              out,
+            );
+          }
+        }
+      }
+    }
+
+    // sink: optional, type check when present
+    const sinkObj = obj["sink"];
+
+    if (typeof sinkObj === "object" && sinkObj !== null && !Array.isArray(sinkObj)) {
+      const sinkType = (sinkObj as Record<string, unknown>)["type"];
+
+      if (typeof sinkType === "string" && sinkType.trim() !== "") {
+        const sinkOffset = findNestedObjectOffset(text, "sink", fromOffset);
+        checkType(
+          text,
+          sinkType,
+          SINK_TYPES,
+          "type",
+          sinkOffset !== -1 ? sinkOffset : fromOffset,
+          fallback,
+          "sink",
+          out,
+        );
+      }
+    }
   }
 };
 
@@ -197,10 +355,6 @@ const validateOne = (
 // Public entry point
 // ---------------------------------------------------------------------------
 
-/**
- * Validate top-level pipe/system config structure.
- * `text` must be valid JSON (call only after Phase A confirms no parse error).
- */
 export const validateConfigStructure = (text: string, options: ValidatorOptions): Diagnostic[] => {
   if (!options.validateConfigStructure) {
     return [];
@@ -211,7 +365,6 @@ export const validateConfigStructure = (text: string, options: ValidatorOptions)
   try {
     parsedJson = JSON.parse(text);
   } catch {
-    // Should not happen — caller already confirmed JSON is valid
     return [];
   }
 
@@ -226,10 +379,8 @@ export const validateConfigStructure = (text: string, options: ValidatorOptions)
       }
 
       if (typeof item === "object" && item !== null && !Array.isArray(item)) {
-        // Find the opening '{' for this config object in the remaining text
         const bracePos = text.indexOf("{", searchFrom);
         validateOne(text, item as ConfigObject, searchFrom, out, options.maxProblems);
-        // Advance past this object for the next iteration
         searchFrom = bracePos + 1;
       }
     }
