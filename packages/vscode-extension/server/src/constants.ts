@@ -1,4 +1,9 @@
-import type { DtlSettings, SystemTypeInfo, SourceTypeInfo } from "./server.types";
+import type {
+  DtlSettings,
+  SystemTypeInfo,
+  SourceTypeInfo,
+  TransformTypeInfo,
+} from "./server.types";
 
 // ---------------------------------------------------------------------------
 // Default settings
@@ -198,20 +203,61 @@ export const PIPE_SOURCE_TYPES: SourceTypeInfo[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Transform-type valid values
+// Transform-type completions data
 // Docs: https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-transforms.html
 // ---------------------------------------------------------------------------
-export const TRANSFORM_TYPES: ReadonlySet<string> = new Set([
-  "dtl",
-  "http",
-  "rest",
-  "conditional",
-  "emit_children",
-  "json_schema_validation",
-  "rdf",
-  "template",
-  "xml",
-]);
+export const PIPE_TRANSFORM_TYPES: TransformTypeInfo[] = [
+  {
+    label: "dtl",
+    detail: "DTL transform",
+    doc: "Applies a DTL rules block to each entity.\n\nRequired: `rules`",
+  },
+  {
+    label: "conditional",
+    detail: "Conditional transform",
+    doc: "Selects from alternative transforms based on a runtime condition.\n\nRequired: `condition`, `alternatives`",
+  },
+  {
+    label: "http",
+    detail: "HTTP transform",
+    doc: "Sends entities to an HTTP endpoint for processing.\n\nRequired: `system`, `operation`",
+  },
+  {
+    label: "rest",
+    detail: "REST transform",
+    doc: "Sends entities to a REST operation and merges the response back.\n\nRequired: `system`, `operation`",
+  },
+  {
+    label: "emit_children",
+    detail: "Emit children transform",
+    doc: "Emits child entities from a list property as individual entities.",
+  },
+  {
+    label: "json_schema_validation",
+    detail: "JSON Schema validation transform",
+    doc: "Validates each entity against a JSON Schema; marks invalid entities with `_failed`.",
+  },
+  {
+    label: "rdf",
+    detail: "RDF transform",
+    doc: "Converts entities to/from RDF format.",
+  },
+  {
+    label: "template",
+    detail: "Template transform",
+    doc: "Renders entities using a Jinja2 template string.\n\nRequired: `template`",
+  },
+  {
+    label: "xml",
+    detail: "XML transform",
+    doc: "Converts entities to/from XML using an XML config.\n\nRequired: `xml_config`",
+  },
+];
+
+/** Set of valid transform type strings — used for validation */
+export const TRANSFORM_TYPES: ReadonlySet<string> = new Set(
+  PIPE_TRANSFORM_TYPES.map((t) => t.label),
+);
 
 // ---------------------------------------------------------------------------
 // Sink-type valid values

@@ -52,3 +52,9 @@ export interface SourceTypeInfo {
   detail: string;
   doc: string;
 }
+
+export interface TransformTypeInfo {
+  label: string;
+  detail: string;
+  doc: string;
+}

@@ -17,7 +17,7 @@ import {
   ENTITY_RESERVED_FIELDS,
 } from "../../../src/shared/dtl-registry";
 import { parseDtlText } from "../dtl-parser";
-import { SYSTEM_TYPES, PIPE_SOURCE_TYPES } from "../constants";
+import { SYSTEM_TYPES, PIPE_SOURCE_TYPES, PIPE_TRANSFORM_TYPES } from "../constants";
 
 import type { DtlFunction } from "../../../src/shared/dtl-registry";
 import type { DtlRange } from "../dtl-parser";
@@ -60,6 +60,10 @@ export const elementsToRange = (document: TextDocument, text: string, elements: 
 // ---------------------------------------------------------------------------
 export const isSourceTypeContext = (prefix: string): boolean => {
   return /"source"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix);
+};
+
+export const isTransformTypeContext = (prefix: string): boolean => {
+  return /"transform"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix);
 };
 
 export const isSystemTypeContext = (prefix: string): boolean => {
@@ -753,6 +757,20 @@ export const buildSourceTypeCompletions = (): CompletionItem[] => {
     documentation: {
       kind: MarkupKind.Markdown,
       value: `**\`${label}\`** — pipe source type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sources.html)`,
+    },
+    insertText: label,
+    sortText: label,
+  }));
+};
+
+export const buildTransformTypeCompletions = (): CompletionItem[] => {
+  return PIPE_TRANSFORM_TYPES.map(({ label, detail, doc }) => ({
+    label,
+    kind: CompletionItemKind.EnumMember,
+    detail,
+    documentation: {
+      kind: MarkupKind.Markdown,
+      value: `**\`${label}\`** — pipe transform type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-transforms.html)`,
     },
     insertText: label,
     sortText: label,

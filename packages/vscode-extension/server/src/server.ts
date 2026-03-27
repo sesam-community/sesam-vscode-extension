@@ -51,6 +51,7 @@ import { validateConfigStructure } from "./config-structure-validator";
 import { defaultSettings } from "./constants";
 import {
   isSourceTypeContext,
+  isTransformTypeContext,
   isSystemTypeContext,
   isVariableContext,
   isFunctionNameContext,
@@ -59,6 +60,7 @@ import {
   getConfigFileType,
   buildSystemTypeCompletions,
   buildSourceTypeCompletions,
+  buildTransformTypeCompletions,
   buildFunctionCompletions,
   buildVariableCompletions,
   buildPropCompletions,
@@ -281,6 +283,11 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
   // Source type completion: inside "source": { "type": "..."
   if (isSourceTypeContext(prefix)) {
     return buildSourceTypeCompletions();
+  }
+
+  // Transform type completion: inside "transform": { "type": "..."
+  if (isTransformTypeContext(prefix)) {
+    return buildTransformTypeCompletions();
   }
 
   // System type completion: root-level "type": "system:..."
