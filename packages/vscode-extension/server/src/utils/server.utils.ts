@@ -18,6 +18,7 @@ import {
 } from "../../../src/shared/dtl-registry";
 import { parseDtlText } from "../dtl-parser";
 import { SYSTEM_TYPES, PIPE_SOURCE_TYPES, PIPE_TRANSFORM_TYPES } from "../constants";
+import { collectDocumentProperties } from "./dtl-property.utils";
 
 import type { DtlFunction } from "../../../src/shared/dtl-registry";
 import type { DtlRange } from "../dtl-parser";
@@ -1856,6 +1857,37 @@ export const buildDocumentSymbols = (
       transformChildren,
     ),
   );
+
+  // ── Properties outline ────────────────────────────────────────────────────
+  // Collect all property names defined via ["add"/"add-if", "propName", ...] and
+  // surface them as a "Properties" outline group with one child per unique name.
+  const definedProps = collectDocumentProperties(text);
+
+  if (definedProps.length > 0) {
+    const propSymbols: DocumentSymbol[] = definedProps.map(({ propName, start, end }) => {
+      const startPos = document.positionAt(start);
+      const endPos = document.positionAt(end);
+      const range = Range.create(startPos, endPos);
+      return DocumentSymbol.create(propName, undefined, SymbolKind.Property, range, range, []);
+    });
+
+    // The Properties group spans from the first to the last property definition.
+    const groupRange = Range.create(
+      propSymbols[0].range.start,
+      propSymbols[propSymbols.length - 1].range.end,
+    );
+
+    symbols.push(
+      DocumentSymbol.create(
+        "Properties",
+        `${propSymbols.length} defined`,
+        SymbolKind.Struct,
+        groupRange,
+        groupRange,
+        propSymbols,
+      ),
+    );
+  }
 
   return symbols;
 };

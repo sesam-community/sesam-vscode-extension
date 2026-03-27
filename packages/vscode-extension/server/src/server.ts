@@ -54,7 +54,6 @@ import {
   isTransformTypeContext,
   isSystemTypeContext,
   isVariableContext,
-  isFunctionNameContext,
   isDtlRuleArrayContext,
   isPropKeyContext,
   getPropKeyContext,
@@ -96,6 +95,7 @@ import {
   collectAliasRanges,
   offsetRangeToLsp,
 } from "./utils/alias-rename.utils";
+import { findAddPropertyAtOffset, findAllAddPropertyDefinitions } from "./utils/dtl-property.utils";
 
 import type { DtlSettings } from "./server.types";
 import type { ValidatorOptions } from "../../types/dtl-validator.types";
@@ -368,11 +368,12 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
   if (word.startsWith("_")) {
     const varKey = word.split(".")[0]; // "_S" from "_S.name"
     const varDesc = DTL_VARIABLES[varKey];
+
     if (varDesc) {
       return {
         contents: {
           kind: MarkupKind.Markdown,
-          value: `**${varKey}**\n\nDTL built-in variable\n\n${varDesc}`,
+          value: `**${varKey}**\n\nDTL built-in variable\n\n${varDesc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/variables.html)`,
         },
       };
     }
@@ -592,6 +593,20 @@ connection.onReferences((params: ReferenceParams): Location[] | null => {
   const text = document.getText();
   const offset = document.offsetAt(params.position);
 
+  // DTL add/add-if property references — checked before alias so a property
+  // named the same as a dataset alias doesn't get hijacked.
+  const propHit = findAddPropertyAtOffset(text, offset);
+
+  if (propHit) {
+    const defs = findAllAddPropertyDefinitions(text, propHit.propName);
+    return defs.map(({ start, end }) =>
+      Location.create(
+        params.textDocument.uri,
+        Range.create(document.positionAt(start), document.positionAt(end)),
+      ),
+    );
+  }
+
   // Alias references
   const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
 
@@ -688,7 +703,7 @@ connection.onPrepareRename(
     const text = document.getText();
     const offset = document.offsetAt(params.position);
 
-    // Try rule key first, then apply-reference, then alias.
+    // Try rule key first, then apply-reference, then property name, then alias.
     const ruleKeyHit = findRuleKeyAtOffset(text, offset);
 
     if (ruleKeyHit) {
@@ -710,6 +725,19 @@ connection.onPrepareRename(
           document.positionAt(applyHit.nameRange.end),
         ),
         placeholder: applyHit.ruleName,
+      };
+    }
+
+    // Property name check before alias — avoids false-positive alias match.
+    const propHitPR = findAddPropertyAtOffset(text, offset);
+
+    if (propHitPR) {
+      return {
+        range: Range.create(
+          document.positionAt(propHitPR.nameStart),
+          document.positionAt(propHitPR.nameEnd),
+        ),
+        placeholder: propHitPR.propName,
       };
     }
 
@@ -759,6 +787,21 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
     const edits = allRanges.map((r) =>
       TextEdit.replace(
         Range.create(document.positionAt(r.start), document.positionAt(r.end)),
+        params.newName,
+      ),
+    );
+
+    return { changes: { [params.textDocument.uri]: edits } };
+  }
+
+  // Add/add-if property rename — checked before alias.
+  const propHitRen = findAddPropertyAtOffset(text, offset);
+
+  if (propHitRen !== null) {
+    const propDefs = findAllAddPropertyDefinitions(text, propHitRen.propName);
+    const edits = propDefs.map(({ start, end }) =>
+      TextEdit.replace(
+        Range.create(document.positionAt(start), document.positionAt(end)),
         params.newName,
       ),
     );
