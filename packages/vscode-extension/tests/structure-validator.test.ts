@@ -368,3 +368,49 @@ describe("validateConfigStructure — disabled", () => {
     expect(diags).toHaveLength(0);
   });
 });
+
+describe("validateConfigStructure — missing default rule", () => {
+  it("warns when dtl transform has rules but no default key", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "dataset", dataset: "foo" },
+      transform: { type: "dtl", rules: { enrich: [] } },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.some((d) => d.code === "missing-default-rule")).toBe(true);
+  });
+
+  it("no warning when default rule is present", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "dataset", dataset: "foo" },
+      transform: { type: "dtl", rules: { default: [], enrich: [] } },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.every((d) => d.code !== "missing-default-rule")).toBe(true);
+  });
+
+  it("no warning when type is not dtl", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "dataset", dataset: "foo" },
+      transform: { type: "http", system: "my-system", operation: "transform" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.every((d) => d.code !== "missing-default-rule")).toBe(true);
+  });
+
+  it("no warning when rules is absent (type check handles that separately)", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "dataset", dataset: "foo" },
+      transform: { type: "dtl" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.every((d) => d.code !== "missing-default-rule")).toBe(true);
+  });
+});

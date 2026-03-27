@@ -330,6 +330,39 @@ const validateOne = (
               out,
             );
           }
+
+          // dtl transform: rules object must have a "default" rule
+          if (tType === "dtl" || tType === undefined) {
+            const rulesObj = (step as Record<string, unknown>)["rules"];
+
+            if (
+              typeof rulesObj === "object" &&
+              rulesObj !== null &&
+              !Array.isArray(rulesObj) &&
+              !("default" in rulesObj)
+            ) {
+              const transformOffset = findNestedObjectOffset(text, "transform", fromOffset);
+              const rulesOffset = findNestedObjectOffset(
+                text,
+                "rules",
+                transformOffset !== -1 ? transformOffset : fromOffset,
+              );
+              const rulesRange = keyValueRange(
+                text,
+                "rules",
+                transformOffset !== -1 ? transformOffset : fromOffset,
+                fallback,
+              );
+              out.push({
+                range: rulesOffset !== -1 ? rulesRange : fallback,
+                severity: DiagnosticSeverity.Warning,
+                message:
+                  'DTL transform is missing a "default" rule. The default rule is the entry point for the transform.',
+                source: "sesam",
+                code: "missing-default-rule",
+              });
+            }
+          }
         }
       }
     }

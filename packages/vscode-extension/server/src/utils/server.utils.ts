@@ -157,7 +157,7 @@ const PIPE_ROOT_PROPS: readonly PropInfo[] = [
     label: "transform",
     detail: "object | array — DTL transform (optional)",
     sortText: "1_01",
-    valueSnippet: "{$0}",
+    valueSnippet: '{\n\t"type": "dtl",\n\t"rules": {\n\t\t"default": [$0]\n\t}\n}',
   },
   {
     label: "sink",
