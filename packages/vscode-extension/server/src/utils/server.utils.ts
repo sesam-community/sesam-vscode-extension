@@ -408,6 +408,7 @@ const TRANSFORM_PROPS: readonly PropInfo[] = [
     detail: "object — DTL rules (dtl transform)",
     sortText: "0_02",
     valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-transforms-dtl.html`,
   },
   { label: "system", detail: "string — system id (http/rest transform)", sortText: "1_01" },
   { label: "operation", detail: "string — operation name (http/rest transform)", sortText: "1_02" },

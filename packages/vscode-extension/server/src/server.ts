@@ -445,10 +445,14 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
     const hoverCtx = getPropKeyContext(hoverPrefix);
 
     if (hoverCtx?.path[hoverCtx.path.length - 1] === "rules") {
+      const isDefault = word === "default";
+
       return {
         contents: {
           kind: MarkupKind.Markdown,
-          value: `**\`${word}\`**\n\nDTL rule name`,
+          value: isDefault
+            ? `**\`default\`** *(required)*\n\nThe entry-point DTL rule. Every DTL transform must have a \`default\` rule — it is the rule applied to each source entity.`
+            : `**\`${word}\`**\n\nDTL rule name\n\nCan be invoked from the \`default\` rule (or other rules) via \`apply\` or \`apply-hops\`.`,
         },
       };
     }

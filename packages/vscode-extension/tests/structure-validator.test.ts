@@ -370,7 +370,7 @@ describe("validateConfigStructure — disabled", () => {
 });
 
 describe("validateConfigStructure — missing default rule", () => {
-  it("warns when dtl transform has rules but no default key", () => {
+  it("errors when dtl transform has rules but no default key", () => {
     const text = JSON.stringify({
       _id: "my-pipe",
       type: "pipe",
@@ -378,7 +378,9 @@ describe("validateConfigStructure — missing default rule", () => {
       transform: { type: "dtl", rules: { enrich: [] } },
     });
     const diags = validateConfigStructure(text, configOptions);
-    expect(diags.some((d) => d.code === "missing-default-rule")).toBe(true);
+    const diag = diags.find((d) => d.code === "missing-default-rule");
+    expect(diag).toBeDefined();
+    expect(diag?.severity).toBe(DiagnosticSeverity.Error);
   });
 
   it("no warning when default rule is present", () => {

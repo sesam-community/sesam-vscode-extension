@@ -355,7 +355,7 @@ const validateOne = (
               );
               out.push({
                 range: rulesOffset !== -1 ? rulesRange : fallback,
-                severity: DiagnosticSeverity.Warning,
+                severity: DiagnosticSeverity.Error,
                 message:
                   'DTL transform is missing a "default" rule. The default rule is the entry point for the transform.',
                 source: "sesam",
