@@ -1,6 +1,6 @@
 # F16: Pipe DAG Views
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 2
 > **Tracking**: [README.md](../impl/README.md)
 > **Depends on**: [F14 — Cross-file Navigation](cross-file-navigation.prompt.md) (workspace index,

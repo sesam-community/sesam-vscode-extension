@@ -11,9 +11,11 @@
   - [Code Snippets](#code-snippets)
   - [Go to Rule Definition](#go-to-rule-definition)
   - [Cross-file Navigation](#cross-file-navigation)
+  - [Dataset Alias Support](#dataset-alias-support)
   - [Pipe Lineage](#pipe-lineage)
   - [Pipe Dependents](#pipe-dependents)
   - [System Pipes](#system-pipes)
+  - [Sesam Panel](#sesam-panel)
   - [Pipe Preview](#pipe-preview)
   - [New Sesam Config File](#new-sesam-config-file)
 - [Getting Started](#getting-started)
@@ -22,6 +24,7 @@
 - [Requirements](#requirements)
 - [Known Limitations](#known-limitations)
 - [Development](#development)
+- [Installation](#installation)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -47,9 +50,33 @@ The long-term goal is to make this extension the single tool Sesam developers ne
 
 ### Auto-Completion
 
-- Function name completions triggered after `["` inside any array context.
-- Variable completions (`_S`, `_T`, `_P`, `_R`, `_B`, `_`) triggered after `_`.
-- Reserved entity field completions for `_id`, `_deleted`, etc.
+#### DTL expressions
+
+- **Function name completions** triggered after `["` inside any array context — all ~160 built-in functions with signatures and docs.
+- **Variable completions** (`_S`, `_T`, `_P`, `_R`, `_B`, `_`) triggered after `_`.
+- **Reserved entity field completions** (`_id`, `_deleted`, `_filtered`, …).
+
+#### Config property keys
+
+When typing a key inside a config object, the extension suggests the correct properties for the current nesting level — including the full value snippet so only the actual value needs filling in.
+
+| Context | Suggestions |
+|---|---|
+| Root of a **pipe** config (`.conf.pipe`) | `_id`, `type`, `source`, `transform`, `sink`, `pump`, … |
+| Root of a **system** config (`.conf.system`) | `_id`, `type`, `description`, `metadata`, … |
+| Root of `node-metadata.conf.json` | `_id`, `type`, `pipe_defaults`, `system_defaults`, `global_defaults`, … |
+| Inside `"source": { … }` | `type`, `dataset`, `system`, `table`, `query`, `url`, … |
+| Inside `"transform": { … }` | `type`, `rules`, `system`, `operation`, … |
+| Inside `"sink": { … }` | `type`, `dataset`, `system`, `table`, `primary_key`, … |
+| Inside `"pump": { … }` | `mode`, `schedule_interval`, `cron_expression`, … |
+
+Keys already present in the object are automatically excluded from suggestions.
+Required fields are sorted first. Value snippets are type-aware: strings get `"$0"`, objects get `{$0}`, booleans offer a `true`/`false` dropdown, and numbers/arrays get appropriate placeholders.
+
+> Works whether you start typing with a `"` or without — both `"sou` and `sou` trigger suggestions.
+
+#### Config value types
+
 - **Source type completions** inside `"source": { "type": "…" }` — all 18 Sesam source types with descriptions.
 - **System type completions** at root level — all supported system types with descriptions.
 
@@ -68,6 +95,8 @@ Hover over any of the following to see its **signature**, description, parameter
 
 ### Diagnostics (Linting)
 
+#### DTL expression errors
+
 | Diagnostic | Severity |
 |---|---|
 | Unknown function name | Error |
@@ -75,42 +104,79 @@ Hover over any of the following to see its **signature**, description, parameter
 | Transform used as an expression | Warning |
 | Unknown variable prefix (`_X.`) | Warning |
 
+#### Config structure validation
+
+The extension validates the overall structure of every `*.conf.pipe`, `*.conf.system`, and `*.conf.json` file:
+
+| Diagnostic | Severity |
+|---|---|
+| Missing required field (`_id`, `type`, `source` for pipes) | Error |
+| `type` value is not a valid pipe/system type | Error |
+| `source.type` is an unknown Sesam source type | Warning |
+| `metadata.conf.json` (`"type": "metadata"`) — no rules applied | — |
+
+All diagnostics are shown as **squiggly underlines** in the editor, as **file badges** (red/yellow) in the Explorer, and in the **Sesam panel** (see below). They do not appear in the Problems view.
+
 ---
 
 ### Formatter
 
-Format any Sesam config file with **Shift+Alt+F** (or **Format Document**). The formatter:
+Format any Sesam config file with **Shift+Alt+F** (or **Format Document** / `Sesam: Format Document`). The formatter:
 
-- Preserves insertion key order — keys are never re-sorted.
+- Preserves insertion key order by default.
+- **Canonical key reordering** on save: root-level keys are reordered to `_id` → `type` → `source` → `transform` → `sink` → `pump` → … for pipes, and `_id` → `type` → … for systems. Unknown keys are placed last, alphabetically. Controlled by `dtl.format.reorderKeys` (default `true`).
 - Renders DTL rule arrays compactly (one rule per line) so diff output stays readable.
 - Pretty-prints top-level config objects with standard indentation.
-- Works on `.conf.json` files and triggers automatically on save.
+- Triggers automatically on save for `*.conf.pipe`, `*.conf.system`, and `*.conf.json` files.
 
 ---
 
 ### Code Snippets
 
-30+ snippets covering all common patterns. Type the prefix and press Tab:
+35+ snippets covering all common patterns. Type the prefix and press Tab:
+
+#### Config file templates
 
 | Prefix | Inserts |
 |---|---|
-| `add` | `["add", "_T.field", value]` |
+| `sesam-pipe` | Pipe config with source type choice (no transform) |
+| `sesam-pipe-with-transform` | Pipe config with source + DTL rules block |
+| `sesam-system` | System config with system type choice |
+| `dtl-rules` | Standalone `transform` block with DTL rules |
+
+#### DTL transforms
+
+| Prefix | Inserts |
+|---|---|
+| `add` | `["add", "$field", value]` |
 | `add-if` | Add with condition |
 | `copy` | `["copy", "*"]` |
 | `remove` | Remove a property |
 | `rename` | Rename a property |
+| `default` | Set property only if not already set |
+| `merge` | Merge dict into target |
 | `filter` | Filter transform |
 | `discard` | Discard entity |
 | `if` | If expression |
 | `case` | Case expression |
-| `hops` | Full hops object with datasets/where |
+| `case-eq` | Equality-based case expression |
+| `create` | Create a new entity |
+| `create-child` | Create child entities |
+| `comment` | Inline no-op comment |
+| `hops` | Full hops object with `datasets`/`where` |
 | `apply-hops` | Apply-hops transform |
 | `map` | Map over a list |
-| `concat` | Concat strings |
-| `make-ni` | Make a namespaced identifier |
-| `dtl-pipe` | Full pipe config template |
-| `dtl-rules` | Transform rules block |
-| … | And many more |
+| `concat` | Concatenate strings |
+| `eq` | Equality comparison |
+| `coalesce` | First non-null value |
+| `if-null` | Value or default if null |
+| `datetime-format` | Format a datetime |
+| `now` | Current UTC datetime |
+| `integer` | Cast to integer |
+| `string` | Cast to string |
+| `ni` | Create namespaced identifier |
+| `make-ni` | Create NI and add to target |
+| `hash128` | 128-bit hash as hex string |
 
 ---
 
@@ -124,6 +190,7 @@ Navigate between `apply`/`apply-hops` call sites and their rule definitions with
 | **Peek Definition** | `Alt+F12` on the rule name |
 | **Find All References** | Right-click a rule definition key → **Find All References** |
 | **Peek References** | `Shift+Alt+F12` on the rule definition key |
+| **Rename rule** | `F2` on a rule key or any `apply`/`apply-hops` reference — renames the rule and all its call sites atomically |
 
 > Rule definitions are always local to the transform block of a single config file.
 
@@ -192,6 +259,17 @@ Each group shows a count, and every item is a clickable link that opens the rele
 
 ---
 
+### Sesam Panel
+
+A dedicated **bottom panel tab** (alongside Terminal / Output) that shows all Sesam diagnostics grouped by file.
+
+- Errors are listed first, followed by warnings, with exact line and column.
+- Clicking any diagnostic navigates directly to the problem location in the editor.
+- File badges (red/yellow) in the Explorer are driven by the same data.
+- Use the **Clear All** (🗑) toolbar button to dismiss all entries until the next save.
+
+---
+
 ### Pipe Preview
 
 A live preview panel that evaluates DTL transforms against a sample input entity — without needing a running Sesam node.
@@ -254,6 +332,7 @@ my-sesam-project/
 | `DTL: Open Documentation` | Open the Sesam DTL docs in a browser |
 | `DTL: New Sesam Config File` | Create a new pipe or system config file from a template |
 | `Sesam: Format Document` | Format the active Sesam config file |
+| `Sesam: Clear Errors` | Clear all entries from the Sesam panel |
 
 ---
 
@@ -306,9 +385,10 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 | `dtl.validate.unknownFunctions` | `true` | Report unknown function names |
 | `dtl.validate.argCount` | `true` | Report wrong argument counts |
 | `dtl.maxNumberOfProblems` | `100` | Cap on diagnostics per file |
+| `dtl.format.reorderKeys` | `true` | Reorder root-level config keys to canonical order on save |
 | `dtl.trace.server` | `off` | LSP communication trace (`off`/`messages`/`verbose`) |
 | `dtl.graph.scanDepth` | `3` | Directory depth to scan for pipe/system files |
-| `sesam.nodeUrl` | `""` | Base URL of your Sesam node (e.g. `https://abc123.sesam.cloud`) — enables node-backed validation on `.conf.json` save |
+| `sesam.nodeUrl` | `""` | Base URL of your Sesam node (e.g. `https://abc123.sesam.cloud`) |
 | `sesam.jwt` | `""` | JWT token for the Sesam node API. Set in **user** settings only — do not commit to `.vscode/settings.json` |
 
 ---

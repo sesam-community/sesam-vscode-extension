@@ -1,5 +1,8 @@
 # F18: Dataset Alias Support
 
+> **Status**: `implemented`
+> **Tracking**: [README.md](../impl/README.md)
+
 ## Summary
 
 In Sesam pipe configs, `"datasets"` array entries use an **`"id alias"`** syntax:
