@@ -114,6 +114,105 @@ export const isFunctionNameContext = (prefix: string): boolean => {
   return /\[\s*"[^"]*$/.test(prefix) || /\[\s*$/.test(prefix);
 };
 
+/**
+ * Returns true when the cursor is inside a DTL rule array, i.e. the JSON
+ * nesting path leading to the current position is:
+ *   transform > rules > <rule-name> > [ (current array, possibly nested deeper)
+ *
+ * Handles both object-style transforms ({"transform":{...}}) and
+ * array-style transforms ({"transform":[{...}]}).
+ */
+export const isDtlRuleArrayContext = (prefix: string): boolean => {
+  // Quick bail: we must be after a `[` (array value context)
+  if (!/\[\s*(?:"[^"]*)?$/.test(prefix)) {
+    return false;
+  }
+
+  type Frame = { container: "object" | "array"; openedByKey: string | null };
+
+  const stack: Frame[] = [];
+  let inStr = false;
+  let escape = false;
+  let curStr = "";
+  let lastKey: string | null = null;
+  let afterColon = false;
+
+  for (let i = 0; i < prefix.length; i++) {
+    const ch = prefix[i];
+
+    if (escape) {
+      if (inStr) {
+        curStr += ch;
+      }
+
+      escape = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      escape = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      if (inStr) {
+        lastKey = curStr;
+        inStr = false;
+      } else {
+        inStr = true;
+        curStr = "";
+      }
+
+      continue;
+    }
+
+    if (inStr) {
+      curStr += ch;
+      continue;
+    }
+
+    if (ch === ":") {
+      afterColon = true;
+    } else if (ch === "{" || ch === "[") {
+      stack.push({
+        container: ch === "{" ? "object" : "array",
+        openedByKey: afterColon ? lastKey : null,
+      });
+      afterColon = false;
+      lastKey = null;
+    } else if (ch === "}" || ch === "]") {
+      stack.pop();
+      afterColon = false;
+    } else if (ch === ",") {
+      afterColon = false;
+    }
+  }
+
+  // Walk up from the current stack top through nested arrays to find the
+  // innermost *named* array (one opened by a key), then check the path.
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const frame = stack[i];
+
+    if (frame.container !== "array") {
+      break; // hit an object boundary — stop
+    }
+
+    if (frame.openedByKey !== null) {
+      // This is a named array. Check: is it a rule array under rules under transform?
+      return (
+        i >= 3 &&
+        stack[i - 1].container === "object" &&
+        stack[i - 1].openedByKey === "rules" &&
+        stack[i - 2].container === "object"
+      );
+    }
+
+    // openedByKey is null => anonymous array (nested inside another array), keep going up
+  }
+
+  return false;
+};
+
 // A cursor is at a property key position when the most recent non-whitespace
 // character (outside strings) before the opening " is { or ,
 // Also detects unquoted keys being typed (no opening ").
@@ -1434,18 +1533,31 @@ export const buildTransformTypeCompletions = (): CompletionItem[] => {
 };
 
 export const buildFunctionCompletions = (): CompletionItem[] => {
-  return getAllFunctions().map((fn: DtlFunction) => ({
-    label: fn.name,
-    kind: fn.kind === "transform" ? CompletionItemKind.Method : CompletionItemKind.Function,
-    detail: fn.description,
-    labelDetails: { description: fn.signature },
-    documentation: {
-      kind: MarkupKind.Markdown,
-      value: buildFunctionMarkdown(fn),
-    },
-    sortText: fn.kind === "transform" ? `0_${fn.name}` : `1_${fn.name}`,
-    insertText: fn.name,
-  }));
+  return getAllFunctions().map((fn: DtlFunction) => {
+    // The user has already typed `[` (which VS Code auto-closes to `[]`).
+    // We only fill in the content between the brackets, e.g.:
+    //   "add", "${1:property}", "${2:value}"
+    // so the final result is ["add", "property", "value"].
+    const required = fn.params.filter((p) => !p.optional);
+    const paramSnippets = required.map((p, i) => `"\${${i + 1}:${p.name}}"`);
+    const insertText =
+      paramSnippets.length > 0 ? `"${fn.name}", ${paramSnippets.join(", ")}` : `"${fn.name}"`;
+
+    return {
+      label: fn.name,
+      kind: fn.kind === "transform" ? CompletionItemKind.Method : CompletionItemKind.Function,
+      detail: fn.description,
+      labelDetails: { description: fn.signature },
+      documentation: {
+        kind: MarkupKind.Markdown,
+        value: buildFunctionMarkdown(fn),
+      },
+      sortText: fn.kind === "transform" ? `0_${fn.name}` : `1_${fn.name}`,
+      insertText,
+      insertTextFormat: InsertTextFormat.Snippet,
+      filterText: fn.name,
+    };
+  });
 };
 
 export const buildVariableCompletions = (): CompletionItem[] => {

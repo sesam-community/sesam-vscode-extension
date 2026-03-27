@@ -55,6 +55,7 @@ import {
   isSystemTypeContext,
   isVariableContext,
   isFunctionNameContext,
+  isDtlRuleArrayContext,
   isPropKeyContext,
   getPropKeyContext,
   getConfigFileType,
@@ -324,8 +325,8 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     return buildVariableCompletions();
   }
 
-  // Function name completion: cursor is after an opening "[" (possibly with a quote)
-  if (isFunctionNameContext(prefix)) {
+  // Function name completion: only inside a DTL rule array (transform.rules.<name>.[...)
+  if (isDtlRuleArrayContext(prefix)) {
     return buildFunctionCompletions();
   }
 
