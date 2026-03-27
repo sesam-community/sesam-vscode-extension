@@ -63,7 +63,12 @@ export const isSourceTypeContext = (prefix: string): boolean => {
 };
 
 export const isTransformTypeContext = (prefix: string): boolean => {
-  return /"transform"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix);
+  // Single transform object: "transform": { "type": "
+  if (/"transform"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix)) return true;
+  // Array of transforms: "transform": [{ "type": "
+  if (/"transform"\s*:\s*\[[^{}\[\]]*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix)) return true;
+
+  return false;
 };
 
 export const isSystemTypeContext = (prefix: string): boolean => {
@@ -142,34 +147,52 @@ interface PropInfo {
   sortText: string;
   /** Snippet for the value portion, e.g. '"$0"' (default), '{$0}', '[$0]', '$0' */
   valueSnippet?: string;
+  /** Optional documentation URL shown in hover */
+  docUrl?: string;
 }
 
+const PIPE_DOCS = "https://docs.sesam.io/hub/documentation/service-configuration/pipes";
+
 const PIPE_ROOT_PROPS: readonly PropInfo[] = [
-  { label: "_id", detail: "string — unique pipe identifier (required)", sortText: "0_01" },
-  { label: "type", detail: 'string — must be "pipe" (required)', sortText: "0_02" },
+  {
+    label: "_id",
+    detail: "string — unique pipe identifier (required)",
+    sortText: "0_01",
+    docUrl: `${PIPE_DOCS}/configuration-pipes.html`,
+  },
+  {
+    label: "type",
+    detail: 'string — must be "pipe" (required)',
+    sortText: "0_02",
+    docUrl: `${PIPE_DOCS}/configuration-pipes.html`,
+  },
   {
     label: "source",
     detail: "object — data source (required)",
     sortText: "0_03",
     valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-sources.html`,
   },
   {
     label: "transform",
     detail: "object | array — DTL transform (optional)",
     sortText: "1_01",
     valueSnippet: '{\n\t"type": "dtl",\n\t"rules": {\n\t\t"default": [$0]\n\t}\n}',
+    docUrl: `${PIPE_DOCS}/configuration-transforms.html`,
   },
   {
     label: "sink",
     detail: "object — data sink (optional)",
     sortText: "1_02",
     valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-sinks.html`,
   },
   {
     label: "pump",
     detail: "object — scheduling config (optional)",
     sortText: "1_03",
     valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-pump.html`,
   },
   {
     label: "metadata",
@@ -229,9 +252,22 @@ const PIPE_ROOT_PROPS: readonly PropInfo[] = [
   },
 ];
 
+const SYS_CONFIG_DOCS =
+  "https://docs.sesam.io/hub/documentation/service-configuration/systems/configuration-systems.html";
+
 const SYSTEM_ROOT_PROPS: readonly PropInfo[] = [
-  { label: "_id", detail: "string — unique system identifier (required)", sortText: "0_01" },
-  { label: "type", detail: 'string — must be "system:*" (required)', sortText: "0_02" },
+  {
+    label: "_id",
+    detail: "string — unique system identifier (required)",
+    sortText: "0_01",
+    docUrl: SYS_CONFIG_DOCS,
+  },
+  {
+    label: "type",
+    detail: 'string — must be "system:*" (required)',
+    sortText: "0_02",
+    docUrl: SYS_CONFIG_DOCS,
+  },
   {
     label: "metadata",
     detail: "object — arbitrary metadata (optional)",
@@ -296,7 +332,12 @@ const UNKNOWN_ROOT_PROPS: readonly PropInfo[] = [
 ];
 
 const SOURCE_PROPS: readonly PropInfo[] = [
-  { label: "type", detail: "string — source type (required)", sortText: "0_01" },
+  {
+    label: "type",
+    detail: "string — source type (required)",
+    sortText: "0_01",
+    docUrl: `${PIPE_DOCS}/configuration-sources.html`,
+  },
   { label: "dataset", detail: "string — dataset name (dataset source)", sortText: "1_01" },
   { label: "system", detail: "string — system id (sql/rest/json/ldap/kafka)", sortText: "1_02" },
   { label: "table", detail: "string — table name (sql source)", sortText: "1_03" },
@@ -352,7 +393,12 @@ const SOURCE_PROPS: readonly PropInfo[] = [
 ];
 
 const TRANSFORM_PROPS: readonly PropInfo[] = [
-  { label: "type", detail: "string — transform type (required)", sortText: "0_01" },
+  {
+    label: "type",
+    detail: "string — transform type (required)",
+    sortText: "0_01",
+    docUrl: `${PIPE_DOCS}/configuration-transforms.html`,
+  },
   {
     label: "rules",
     detail: "object — DTL rules (dtl transform)",
@@ -389,7 +435,12 @@ const TRANSFORM_PROPS: readonly PropInfo[] = [
 ];
 
 const SINK_PROPS: readonly PropInfo[] = [
-  { label: "type", detail: "string — sink type (required)", sortText: "0_01" },
+  {
+    label: "type",
+    detail: "string — sink type (required)",
+    sortText: "0_01",
+    docUrl: `${PIPE_DOCS}/configuration-sinks.html`,
+  },
   { label: "dataset", detail: "string — target dataset (dataset sink)", sortText: "1_01" },
   { label: "system", detail: "string — system id (sql/rest/elasticsearch)", sortText: "1_02" },
   { label: "table", detail: "string — table name (sql sink)", sortText: "1_03" },
@@ -797,20 +848,56 @@ export const buildPropKeyHover = (word: string, path: string[]): string | null =
   const table = PROP_TABLE_BY_PATH(path);
   const prop = table.find((p) => p.label === word);
 
-  return prop ? prop.detail : null;
+  if (!prop) return null;
+
+  return prop.docUrl
+    ? `${prop.detail}\n\n[\ud83d\udcd6 Documentation](${prop.docUrl})`
+    : prop.detail;
+};
+
+// ---------------------------------------------------------------------------
+// Type value hover builders (for hovering over source/transform/system type values)
+// ---------------------------------------------------------------------------
+
+const buildTypeHoverContent = (
+  label: string,
+  categoryLabel: string,
+  doc: string,
+  docUrl: string,
+): string =>
+  `**\`${label}\`**\n\n${categoryLabel}\n\n${doc}\n\n[\ud83d\udcd6 Documentation](${docUrl})`;
+
+export const buildSourceTypeHover = (word: string): string | null => {
+  const info = PIPE_SOURCE_TYPES.find((t) => t.label === word);
+
+  return info ? buildTypeHoverContent(info.label, "pipe source type", info.doc, info.docUrl) : null;
+};
+
+export const buildSystemTypeHover = (word: string): string | null => {
+  const info = SYSTEM_TYPES.find((t) => t.label === word);
+
+  return info ? buildTypeHoverContent(info.label, "system type", info.doc, info.docUrl) : null;
+};
+
+export const buildTransformTypeHover = (word: string): string | null => {
+  const info = PIPE_TRANSFORM_TYPES.find((t) => t.label === word);
+
+  return info
+    ? buildTypeHoverContent(info.label, "pipe transform type", info.doc, info.docUrl)
+    : null;
 };
 
 // ---------------------------------------------------------------------------
 // Completion item builders
 // ---------------------------------------------------------------------------
 export const buildSystemTypeCompletions = (): CompletionItem[] => {
-  return SYSTEM_TYPES.map(({ label, detail, doc }) => ({
+  return SYSTEM_TYPES.map(({ label, detail, doc, docUrl }) => ({
     label,
     kind: CompletionItemKind.EnumMember,
     detail,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**\`${label}\`**\n\n${detail}\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/systems/configuration-systems.html)`,
+      value: `**\`${label}\`**\n\n${detail}\n\n${doc}\n\n[📖 Documentation](${docUrl})`,
     },
     insertText: label,
     sortText: label,
@@ -818,13 +905,13 @@ export const buildSystemTypeCompletions = (): CompletionItem[] => {
 };
 
 export const buildSourceTypeCompletions = (): CompletionItem[] => {
-  return PIPE_SOURCE_TYPES.map(({ label, detail, doc }) => ({
+  return PIPE_SOURCE_TYPES.map(({ label, detail, doc, docUrl }) => ({
     label,
     kind: CompletionItemKind.EnumMember,
     detail,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**\`${label}\`**\n\npipe source type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sources.html)`,
+      value: `**\`${label}\`**\n\npipe source type\n\n${doc}\n\n[📖 Documentation](${docUrl})`,
     },
     insertText: label,
     sortText: label,
@@ -832,13 +919,13 @@ export const buildSourceTypeCompletions = (): CompletionItem[] => {
 };
 
 export const buildTransformTypeCompletions = (): CompletionItem[] => {
-  return PIPE_TRANSFORM_TYPES.map(({ label, detail, doc }) => ({
+  return PIPE_TRANSFORM_TYPES.map(({ label, detail, doc, docUrl }) => ({
     label,
     kind: CompletionItemKind.EnumMember,
     detail,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**\`${label}\`**\n\npipe transform type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-transforms.html)`,
+      value: `**\`${label}\`**\n\npipe transform type\n\n${doc}\n\n[📖 Documentation](${docUrl})`,
     },
     insertText: label,
     sortText: label,
@@ -867,7 +954,7 @@ export const buildVariableCompletions = (): CompletionItem[] => {
     detail: desc,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**${name}**\n\nDTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/dtl-variables.html)`,
+      value: `**${name}**\n\nDTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/variables.html)`,
     },
     insertText: name,
     sortText: `0_${name}`,
@@ -919,6 +1006,8 @@ export const buildFunctionMarkdown = (fn: DtlFunction): string => {
       : fn.minArgs === fn.maxArgs
         ? `${fn.minArgs} argument${fn.minArgs !== 1 ? "s" : ""}`
         : `${fn.minArgs}–${fn.maxArgs} arguments`;
+  const docUrl = fn.docUrl.includes("#") ? fn.docUrl : `${fn.docUrl}#${fn.name}`;
+
   return [
     `**\`${fn.name}\`** — ${fn.category} · ${kindLabel}`,
     "",
@@ -928,7 +1017,7 @@ export const buildFunctionMarkdown = (fn: DtlFunction): string => {
     "",
     params ? `**Parameters** (${argInfo}):\n${params}` : `*No arguments.*`,
     "",
-    `[📖 Documentation](${fn.docUrl})`,
+    `[📖 Documentation](${docUrl})`,
   ].join("\n");
 };
 

@@ -45,16 +45,19 @@ export interface SystemTypeInfo {
   label: string; // full "system:xxx" value
   detail: string;
   doc: string;
+  docUrl: string;
 }
 
 export interface SourceTypeInfo {
   label: string;
   detail: string;
   doc: string;
+  docUrl: string;
 }
 
 export interface TransformTypeInfo {
   label: string;
   detail: string;
   doc: string;
+  docUrl: string;
 }

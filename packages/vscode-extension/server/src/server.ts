@@ -69,6 +69,9 @@ import {
   isAtJsonKeyPosition,
   buildPropKeyHover,
   buildFunctionMarkdown,
+  buildSourceTypeHover,
+  buildSystemTypeHover,
+  buildTransformTypeHover,
   buildDocumentSymbols,
   offsetToPosition,
 } from "./utils/server.utils";
@@ -379,6 +382,35 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
   // never as object keys, so a key like "default" under "rules" must not
   // be mistaken for the DTL `default` function.
   if (!isAtJsonKeyPosition(text, offset)) {
+    const prefix = text.slice(0, offset);
+
+    // System type value hover ("type": "system:*")
+    if (isSystemTypeContext(prefix)) {
+      const content = buildSystemTypeHover(word);
+
+      if (content) {
+        return { contents: { kind: MarkupKind.Markdown, value: content } };
+      }
+    }
+
+    // Source type value hover (inside source.type)
+    if (isSourceTypeContext(prefix)) {
+      const content = buildSourceTypeHover(word);
+
+      if (content) {
+        return { contents: { kind: MarkupKind.Markdown, value: content } };
+      }
+    }
+
+    // Transform type value hover (inside transform.type)
+    if (isTransformTypeContext(prefix)) {
+      const content = buildTransformTypeHover(word);
+
+      if (content) {
+        return { contents: { kind: MarkupKind.Markdown, value: content } };
+      }
+    }
+
     const fn = getDtlFunction(word);
 
     if (fn) {
