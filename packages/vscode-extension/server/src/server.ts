@@ -65,6 +65,9 @@ import {
   buildVariableCompletions,
   buildPropCompletions,
   getWordAtPosition,
+  isWordChar,
+  isAtJsonKeyPosition,
+  buildPropKeyHover,
   buildFunctionMarkdown,
   buildDocumentSymbols,
   offsetToPosition,
@@ -346,7 +349,7 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
     return {
       contents: {
         kind: MarkupKind.Markdown,
-        value: `**${aliasHit.alias}** — alias for dataset \`${aliasHit.datasetId}\``,
+        value: `**${aliasHit.alias}**\n\nalias for dataset \`${aliasHit.datasetId}\``,
       },
     };
   }
@@ -365,21 +368,27 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
       return {
         contents: {
           kind: MarkupKind.Markdown,
-          value: `**${varKey}** — DTL built-in variable\n\n${varDesc}`,
+          value: `**${varKey}**\n\nDTL built-in variable\n\n${varDesc}`,
         },
       };
     }
   }
 
-  // Check DTL functions
-  const fn = getDtlFunction(word);
-  if (fn) {
-    return {
-      contents: {
-        kind: MarkupKind.Markdown,
-        value: buildFunctionMarkdown(fn),
-      },
-    };
+  // Check DTL functions — only when NOT at a JSON key position.
+  // Function names appear as string values inside arrays (["add", ...]),
+  // never as object keys, so a key like "default" under "rules" must not
+  // be mistaken for the DTL `default` function.
+  if (!isAtJsonKeyPosition(text, offset)) {
+    const fn = getDtlFunction(word);
+
+    if (fn) {
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: buildFunctionMarkdown(fn),
+        },
+      };
+    }
   }
 
   // Reserved entity fields
@@ -387,9 +396,41 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
     return {
       contents: {
         kind: MarkupKind.Markdown,
-        value: `**${word}** — Sesam reserved entity field.\n\n[DTL documentation](https://docs.sesam.io/hub/quick-reference.html)`,
+        value: `**${word}**\n\nSesam reserved entity field.\n\n[DTL documentation](https://docs.sesam.io/hub/quick-reference.html)`,
       },
     };
+  }
+
+  // Config property key hover
+  if (isAtJsonKeyPosition(text, offset)) {
+    let wordStart = offset;
+
+    while (wordStart > 0 && isWordChar(text[wordStart - 1])) {
+      wordStart--;
+    }
+
+    const hoverPrefix = text.slice(0, wordStart);
+    const hoverCtx = getPropKeyContext(hoverPrefix);
+
+    if (hoverCtx?.path[hoverCtx.path.length - 1] === "rules") {
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: `**\`${word}\`**\n\nDTL rule name`,
+        },
+      };
+    }
+
+    const detail = buildPropKeyHover(word, hoverCtx?.path ?? []);
+
+    if (detail) {
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: `**\`${word}\`**\n\n${detail}`,
+        },
+      };
+    }
   }
 
   return null;

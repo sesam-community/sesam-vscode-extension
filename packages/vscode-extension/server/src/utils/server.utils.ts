@@ -733,6 +733,74 @@ export const buildPropCompletions = (
 };
 
 // ---------------------------------------------------------------------------
+// Prop hover: path-aware lookup + key-position guard
+// ---------------------------------------------------------------------------
+
+const PROP_TABLE_BY_PATH = (path: string[]): readonly PropInfo[] => {
+  const tail = path[path.length - 1];
+
+  if (path.length === 0) {
+    return PIPE_ROOT_PROPS;
+  }
+
+  switch (tail) {
+    case "source":
+      return SOURCE_PROPS;
+    case "transform":
+      return TRANSFORM_PROPS;
+    case "sink":
+      return SINK_PROPS;
+    case "pump":
+      return PUMP_PROPS;
+    case "pipe_defaults":
+      return PIPE_ROOT_PROPS;
+    case "system_defaults":
+      return SYSTEM_ROOT_PROPS;
+    default:
+      return [
+        ...PIPE_ROOT_PROPS,
+        ...SYSTEM_ROOT_PROPS,
+        ...NODE_METADATA_ROOT_PROPS,
+        ...SOURCE_PROPS,
+        ...TRANSFORM_PROPS,
+        ...SINK_PROPS,
+        ...PUMP_PROPS,
+      ];
+  }
+};
+
+/**
+ * Returns true when `offset` is inside a JSON key string —
+ * i.e. after the word's closing `"` comes optional whitespace then `:`.
+ */
+export const isAtJsonKeyPosition = (text: string, offset: number): boolean => {
+  let i = offset;
+
+  while (i < text.length && /[a-zA-Z0-9_$\-!.]/.test(text[i])) {
+    i++;
+  }
+
+  if (text[i] !== '"') {
+    return false;
+  }
+
+  i++;
+
+  while (i < text.length && /\s/.test(text[i])) {
+    i++;
+  }
+
+  return text[i] === ":";
+};
+
+export const buildPropKeyHover = (word: string, path: string[]): string | null => {
+  const table = PROP_TABLE_BY_PATH(path);
+  const prop = table.find((p) => p.label === word);
+
+  return prop ? prop.detail : null;
+};
+
+// ---------------------------------------------------------------------------
 // Completion item builders
 // ---------------------------------------------------------------------------
 export const buildSystemTypeCompletions = (): CompletionItem[] => {
@@ -742,7 +810,7 @@ export const buildSystemTypeCompletions = (): CompletionItem[] => {
     detail,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**\`${label}\`** — ${detail}\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/systems/configuration-systems.html)`,
+      value: `**\`${label}\`**\n\n${detail}\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/systems/configuration-systems.html)`,
     },
     insertText: label,
     sortText: label,
@@ -756,7 +824,7 @@ export const buildSourceTypeCompletions = (): CompletionItem[] => {
     detail,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**\`${label}\`** — pipe source type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sources.html)`,
+      value: `**\`${label}\`**\n\npipe source type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sources.html)`,
     },
     insertText: label,
     sortText: label,
@@ -770,7 +838,7 @@ export const buildTransformTypeCompletions = (): CompletionItem[] => {
     detail,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**\`${label}\`** — pipe transform type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-transforms.html)`,
+      value: `**\`${label}\`**\n\npipe transform type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-transforms.html)`,
     },
     insertText: label,
     sortText: label,
@@ -799,7 +867,7 @@ export const buildVariableCompletions = (): CompletionItem[] => {
     detail: desc,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**${name}** — DTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/dtl-variables.html)`,
+      value: `**${name}**\n\nDTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/dtl-variables.html)`,
     },
     insertText: name,
     sortText: `0_${name}`,
