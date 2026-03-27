@@ -475,6 +475,61 @@ const PUMP_PROPS: readonly PropInfo[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Phase C — type-specific prop narrowing
+// ---------------------------------------------------------------------------
+
+const SOURCE_TYPE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  dataset: ["dataset", "completeness", "supports_signalling"],
+  sql: ["system", "table", "query"],
+  rest: ["system", "operation", "url", "headers", "params", "since_property_name", "since_default"],
+  json: ["system", "url", "headers", "params", "since_property_name"],
+  kafka: ["system", "operation"],
+  ldap: ["system"],
+  embedded: ["entities"],
+  union_datasets: ["datasets"],
+  merge_datasets: ["datasets"],
+  merge: ["datasets"],
+  csv: ["system", "url"],
+  binary: ["system", "url"],
+  sdshare: ["url"],
+  sparql: ["url", "system"],
+  rdf: ["url"],
+  http_endpoint: [],
+  empty: [],
+};
+
+const TRANSFORM_TYPE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  dtl: ["rules"],
+  http: ["system", "operation", "side_effects"],
+  rest: ["system", "operation", "side_effects"],
+  conditional: ["transform", "condition"],
+  xml: ["xml_config"],
+  template: ["template"],
+};
+
+const SINK_TYPE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  dataset: ["dataset", "deletion_tracking", "enable_optimistic_locking", "set_initial_offset"],
+  sql: ["system", "table", "primary_key", "batch_size"],
+  rest: ["system", "operation", "side_effects", "batch_size"],
+  http: ["system", "operation", "side_effects", "batch_size"],
+  elasticsearch: ["system", "batch_size"],
+  kafka: ["system", "operation"],
+  solr: ["system", "batch_size"],
+  mail: ["system"],
+  smtp: ["system"],
+};
+
+const narrowByType = <T extends { label: string }>(
+  all: readonly T[],
+  typeMap: Readonly<Record<string, readonly string[]>>,
+  typeValue: string,
+): readonly T[] => {
+  const keys = typeMap[typeValue];
+
+  return keys !== undefined ? all.filter((p) => keys.includes(p.label)) : all;
+};
+
+// ---------------------------------------------------------------------------
 // Prefix scanner: determine key-position nesting context
 // ---------------------------------------------------------------------------
 
@@ -486,7 +541,12 @@ const PUMP_PROPS: readonly PropInfo[] = [
  */
 export const getPropKeyContext = (
   prefix: string,
-): { path: string[]; presentKeys: Set<string>; hasOpenQuote: boolean } | null => {
+): {
+  path: string[];
+  presentKeys: Set<string>;
+  hasOpenQuote: boolean;
+  typeAtCurrentDepth: string | null;
+} | null => {
   const hasOpenQuote = /[{,]\s*"[^"]*$/.test(prefix);
   const hasUnquotedWord = /[{,]\s*[a-zA-Z_][a-zA-Z0-9_]*$/.test(prefix);
 
@@ -496,6 +556,7 @@ export const getPropKeyContext = (
 
   const pathStack: string[] = [];
   const presentsStack: Array<Set<string>> = [];
+  const typeAtDepth: string[] = [];
   let depth = 0;
   let inStr = false;
   let esc = false;
@@ -527,6 +588,8 @@ export const getPropKeyContext = (
         if (isKey && depth > 0) {
           lastKey = curStr;
           presentsStack[depth - 1].add(curStr);
+        } else if (!isKey && depth > 0 && lastKey === "type") {
+          typeAtDepth[depth - 1] = curStr;
         }
         inStr = false;
         curStr = "";
@@ -577,7 +640,12 @@ export const getPropKeyContext = (
   // so no removal is needed.
   const currentPresentKeys = new Set(presentsStack[depth - 1] ?? []);
 
-  return { path: [...pathStack], presentKeys: currentPresentKeys, hasOpenQuote };
+  return {
+    path: [...pathStack],
+    presentKeys: currentPresentKeys,
+    hasOpenQuote,
+    typeAtCurrentDepth: typeAtDepth[depth - 1] ?? null,
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -605,6 +673,7 @@ export const buildPropCompletions = (
   fileType: ConfigFileType,
   presentKeys: Set<string>,
   hasOpenQuote = true,
+  typeAtCurrentDepth: string | null = null,
 ): CompletionItem[] => {
   let props: readonly PropInfo[];
 
@@ -624,11 +693,20 @@ export const buildPropCompletions = (
         props = UNKNOWN_ROOT_PROPS;
     }
   } else if (path[path.length - 1] === "source") {
-    props = SOURCE_PROPS;
+    props =
+      typeAtCurrentDepth !== null
+        ? narrowByType(SOURCE_PROPS, SOURCE_TYPE_KEYS, typeAtCurrentDepth)
+        : SOURCE_PROPS;
   } else if (path[path.length - 1] === "transform") {
-    props = TRANSFORM_PROPS;
+    props =
+      typeAtCurrentDepth !== null
+        ? narrowByType(TRANSFORM_PROPS, TRANSFORM_TYPE_KEYS, typeAtCurrentDepth)
+        : TRANSFORM_PROPS;
   } else if (path[path.length - 1] === "sink") {
-    props = SINK_PROPS;
+    props =
+      typeAtCurrentDepth !== null
+        ? narrowByType(SINK_PROPS, SINK_TYPE_KEYS, typeAtCurrentDepth)
+        : SINK_PROPS;
   } else if (path[path.length - 1] === "pump") {
     props = PUMP_PROPS;
   } else if (

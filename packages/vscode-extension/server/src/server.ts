@@ -296,7 +296,13 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     const ctx = getPropKeyContext(prefix);
 
     if (ctx) {
-      return buildPropCompletions(ctx.path, fileType, ctx.presentKeys, ctx.hasOpenQuote);
+      return buildPropCompletions(
+        ctx.path,
+        fileType,
+        ctx.presentKeys,
+        ctx.hasOpenQuote,
+        ctx.typeAtCurrentDepth,
+      );
     }
   }
 

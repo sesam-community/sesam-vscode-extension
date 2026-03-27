@@ -32,7 +32,7 @@
 | F18 | Dataset Alias Support (highlight + hover + rename) | — | `implemented` | [dataset-alias-support.prompt.md](../plans/dataset-alias-support.prompt.md) |
 | F19 | DTL Syntax Linting | Phase 1 | `implemented` | [impl-f19-syntax-linting.prompt.md](impl-f19-syntax-linting.prompt.md) |
 | F20 | Extension Language Model Tools API | Phase 1 | `planned` | [impl-f20-lm-tools-api.prompt.md](impl-f20-lm-tools-api.prompt.md) |
-| F21 | Config Property Completions | Phase 1 | `phase A+B+D implemented` | [impl-f21-config-prop-completions.prompt.md](impl-f21-config-prop-completions.prompt.md) |
+| F21 | Config Property Completions | Phase 1 | `implemented` | [impl-f21-config-prop-completions.prompt.md](impl-f21-config-prop-completions.prompt.md) |
 | F22 | Sesam Panel (Errors / Warnings View) | Phase 1 | `implemented` | — |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
@@ -69,7 +69,7 @@
 | F18: Dataset Alias Support | `implemented` |
 | F19: DTL Syntax Linting | `implemented` |
 | F20: Extension Language Model Tools API | `planned` |
-| F21: Config Property Completions (Phases A+B+D) | `phase A+B+D implemented` |
+| F21: Config Property Completions (all phases) | `implemented` |
 | F22: Sesam Panel (Errors / Warnings View) | `implemented` |
 
 ### Phase 2: Testing & Diff Loop

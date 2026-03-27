@@ -1,6 +1,6 @@
 # F21: Config Property Completions
 
-> **Status**: `phase A+B+D implemented` — including full `"key": value` snippet insertText UX and `docUrl` documentation popup support
+> **Status**: `implemented` — Phases A, B, C, D all complete, including full `"key": value` snippet insertText UX and `docUrl` documentation popup support
 > **Rollout Phase**: Phase 1 – MVP
 > **Depends on**: F19 (Phase E — config structure validation data already in `constants.ts`)
 > **Tracking**: [README.md](README.md)
