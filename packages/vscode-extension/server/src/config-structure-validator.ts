@@ -39,6 +39,237 @@ const KNOWN_SYSTEM_TYPES: ReadonlySet<string> = new Set(SYSTEM_TYPES.map((s) => 
 const KNOWN_SOURCE_TYPES: ReadonlySet<string> = new Set(PIPE_SOURCE_TYPES.map((s) => s.label));
 
 // ---------------------------------------------------------------------------
+// Source type field schemas (required + allowed keys, excluding "type")
+// Sourced from each type's dedicated docs page.
+// ---------------------------------------------------------------------------
+
+interface SourceSchema {
+  required: readonly string[];
+  allowed: ReadonlySet<string>;
+}
+
+// Properties available on every source type regardless of "type".
+// "type" itself is always excluded from field-level checks via the filter below.
+// Ref: https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sources.html
+const COMMON_SOURCE_PROPS: ReadonlySet<string> = new Set([
+  "comment",
+  // Continuation support properties (relevant when supports_since is true)
+  "supports_since",
+  "is_since_comparable",
+  "is_chronological",
+  "updated_expression",
+  "since_property_name",
+  "since_property_location",
+  "initial_since_value",
+]);
+
+const SOURCE_SCHEMAS: Readonly<Record<string, SourceSchema>> = (() => {
+  const define = (required: string[], allowed: string[]): SourceSchema => ({
+    required,
+    allowed: new Set([...required, ...allowed]),
+  });
+
+  return {
+    dataset: define(
+      ["dataset"],
+      [
+        "subset",
+        "completeness",
+        "initial_completeness",
+        "require_populated_input",
+        "include_previous_versions",
+        "include_replaced",
+        "supports_signalling",
+        "if_source_empty",
+      ],
+    ),
+    sql: define(
+      ["system", "table"],
+      [
+        "primary_key",
+        "query",
+        "updated_column",
+        "updated_query",
+        "schema",
+        "whitelist",
+        "blacklist",
+        "preserve_null_values",
+        "fetch_size",
+        "if_source_empty",
+        "supports_since",
+        "is_since_comparable",
+        "is_chronological",
+        "is_chronological_full",
+      ],
+    ),
+    rest: define(
+      ["system", "operation"],
+      [
+        "operations",
+        "properties",
+        "payload",
+        "response_property",
+        "response_headers_property",
+        "response_include_content_type",
+        "payload_property",
+        "id_expression",
+        "updated_expression",
+        "rate_limiting_retries",
+        "rate_limiting_delay",
+        "if_source_empty",
+        "trace",
+        "supports_since",
+        "is_since_comparable",
+        "is_chronological",
+        "since_property_name",
+        "since_property_location",
+        "initial_since_value",
+      ],
+    ),
+    json: define(
+      ["system", "url"],
+      [
+        "supports_signalling",
+        "page_size",
+        "subset",
+        "headers",
+        "if_source_empty",
+        "supports_since",
+        "is_since_comparable",
+        "is_chronological",
+      ],
+    ),
+    csv: define(
+      ["url", "system", "primary_key"],
+      [
+        "has_header",
+        "field_names",
+        "auto_dialect",
+        "dialect",
+        "encoding",
+        "decode_error_strategy",
+        "whitelist",
+        "blacklist",
+        "preserve_empty_strings",
+        "delimiter",
+        "escape_null_bytes",
+        "if_source_empty",
+        "supports_since",
+        "is_since_comparable",
+        "is_chronological",
+      ],
+    ),
+    http_endpoint: define(
+      [],
+      [
+        "auto_populate_dataset",
+        "do_float_as_decimal",
+        "do_float_as_int",
+        "trace",
+        "validation_expression",
+      ],
+    ),
+    embedded: define(
+      ["entities"],
+      ["system", "if_source_empty", "supports_since", "is_since_comparable", "is_chronological"],
+    ),
+    empty: define([], []),
+    union_datasets: define(
+      ["datasets"],
+      [
+        "initial_datasets",
+        "ignore_non_existent_datasets",
+        "require_populated_input",
+        "include_previous_versions",
+        "supports_signalling",
+        "prefix_ids",
+        "if_source_empty",
+      ],
+    ),
+    merge: define(
+      ["datasets"],
+      [
+        "version",
+        "initial_datasets",
+        "ignore_non_existent_datasets",
+        "require_populated_input",
+        "equality",
+        "equality_sets",
+        "identity",
+        "strategy",
+        "include_internal_properties",
+        "max_merged",
+        "supports_signalling",
+        "if_source_empty",
+      ],
+    ),
+    merge_datasets: define(
+      ["datasets"],
+      [
+        "initial_datasets",
+        "ignore_non_existent_datasets",
+        "require_populated_input",
+        "strategy",
+        "supports_signalling",
+        "if_source_empty",
+      ],
+    ),
+    conditional: define(["condition", "alternatives"], []),
+    kafka: define(
+      ["system", "topic"],
+      [
+        "partitions",
+        "seek_to_beginning",
+        "key_deserializer",
+        "value_deserializer",
+        "strategy",
+        "strict",
+        "consumer_timeout_ms",
+      ],
+    ),
+    ldap: define(
+      ["system"],
+      [
+        "search_base",
+        "search_filter",
+        "attributes",
+        "id_attribute",
+        "page_size",
+        "attribute_blacklist",
+        "if_source_empty",
+      ],
+    ),
+    binary: define(["system", "url"], ["supports_signalling", "page_size", "subset"]),
+    sdshare: define(
+      ["system", "url"],
+      ["sort_lists", "if_source_empty", "supports_since", "is_chronological"],
+    ),
+    sparql: define(
+      ["system", "fragments_query", "fragment_query"],
+      [
+        "initial_since_value",
+        "if_source_empty",
+        "supports_since",
+        "is_since_comparable",
+        "is_chronological",
+      ],
+    ),
+    rdf: define(
+      ["system", "url"],
+      [
+        "format",
+        "sort_lists",
+        "is_sorted",
+        "if_source_empty",
+        "supports_since",
+        "is_since_comparable",
+        "is_chronological",
+      ],
+    ),
+  };
+})();
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -283,7 +514,20 @@ const validateOne = (
       if (typeof sourceObj === "object" && sourceObj !== null && !Array.isArray(sourceObj)) {
         const srcType = (sourceObj as Record<string, unknown>)["type"];
 
-        if (typeof srcType === "string" && srcType.trim() !== "") {
+        if (typeof srcType !== "string" || srcType.trim() === "") {
+          const sourceRange = keyValueRange(text, "source", fromOffset, fallback);
+          out.push({
+            range: sourceRange,
+            severity: DiagnosticSeverity.Error,
+            message: 'Source object is missing required property "type".',
+            source: "sesam",
+            code: "missing-source-type",
+          });
+
+          if (out.length >= maxProblems) {
+            return;
+          }
+        } else {
           const sourceOffset = findNestedObjectOffset(text, "source", fromOffset);
           checkType(
             text,
@@ -298,6 +542,61 @@ const validateOne = (
 
           if (out.length >= maxProblems) {
             return;
+          }
+
+          // Validate required and allowed fields for known source types
+          const schema = SOURCE_SCHEMAS[srcType];
+
+          if (schema) {
+            const srcKeys = Object.keys(sourceObj as Record<string, unknown>).filter(
+              (k) => k !== "type" && !COMMON_SOURCE_PROPS.has(k),
+            );
+
+            // Missing required fields
+            for (const req of schema.required) {
+              if (!(req in (sourceObj as Record<string, unknown>))) {
+                const sourceRange = keyValueRange(
+                  text,
+                  "type",
+                  sourceOffset !== -1 ? sourceOffset : fromOffset,
+                  fallback,
+                );
+                out.push({
+                  range: sourceRange,
+                  severity: DiagnosticSeverity.Error,
+                  message: `Source type "${srcType}" is missing required property "${req}".`,
+                  source: "sesam",
+                  code: "missing-source-property",
+                });
+
+                if (out.length >= maxProblems) {
+                  return;
+                }
+              }
+            }
+
+            // Unknown fields (common props are already excluded from srcKeys)
+            for (const key of srcKeys) {
+              if (!schema.allowed.has(key)) {
+                const keyRange = keyValueRange(
+                  text,
+                  key,
+                  sourceOffset !== -1 ? sourceOffset : fromOffset,
+                  fallback,
+                );
+                out.push({
+                  range: keyRange,
+                  severity: DiagnosticSeverity.Warning,
+                  message: `Property "${key}" is not valid for source type "${srcType}".`,
+                  source: "sesam",
+                  code: "invalid-source-property",
+                });
+
+                if (out.length >= maxProblems) {
+                  return;
+                }
+              }
+            }
           }
         }
       }
@@ -329,6 +628,39 @@ const validateOne = (
               "transform",
               out,
             );
+          }
+
+          // dtl transform: rules object must have a "default" rule
+          if (tType === "dtl" || tType === undefined) {
+            const rulesObj = (step as Record<string, unknown>)["rules"];
+
+            if (
+              typeof rulesObj === "object" &&
+              rulesObj !== null &&
+              !Array.isArray(rulesObj) &&
+              !("default" in rulesObj)
+            ) {
+              const transformOffset = findNestedObjectOffset(text, "transform", fromOffset);
+              const rulesOffset = findNestedObjectOffset(
+                text,
+                "rules",
+                transformOffset !== -1 ? transformOffset : fromOffset,
+              );
+              const rulesRange = keyValueRange(
+                text,
+                "rules",
+                transformOffset !== -1 ? transformOffset : fromOffset,
+                fallback,
+              );
+              out.push({
+                range: rulesOffset !== -1 ? rulesRange : fallback,
+                severity: DiagnosticSeverity.Error,
+                message:
+                  'DTL transform is missing a "default" rule. The default rule is the entry point for the transform.',
+                source: "sesam",
+                code: "missing-default-rule",
+              });
+            }
           }
         }
       }

@@ -51,19 +51,27 @@ import { validateConfigStructure } from "./config-structure-validator";
 import { defaultSettings } from "./constants";
 import {
   isSourceTypeContext,
+  isTransformTypeContext,
   isSystemTypeContext,
   isVariableContext,
-  isFunctionNameContext,
+  isDtlRuleArrayContext,
   isPropKeyContext,
   getPropKeyContext,
   getConfigFileType,
   buildSystemTypeCompletions,
   buildSourceTypeCompletions,
+  buildTransformTypeCompletions,
   buildFunctionCompletions,
   buildVariableCompletions,
   buildPropCompletions,
   getWordAtPosition,
+  isWordChar,
+  isAtJsonKeyPosition,
+  buildPropKeyHover,
   buildFunctionMarkdown,
+  buildSourceTypeHover,
+  buildSystemTypeHover,
+  buildTransformTypeHover,
   buildDocumentSymbols,
   offsetToPosition,
 } from "./utils/server.utils";
@@ -87,6 +95,7 @@ import {
   collectAliasRanges,
   offsetRangeToLsp,
 } from "./utils/alias-rename.utils";
+import { findAddPropertyAtOffset, findAllAddPropertyDefinitions } from "./utils/dtl-property.utils";
 
 import type { DtlSettings } from "./server.types";
 import type { ValidatorOptions } from "../../types/dtl-validator.types";
@@ -283,6 +292,11 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     return buildSourceTypeCompletions();
   }
 
+  // Transform type completion: inside "transform": { "type": "..."
+  if (isTransformTypeContext(prefix)) {
+    return buildTransformTypeCompletions();
+  }
+
   // System type completion: root-level "type": "system:..."
   // Not applicable for node-metadata.conf.json
   if (isSystemTypeContext(prefix) && fileType !== "node-metadata") {
@@ -296,7 +310,13 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     const ctx = getPropKeyContext(prefix);
 
     if (ctx) {
-      return buildPropCompletions(ctx.path, fileType, ctx.presentKeys, ctx.hasOpenQuote);
+      return buildPropCompletions(
+        ctx.path,
+        fileType,
+        ctx.presentKeys,
+        ctx.hasOpenQuote,
+        ctx.typeAtCurrentDepth,
+      );
     }
   }
 
@@ -305,8 +325,8 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     return buildVariableCompletions();
   }
 
-  // Function name completion: cursor is after an opening "[" (possibly with a quote)
-  if (isFunctionNameContext(prefix)) {
+  // Function name completion: only inside a DTL rule array (transform.rules.<name>.[...)
+  if (isDtlRuleArrayContext(prefix)) {
     return buildFunctionCompletions();
   }
 
@@ -333,7 +353,7 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
     return {
       contents: {
         kind: MarkupKind.Markdown,
-        value: `**${aliasHit.alias}** — alias for dataset \`${aliasHit.datasetId}\``,
+        value: `**${aliasHit.alias}**\n\nalias for dataset \`${aliasHit.datasetId}\``,
       },
     };
   }
@@ -348,25 +368,61 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
   if (word.startsWith("_")) {
     const varKey = word.split(".")[0]; // "_S" from "_S.name"
     const varDesc = DTL_VARIABLES[varKey];
+
     if (varDesc) {
       return {
         contents: {
           kind: MarkupKind.Markdown,
-          value: `**${varKey}** — DTL built-in variable\n\n${varDesc}`,
+          value: `**${varKey}**\n\nDTL built-in variable\n\n${varDesc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/variables.html)`,
         },
       };
     }
   }
 
-  // Check DTL functions
-  const fn = getDtlFunction(word);
-  if (fn) {
-    return {
-      contents: {
-        kind: MarkupKind.Markdown,
-        value: buildFunctionMarkdown(fn),
-      },
-    };
+  // Check DTL functions — only when NOT at a JSON key position.
+  // Function names appear as string values inside arrays (["add", ...]),
+  // never as object keys, so a key like "default" under "rules" must not
+  // be mistaken for the DTL `default` function.
+  if (!isAtJsonKeyPosition(text, offset)) {
+    const prefix = text.slice(0, offset);
+
+    // System type value hover ("type": "system:*")
+    if (isSystemTypeContext(prefix)) {
+      const content = buildSystemTypeHover(word);
+
+      if (content) {
+        return { contents: { kind: MarkupKind.Markdown, value: content } };
+      }
+    }
+
+    // Source type value hover (inside source.type)
+    if (isSourceTypeContext(prefix)) {
+      const content = buildSourceTypeHover(word);
+
+      if (content) {
+        return { contents: { kind: MarkupKind.Markdown, value: content } };
+      }
+    }
+
+    // Transform type value hover (inside transform.type)
+    if (isTransformTypeContext(prefix)) {
+      const content = buildTransformTypeHover(word);
+
+      if (content) {
+        return { contents: { kind: MarkupKind.Markdown, value: content } };
+      }
+    }
+
+    const fn = getDtlFunction(word);
+
+    if (fn) {
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: buildFunctionMarkdown(fn),
+        },
+      };
+    }
   }
 
   // Reserved entity fields
@@ -374,9 +430,45 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
     return {
       contents: {
         kind: MarkupKind.Markdown,
-        value: `**${word}** — Sesam reserved entity field.\n\n[DTL documentation](https://docs.sesam.io/hub/quick-reference.html)`,
+        value: `**${word}**\n\nSesam reserved entity field.\n\n[DTL documentation](https://docs.sesam.io/hub/quick-reference.html)`,
       },
     };
+  }
+
+  // Config property key hover
+  if (isAtJsonKeyPosition(text, offset)) {
+    let wordStart = offset;
+
+    while (wordStart > 0 && isWordChar(text[wordStart - 1])) {
+      wordStart--;
+    }
+
+    const hoverPrefix = text.slice(0, wordStart);
+    const hoverCtx = getPropKeyContext(hoverPrefix);
+
+    if (hoverCtx?.path[hoverCtx.path.length - 1] === "rules") {
+      const isDefault = word === "default";
+
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: isDefault
+            ? `**\`default\`** *(required)*\n\nThe entry-point DTL rule. Every DTL transform must have a \`default\` rule — it is the rule applied to each source entity.`
+            : `**\`${word}\`**\n\nDTL rule name\n\nCan be invoked from the \`default\` rule (or other rules) via \`apply\` or \`apply-hops\`.`,
+        },
+      };
+    }
+
+    const detail = buildPropKeyHover(word, hoverCtx?.path ?? []);
+
+    if (detail) {
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: `**\`${word}\`**\n\n${detail}`,
+        },
+      };
+    }
   }
 
   return null;
@@ -501,6 +593,20 @@ connection.onReferences((params: ReferenceParams): Location[] | null => {
   const text = document.getText();
   const offset = document.offsetAt(params.position);
 
+  // DTL add/add-if property references — checked before alias so a property
+  // named the same as a dataset alias doesn't get hijacked.
+  const propHit = findAddPropertyAtOffset(text, offset);
+
+  if (propHit) {
+    const defs = findAllAddPropertyDefinitions(text, propHit.propName);
+    return defs.map(({ start, end }) =>
+      Location.create(
+        params.textDocument.uri,
+        Range.create(document.positionAt(start), document.positionAt(end)),
+      ),
+    );
+  }
+
   // Alias references
   const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
 
@@ -597,7 +703,7 @@ connection.onPrepareRename(
     const text = document.getText();
     const offset = document.offsetAt(params.position);
 
-    // Try rule key first, then apply-reference, then alias.
+    // Try rule key first, then apply-reference, then property name, then alias.
     const ruleKeyHit = findRuleKeyAtOffset(text, offset);
 
     if (ruleKeyHit) {
@@ -619,6 +725,19 @@ connection.onPrepareRename(
           document.positionAt(applyHit.nameRange.end),
         ),
         placeholder: applyHit.ruleName,
+      };
+    }
+
+    // Property name check before alias — avoids false-positive alias match.
+    const propHitPR = findAddPropertyAtOffset(text, offset);
+
+    if (propHitPR) {
+      return {
+        range: Range.create(
+          document.positionAt(propHitPR.nameStart),
+          document.positionAt(propHitPR.nameEnd),
+        ),
+        placeholder: propHitPR.propName,
       };
     }
 
@@ -668,6 +787,21 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
     const edits = allRanges.map((r) =>
       TextEdit.replace(
         Range.create(document.positionAt(r.start), document.positionAt(r.end)),
+        params.newName,
+      ),
+    );
+
+    return { changes: { [params.textDocument.uri]: edits } };
+  }
+
+  // Add/add-if property rename — checked before alias.
+  const propHitRen = findAddPropertyAtOffset(text, offset);
+
+  if (propHitRen !== null) {
+    const propDefs = findAllAddPropertyDefinitions(text, propHitRen.propName);
+    const edits = propDefs.map(({ start, end }) =>
+      TextEdit.replace(
+        Range.create(document.positionAt(start), document.positionAt(end)),
         params.newName,
       ),
     );

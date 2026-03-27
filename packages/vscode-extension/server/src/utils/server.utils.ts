@@ -17,7 +17,8 @@ import {
   ENTITY_RESERVED_FIELDS,
 } from "../../../src/shared/dtl-registry";
 import { parseDtlText } from "../dtl-parser";
-import { SYSTEM_TYPES, PIPE_SOURCE_TYPES } from "../constants";
+import { SYSTEM_TYPES, PIPE_SOURCE_TYPES, PIPE_TRANSFORM_TYPES } from "../constants";
+import { collectDocumentProperties } from "./dtl-property.utils";
 
 import type { DtlFunction } from "../../../src/shared/dtl-registry";
 import type { DtlRange } from "../dtl-parser";
@@ -62,6 +63,19 @@ export const isSourceTypeContext = (prefix: string): boolean => {
   return /"source"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix);
 };
 
+export const isTransformTypeContext = (prefix: string): boolean => {
+  // Single transform object: "transform": { "type": "
+  if (/"transform"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix)) {
+    return true;
+  }
+  // Array of transforms: "transform": [{ "type": "
+  if (/"transform"\s*:\s*\[[^{}[\]]*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix)) {
+    return true;
+  }
+
+  return false;
+};
+
 export const isSystemTypeContext = (prefix: string): boolean => {
   if (!/"type"\s*:\s*"[^"]*$/.test(prefix)) {
     return false;
@@ -101,6 +115,105 @@ export const isFunctionNameContext = (prefix: string): boolean => {
   return /\[\s*"[^"]*$/.test(prefix) || /\[\s*$/.test(prefix);
 };
 
+/**
+ * Returns true when the cursor is inside a DTL rule array, i.e. the JSON
+ * nesting path leading to the current position is:
+ *   transform > rules > <rule-name> > [ (current array, possibly nested deeper)
+ *
+ * Handles both object-style transforms ({"transform":{...}}) and
+ * array-style transforms ({"transform":[{...}]}).
+ */
+export const isDtlRuleArrayContext = (prefix: string): boolean => {
+  // Quick bail: we must be after a `[` (array value context)
+  if (!/\[\s*(?:"[^"]*)?$/.test(prefix)) {
+    return false;
+  }
+
+  type Frame = { container: "object" | "array"; openedByKey: string | null };
+
+  const stack: Frame[] = [];
+  let inStr = false;
+  let escape = false;
+  let curStr = "";
+  let lastKey: string | null = null;
+  let afterColon = false;
+
+  for (let i = 0; i < prefix.length; i++) {
+    const ch = prefix[i];
+
+    if (escape) {
+      if (inStr) {
+        curStr += ch;
+      }
+
+      escape = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      escape = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      if (inStr) {
+        lastKey = curStr;
+        inStr = false;
+      } else {
+        inStr = true;
+        curStr = "";
+      }
+
+      continue;
+    }
+
+    if (inStr) {
+      curStr += ch;
+      continue;
+    }
+
+    if (ch === ":") {
+      afterColon = true;
+    } else if (ch === "{" || ch === "[") {
+      stack.push({
+        container: ch === "{" ? "object" : "array",
+        openedByKey: afterColon ? lastKey : null,
+      });
+      afterColon = false;
+      lastKey = null;
+    } else if (ch === "}" || ch === "]") {
+      stack.pop();
+      afterColon = false;
+    } else if (ch === ",") {
+      afterColon = false;
+    }
+  }
+
+  // Walk up from the current stack top through nested arrays to find the
+  // innermost *named* array (one opened by a key), then check the path.
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const frame = stack[i];
+
+    if (frame.container !== "array") {
+      break; // hit an object boundary — stop
+    }
+
+    if (frame.openedByKey !== null) {
+      // This is a named array. Check: is it a rule array under rules under transform?
+      return (
+        i >= 3 &&
+        stack[i - 1].container === "object" &&
+        stack[i - 1].openedByKey === "rules" &&
+        stack[i - 2].container === "object"
+      );
+    }
+
+    // openedByKey is null => anonymous array (nested inside another array), keep going up
+  }
+
+  return false;
+};
+
 // A cursor is at a property key position when the most recent non-whitespace
 // character (outside strings) before the opening " is { or ,
 // Also detects unquoted keys being typed (no opening ").
@@ -138,34 +251,52 @@ interface PropInfo {
   sortText: string;
   /** Snippet for the value portion, e.g. '"$0"' (default), '{$0}', '[$0]', '$0' */
   valueSnippet?: string;
+  /** Optional documentation URL shown in hover */
+  docUrl?: string;
 }
 
+const PIPE_DOCS = "https://docs.sesam.io/hub/documentation/service-configuration/pipes";
+
 const PIPE_ROOT_PROPS: readonly PropInfo[] = [
-  { label: "_id", detail: "string — unique pipe identifier (required)", sortText: "0_01" },
-  { label: "type", detail: 'string — must be "pipe" (required)', sortText: "0_02" },
+  {
+    label: "_id",
+    detail: "string — unique pipe identifier (required)",
+    sortText: "0_01",
+    docUrl: `${PIPE_DOCS}/configuration-pipes.html`,
+  },
+  {
+    label: "type",
+    detail: 'string — must be "pipe" (required)',
+    sortText: "0_02",
+    docUrl: `${PIPE_DOCS}/configuration-pipes.html`,
+  },
   {
     label: "source",
     detail: "object — data source (required)",
     sortText: "0_03",
     valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-sources.html`,
   },
   {
     label: "transform",
     detail: "object | array — DTL transform (optional)",
     sortText: "1_01",
-    valueSnippet: "{$0}",
+    valueSnippet: '{\n\t"type": "dtl",\n\t"rules": {\n\t\t"default": [$0]\n\t}\n}',
+    docUrl: `${PIPE_DOCS}/configuration-transforms.html`,
   },
   {
     label: "sink",
     detail: "object — data sink (optional)",
     sortText: "1_02",
     valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-sinks.html`,
   },
   {
     label: "pump",
     detail: "object — scheduling config (optional)",
     sortText: "1_03",
     valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-pump.html`,
   },
   {
     label: "metadata",
@@ -225,9 +356,22 @@ const PIPE_ROOT_PROPS: readonly PropInfo[] = [
   },
 ];
 
+const SYS_CONFIG_DOCS =
+  "https://docs.sesam.io/hub/documentation/service-configuration/systems/configuration-systems.html";
+
 const SYSTEM_ROOT_PROPS: readonly PropInfo[] = [
-  { label: "_id", detail: "string — unique system identifier (required)", sortText: "0_01" },
-  { label: "type", detail: 'string — must be "system:*" (required)', sortText: "0_02" },
+  {
+    label: "_id",
+    detail: "string — unique system identifier (required)",
+    sortText: "0_01",
+    docUrl: SYS_CONFIG_DOCS,
+  },
+  {
+    label: "type",
+    detail: 'string — must be "system:*" (required)',
+    sortText: "0_02",
+    docUrl: SYS_CONFIG_DOCS,
+  },
   {
     label: "metadata",
     detail: "object — arbitrary metadata (optional)",
@@ -292,68 +436,473 @@ const UNKNOWN_ROOT_PROPS: readonly PropInfo[] = [
 ];
 
 const SOURCE_PROPS: readonly PropInfo[] = [
-  { label: "type", detail: "string — source type (required)", sortText: "0_01" },
-  { label: "dataset", detail: "string — dataset name (dataset source)", sortText: "1_01" },
-  { label: "system", detail: "string — system id (sql/rest/json/ldap/kafka)", sortText: "1_02" },
-  { label: "table", detail: "string — table name (sql source)", sortText: "1_03" },
-  { label: "query", detail: "string — SQL query (sql source)", sortText: "1_04" },
-  { label: "url", detail: "string — URL (json/http_endpoint source)", sortText: "1_05" },
-  { label: "operation", detail: "string — operation (rest/kafka source)", sortText: "1_06" },
+  // ── Universal ────────────────────────────────────────────────────────────
   {
-    label: "headers",
-    detail: "object — HTTP headers (optional)",
-    sortText: "1_07",
-    valueSnippet: "{$0}",
+    label: "type",
+    detail: "string — source type (required)",
+    sortText: "0_01",
+    docUrl: `${PIPE_DOCS}/configuration-sources.html#type-of-sources`,
+  },
+
+  // ── Dataset source ───────────────────────────────────────────────────────
+  {
+    label: "dataset",
+    detail: "string — source dataset name (dataset source)",
+    sortText: "1_01",
+    docUrl: `${PIPE_DOCS}/configuration-sources-dataset.html`,
   },
   {
-    label: "params",
-    detail: "object — query parameters (optional)",
-    sortText: "1_08",
-    valueSnippet: "{$0}",
-  },
-  {
-    label: "entities",
-    detail: "array — inline entities (embedded source)",
-    sortText: "1_09",
+    label: "subset",
+    detail: "array — DTL expression to filter entities (dataset/json/binary source)",
+    sortText: "2_02",
     valueSnippet: "[$0]",
-  },
-  {
-    label: "datasets",
-    detail: "array — datasets list (union_datasets/merge)",
-    sortText: "1_10",
-    valueSnippet: "[$0]",
-  },
-  {
-    label: "since_property_name",
-    detail: "string — REST since-tracking (optional)",
-    sortText: "1_11",
-  },
-  {
-    label: "since_default",
-    detail: "string — REST since-tracking default (optional)",
-    sortText: "1_12",
+    docUrl: `${PIPE_DOCS}/configuration-sources-dataset.html`,
   },
   {
     label: "completeness",
-    detail: "boolean — completeness tracking (optional)",
-    sortText: "1_13",
+    detail: "boolean — enable completeness tracking (dataset source)",
+    sortText: "2_03",
     valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-dataset.html`,
   },
   {
-    label: "supports_signalling",
-    detail: "boolean — signalling support (optional)",
-    sortText: "1_14",
+    label: "initial_completeness",
+    detail: "boolean — treat first run as complete (dataset source)",
+    sortText: "2_04",
     valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-dataset.html`,
+  },
+  {
+    label: "include_previous_versions",
+    detail: "boolean — include older entity versions (dataset/union_datasets source)",
+    sortText: "2_05",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-dataset.html`,
+  },
+  {
+    label: "include_replaced",
+    detail: "boolean — include replaced entities (dataset source)",
+    sortText: "2_06",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-dataset.html`,
+  },
+
+  // ── SQL source ───────────────────────────────────────────────────────────
+  {
+    label: "system",
+    detail: "string — system id (sql/rest/json/ldap/kafka/...)",
+    sortText: "1_02",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+  {
+    label: "table",
+    detail: "string — table name (sql/csv source)",
+    sortText: "1_03",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+  {
+    label: "query",
+    detail: "string — SQL query override (sql source)",
+    sortText: "2_01",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+  {
+    label: "primary_key",
+    detail: "string or array — primary key column(s) (sql/csv source)",
+    sortText: "1_13",
+    valueSnippet: '["$0"]',
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+  {
+    label: "updated_column",
+    detail: "string — column holding last-updated timestamp for since-tracking (sql source)",
+    sortText: "2_08",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+  {
+    label: "schema",
+    detail: "string — database schema name (sql source)",
+    sortText: "2_09",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+  {
+    label: "fetch_size",
+    detail: "integer — rows per fetch batch (sql/ldap source)",
+    sortText: "2_10",
+    valueSnippet: "$0",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+  {
+    label: "whitelist",
+    detail: "array — columns to include (sql/csv source)",
+    sortText: "2_12",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+  {
+    label: "blacklist",
+    detail: "array — columns to exclude (sql/csv source)",
+    sortText: "2_13",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+  {
+    label: "preserve_null_values",
+    detail: "boolean — keep SQL NULL as null in entities (sql source)",
+    sortText: "2_14",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sql.html`,
+  },
+
+  // ── URL-based sources ────────────────────────────────────────────────────
+  {
+    label: "url",
+    detail: "string — URL (json/csv/binary/sdshare/rdf/sparql source)",
+    sortText: "1_04",
+    docUrl: `${PIPE_DOCS}/configuration-sources-json.html`,
+  },
+  {
+    label: "headers",
+    detail: "object — HTTP request headers (json/rest source)",
+    sortText: "2_15",
+    valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-json.html`,
+  },
+  {
+    label: "page_size",
+    detail: "integer — page size for paged sources (json/ldap/binary source)",
+    sortText: "2_11",
+    valueSnippet: "$0",
+    docUrl: `${PIPE_DOCS}/configuration-sources-json.html`,
+  },
+
+  // ── REST source ──────────────────────────────────────────────────────────
+  {
+    label: "operation",
+    detail: "string — operation name (rest/kafka source)",
+    sortText: "1_05",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rest.html`,
+  },
+  {
+    label: "operations",
+    detail: "object — operation definitions map (rest source)",
+    sortText: "2_16",
+    valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rest.html`,
+  },
+  {
+    label: "payload",
+    detail: "object — request body template (rest source)",
+    sortText: "2_17",
+    valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rest.html`,
+  },
+  {
+    label: "response_property",
+    detail: "string — response body property containing entities (rest source)",
+    sortText: "2_18",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rest.html`,
+  },
+  {
+    label: "id_expression",
+    detail: "string — Jinja template producing entity _id (rest source)",
+    sortText: "2_19",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rest.html`,
+  },
+  {
+    label: "rate_limiting_retries",
+    detail: "integer — retries on HTTP 429 responses (rest source)",
+    sortText: "2_20",
+    valueSnippet: "$0",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rest.html`,
+  },
+  {
+    label: "rate_limiting_delay",
+    detail: "integer — seconds to wait after HTTP 429 (rest source)",
+    sortText: "2_21",
+    valueSnippet: "$0",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rest.html`,
+  },
+  {
+    label: "trace",
+    detail: "boolean — log full request/response (rest/http_endpoint source)",
+    sortText: "2_22",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rest.html`,
+  },
+
+  // ── CSV source ───────────────────────────────────────────────────────────
+  {
+    label: "has_header",
+    detail: "boolean — first row is a header row (csv source)",
+    sortText: "2_23",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-csv.html`,
+  },
+  {
+    label: "field_names",
+    detail: "array — column names when no header row (csv source)",
+    sortText: "2_24",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-csv.html`,
+  },
+  {
+    label: "delimiter",
+    detail: "string — field separator character (csv source)",
+    sortText: "2_25",
+    docUrl: `${PIPE_DOCS}/configuration-sources-csv.html`,
+  },
+  {
+    label: "encoding",
+    detail: "string — file encoding, e.g. utf-8 (csv source)",
+    sortText: "2_26",
+    docUrl: `${PIPE_DOCS}/configuration-sources-csv.html`,
+  },
+  {
+    label: "auto_dialect",
+    detail: "boolean — auto-detect CSV dialect (csv source)",
+    sortText: "2_27",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-csv.html`,
+  },
+
+  // ── HTTP endpoint source ─────────────────────────────────────────────────
+  {
+    label: "auto_populate_dataset",
+    detail: "boolean — auto-create target dataset (http_endpoint source)",
+    sortText: "2_28",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-http.html`,
+  },
+  {
+    label: "validation_expression",
+    detail: "array — DTL expression to validate incoming entities (http_endpoint source)",
+    sortText: "2_29",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-http.html`,
+  },
+
+  // ── Embedded source ──────────────────────────────────────────────────────
+  {
+    label: "entities",
+    detail: "array — inline entity list (embedded source)",
+    sortText: "1_06",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-embedded.html`,
+  },
+
+  // ── Datasets-based sources ───────────────────────────────────────────────
+  {
+    label: "datasets",
+    detail: "array — dataset names (union_datasets/merge/merge_datasets source)",
+    sortText: "1_07",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-union-datasets.html`,
+  },
+  {
+    label: "initial_datasets",
+    detail: "array — bootstrap datasets for first run (union_datasets/merge source)",
+    sortText: "2_30",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-union-datasets.html`,
+  },
+  {
+    label: "ignore_non_existent_datasets",
+    detail: "boolean — skip missing datasets instead of failing (union_datasets/merge source)",
+    sortText: "2_31",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-union-datasets.html`,
+  },
+  {
+    label: "prefix_ids",
+    detail: "boolean — prefix entity _id with dataset name (union_datasets source)",
+    sortText: "2_32",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-union-datasets.html`,
+  },
+  {
+    label: "require_populated_input",
+    detail: "boolean — require non-empty input datasets (dataset/union/merge source)",
+    sortText: "2_07",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-union-datasets.html`,
+  },
+
+  // ── Merge source ─────────────────────────────────────────────────────────
+  {
+    label: "equality",
+    detail: "array — equality expressions for merge grouping (merge source)",
+    sortText: "2_33",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-merge.html`,
+  },
+  {
+    label: "identity",
+    detail: "string — merge identity strategy (merge source)",
+    sortText: "2_34",
+    docUrl: `${PIPE_DOCS}/configuration-sources-merge.html`,
+  },
+  {
+    label: "strategy",
+    detail: "string — merge or partition strategy (merge/merge_datasets/kafka source)",
+    sortText: "2_35",
+    docUrl: `${PIPE_DOCS}/configuration-sources-merge.html`,
+  },
+  {
+    label: "max_merged",
+    detail: "integer — max entities in one merged group (merge source)",
+    sortText: "2_36",
+    valueSnippet: "$0",
+    docUrl: `${PIPE_DOCS}/configuration-sources-merge.html`,
+  },
+
+  // ── Conditional source ───────────────────────────────────────────────────
+  {
+    label: "condition",
+    detail: "array — DTL condition expression (conditional source)",
+    sortText: "1_09",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-conditional.html`,
+  },
+  {
+    label: "alternatives",
+    detail: "object — named alternative sources keyed by condition value (conditional source)",
+    sortText: "1_10",
+    valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-conditional.html`,
+  },
+
+  // ── Kafka source ─────────────────────────────────────────────────────────
+  {
+    label: "topic",
+    detail: "string — Kafka topic name (kafka source)",
+    sortText: "1_08",
+    docUrl: `${PIPE_DOCS}/configuration-sources-kafka.html`,
+  },
+  {
+    label: "partitions",
+    detail: "integer or array — Kafka partitions to consume (kafka source)",
+    sortText: "2_37",
+    valueSnippet: "$0",
+    docUrl: `${PIPE_DOCS}/configuration-sources-kafka.html`,
+  },
+  {
+    label: "seek_to_beginning",
+    detail: "boolean — start consuming from partition beginning (kafka source)",
+    sortText: "2_38",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-kafka.html`,
+  },
+  {
+    label: "consumer_timeout_ms",
+    detail: "integer — Kafka consumer idle timeout in ms (kafka source)",
+    sortText: "2_39",
+    valueSnippet: "$0",
+    docUrl: `${PIPE_DOCS}/configuration-sources-kafka.html`,
+  },
+
+  // ── LDAP source ──────────────────────────────────────────────────────────
+  {
+    label: "search_base",
+    detail: "string — LDAP search base DN (ldap source)",
+    sortText: "2_40",
+    docUrl: `${PIPE_DOCS}/configuration-sources-ldap.html`,
+  },
+  {
+    label: "search_filter",
+    detail: "string — LDAP search filter expression (ldap source)",
+    sortText: "2_41",
+    docUrl: `${PIPE_DOCS}/configuration-sources-ldap.html`,
+  },
+  {
+    label: "attributes",
+    detail: "array — LDAP attributes to retrieve (ldap source)",
+    sortText: "2_42",
+    valueSnippet: "[$0]",
+    docUrl: `${PIPE_DOCS}/configuration-sources-ldap.html`,
+  },
+  {
+    label: "id_attribute",
+    detail: "string — LDAP attribute to use as entity _id (ldap source)",
+    sortText: "2_43",
+    docUrl: `${PIPE_DOCS}/configuration-sources-ldap.html`,
+  },
+
+  // ── SDShare / RDF sources ────────────────────────────────────────────────
+  {
+    label: "sort_lists",
+    detail: "boolean — sort RDF list values (sdshare/rdf source)",
+    sortText: "2_44",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sdshare.html`,
+  },
+
+  // ── SPARQL source ────────────────────────────────────────────────────────
+  {
+    label: "fragments_query",
+    detail: "string — SPARQL query that returns the fragment list (sparql source)",
+    sortText: "1_11",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sparql.html`,
+  },
+  {
+    label: "fragment_query",
+    detail: "string — SPARQL query for a single fragment (sparql source)",
+    sortText: "1_12",
+    docUrl: `${PIPE_DOCS}/configuration-sources-sparql.html`,
+  },
+
+  // ── RDF source ───────────────────────────────────────────────────────────
+  {
+    label: "format",
+    detail: 'string — RDF serialization format, e.g. "turtle" (rdf source)',
+    sortText: "2_45",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rdf.html`,
+  },
+  {
+    label: "is_sorted",
+    detail: "boolean — entities are already sorted in the source (rdf source)",
+    sortText: "2_46",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources-rdf.html`,
+  },
+
+  // ── Cross-type optional ──────────────────────────────────────────────────
+  {
+    label: "supports_signalling",
+    detail: "boolean — enable pipe signalling (dataset/union/binary/merge_datasets source)",
+    sortText: "2_47",
+    valueSnippet: "${0|true,false|}",
+    docUrl: `${PIPE_DOCS}/configuration-sources.html`,
+  },
+  {
+    label: "if_source_empty",
+    detail: 'string — action when source is empty: "fail", "accept", or "ignore" (optional)',
+    sortText: "2_48",
+    docUrl: `${PIPE_DOCS}/configuration-sources.html`,
+  },
+
+  // ── Common ────────────────────────────────────────────────────────────────
+  {
+    label: "comment",
+    detail: "string or array — human-readable comment (all source types)",
+    sortText: "3_01",
+    docUrl: `${PIPE_DOCS}/configuration-sources.html`,
   },
 ];
 
 const TRANSFORM_PROPS: readonly PropInfo[] = [
-  { label: "type", detail: "string — transform type (required)", sortText: "0_01" },
+  {
+    label: "type",
+    detail: "string — transform type (required)",
+    sortText: "0_01",
+    docUrl: `${PIPE_DOCS}/configuration-transforms.html#type-of-transforms`,
+  },
   {
     label: "rules",
     detail: "object — DTL rules (dtl transform)",
     sortText: "0_02",
     valueSnippet: "{$0}",
+    docUrl: `${PIPE_DOCS}/configuration-transforms-dtl.html`,
   },
   { label: "system", detail: "string — system id (http/rest transform)", sortText: "1_01" },
   { label: "operation", detail: "string — operation name (http/rest transform)", sortText: "1_02" },
@@ -385,7 +934,12 @@ const TRANSFORM_PROPS: readonly PropInfo[] = [
 ];
 
 const SINK_PROPS: readonly PropInfo[] = [
-  { label: "type", detail: "string — sink type (required)", sortText: "0_01" },
+  {
+    label: "type",
+    detail: "string — sink type (required)",
+    sortText: "0_01",
+    docUrl: `${PIPE_DOCS}/configuration-sinks.html`,
+  },
   { label: "dataset", detail: "string — target dataset (dataset sink)", sortText: "1_01" },
   { label: "system", detail: "string — system id (sql/rest/elasticsearch)", sortText: "1_02" },
   { label: "table", detail: "string — table name (sql sink)", sortText: "1_03" },
@@ -475,6 +1029,161 @@ const PUMP_PROPS: readonly PropInfo[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Phase C — type-specific prop narrowing
+// ---------------------------------------------------------------------------
+
+const SOURCE_TYPE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  dataset: [
+    "dataset",
+    "subset",
+    "completeness",
+    "initial_completeness",
+    "require_populated_input",
+    "include_previous_versions",
+    "include_replaced",
+    "supports_signalling",
+    "if_source_empty",
+    "comment",
+  ],
+  sql: [
+    "system",
+    "table",
+    "query",
+    "primary_key",
+    "updated_column",
+    "schema",
+    "fetch_size",
+    "whitelist",
+    "blacklist",
+    "preserve_null_values",
+    "if_source_empty",
+    "comment",
+  ],
+  rest: [
+    "system",
+    "operation",
+    "url",
+    "headers",
+    "operations",
+    "payload",
+    "response_property",
+    "id_expression",
+    "rate_limiting_retries",
+    "rate_limiting_delay",
+    "trace",
+    "if_source_empty",
+    "comment",
+  ],
+  json: ["system", "url", "headers", "page_size", "subset", "if_source_empty", "comment"],
+  csv: [
+    "url",
+    "system",
+    "primary_key",
+    "has_header",
+    "field_names",
+    "delimiter",
+    "encoding",
+    "auto_dialect",
+    "whitelist",
+    "blacklist",
+    "if_source_empty",
+    "comment",
+  ],
+  http_endpoint: ["auto_populate_dataset", "trace", "validation_expression", "comment"],
+  embedded: ["entities", "if_source_empty", "comment"],
+  empty: ["comment"],
+  union_datasets: [
+    "datasets",
+    "initial_datasets",
+    "ignore_non_existent_datasets",
+    "require_populated_input",
+    "include_previous_versions",
+    "supports_signalling",
+    "prefix_ids",
+    "if_source_empty",
+    "comment",
+  ],
+  merge: [
+    "datasets",
+    "initial_datasets",
+    "ignore_non_existent_datasets",
+    "require_populated_input",
+    "equality",
+    "identity",
+    "strategy",
+    "max_merged",
+    "supports_signalling",
+    "if_source_empty",
+    "comment",
+  ],
+  merge_datasets: [
+    "datasets",
+    "initial_datasets",
+    "ignore_non_existent_datasets",
+    "require_populated_input",
+    "strategy",
+    "supports_signalling",
+    "if_source_empty",
+    "comment",
+  ],
+  conditional: ["condition", "alternatives", "comment"],
+  kafka: [
+    "system",
+    "topic",
+    "partitions",
+    "seek_to_beginning",
+    "strategy",
+    "consumer_timeout_ms",
+    "comment",
+  ],
+  ldap: [
+    "system",
+    "search_base",
+    "search_filter",
+    "attributes",
+    "id_attribute",
+    "fetch_size",
+    "if_source_empty",
+    "comment",
+  ],
+  binary: ["system", "url", "subset", "page_size", "supports_signalling", "comment"],
+  sdshare: ["system", "url", "sort_lists", "if_source_empty", "comment"],
+  sparql: ["system", "fragments_query", "fragment_query", "if_source_empty", "comment"],
+  rdf: ["system", "url", "format", "sort_lists", "is_sorted", "if_source_empty", "comment"],
+};
+
+const TRANSFORM_TYPE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  dtl: ["rules"],
+  http: ["system", "operation", "side_effects"],
+  rest: ["system", "operation", "side_effects"],
+  conditional: ["transform", "condition"],
+  xml: ["xml_config"],
+  template: ["template"],
+};
+
+const SINK_TYPE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  dataset: ["dataset", "deletion_tracking", "enable_optimistic_locking", "set_initial_offset"],
+  sql: ["system", "table", "primary_key", "batch_size"],
+  rest: ["system", "operation", "side_effects", "batch_size"],
+  http: ["system", "operation", "side_effects", "batch_size"],
+  elasticsearch: ["system", "batch_size"],
+  kafka: ["system", "operation"],
+  solr: ["system", "batch_size"],
+  mail: ["system"],
+  smtp: ["system"],
+};
+
+const narrowByType = <T extends { label: string }>(
+  all: readonly T[],
+  typeMap: Readonly<Record<string, readonly string[]>>,
+  typeValue: string,
+): readonly T[] => {
+  const keys = typeMap[typeValue];
+
+  return keys !== undefined ? all.filter((p) => keys.includes(p.label)) : all;
+};
+
+// ---------------------------------------------------------------------------
 // Prefix scanner: determine key-position nesting context
 // ---------------------------------------------------------------------------
 
@@ -486,7 +1195,12 @@ const PUMP_PROPS: readonly PropInfo[] = [
  */
 export const getPropKeyContext = (
   prefix: string,
-): { path: string[]; presentKeys: Set<string>; hasOpenQuote: boolean } | null => {
+): {
+  path: string[];
+  presentKeys: Set<string>;
+  hasOpenQuote: boolean;
+  typeAtCurrentDepth: string | null;
+} | null => {
   const hasOpenQuote = /[{,]\s*"[^"]*$/.test(prefix);
   const hasUnquotedWord = /[{,]\s*[a-zA-Z_][a-zA-Z0-9_]*$/.test(prefix);
 
@@ -496,6 +1210,7 @@ export const getPropKeyContext = (
 
   const pathStack: string[] = [];
   const presentsStack: Array<Set<string>> = [];
+  const typeAtDepth: string[] = [];
   let depth = 0;
   let inStr = false;
   let esc = false;
@@ -527,6 +1242,8 @@ export const getPropKeyContext = (
         if (isKey && depth > 0) {
           lastKey = curStr;
           presentsStack[depth - 1].add(curStr);
+        } else if (!isKey && depth > 0 && lastKey === "type") {
+          typeAtDepth[depth - 1] = curStr;
         }
         inStr = false;
         curStr = "";
@@ -577,7 +1294,12 @@ export const getPropKeyContext = (
   // so no removal is needed.
   const currentPresentKeys = new Set(presentsStack[depth - 1] ?? []);
 
-  return { path: [...pathStack], presentKeys: currentPresentKeys, hasOpenQuote };
+  return {
+    path: [...pathStack],
+    presentKeys: currentPresentKeys,
+    hasOpenQuote,
+    typeAtCurrentDepth: typeAtDepth[depth - 1] ?? null,
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -605,6 +1327,7 @@ export const buildPropCompletions = (
   fileType: ConfigFileType,
   presentKeys: Set<string>,
   hasOpenQuote = true,
+  typeAtCurrentDepth: string | null = null,
 ): CompletionItem[] => {
   let props: readonly PropInfo[];
 
@@ -624,11 +1347,20 @@ export const buildPropCompletions = (
         props = UNKNOWN_ROOT_PROPS;
     }
   } else if (path[path.length - 1] === "source") {
-    props = SOURCE_PROPS;
+    props =
+      typeAtCurrentDepth !== null
+        ? narrowByType(SOURCE_PROPS, SOURCE_TYPE_KEYS, typeAtCurrentDepth)
+        : SOURCE_PROPS;
   } else if (path[path.length - 1] === "transform") {
-    props = TRANSFORM_PROPS;
+    props =
+      typeAtCurrentDepth !== null
+        ? narrowByType(TRANSFORM_PROPS, TRANSFORM_TYPE_KEYS, typeAtCurrentDepth)
+        : TRANSFORM_PROPS;
   } else if (path[path.length - 1] === "sink") {
-    props = SINK_PROPS;
+    props =
+      typeAtCurrentDepth !== null
+        ? narrowByType(SINK_PROPS, SINK_TYPE_KEYS, typeAtCurrentDepth)
+        : SINK_PROPS;
   } else if (path[path.length - 1] === "pump") {
     props = PUMP_PROPS;
   } else if (
@@ -651,16 +1383,122 @@ export const buildPropCompletions = (
 };
 
 // ---------------------------------------------------------------------------
+// Prop hover: path-aware lookup + key-position guard
+// ---------------------------------------------------------------------------
+
+const PROP_TABLE_BY_PATH = (path: string[]): readonly PropInfo[] => {
+  const tail = path[path.length - 1];
+
+  if (path.length === 0) {
+    return PIPE_ROOT_PROPS;
+  }
+
+  switch (tail) {
+    case "source":
+      return SOURCE_PROPS;
+    case "transform":
+      return TRANSFORM_PROPS;
+    case "sink":
+      return SINK_PROPS;
+    case "pump":
+      return PUMP_PROPS;
+    case "pipe_defaults":
+      return PIPE_ROOT_PROPS;
+    case "system_defaults":
+      return SYSTEM_ROOT_PROPS;
+    default:
+      return [
+        ...PIPE_ROOT_PROPS,
+        ...SYSTEM_ROOT_PROPS,
+        ...NODE_METADATA_ROOT_PROPS,
+        ...SOURCE_PROPS,
+        ...TRANSFORM_PROPS,
+        ...SINK_PROPS,
+        ...PUMP_PROPS,
+      ];
+  }
+};
+
+/**
+ * Returns true when `offset` is inside a JSON key string —
+ * i.e. after the word's closing `"` comes optional whitespace then `:`.
+ */
+export const isAtJsonKeyPosition = (text: string, offset: number): boolean => {
+  let i = offset;
+
+  while (i < text.length && /[a-zA-Z0-9_$\-!.]/.test(text[i])) {
+    i++;
+  }
+
+  if (text[i] !== '"') {
+    return false;
+  }
+
+  i++;
+
+  while (i < text.length && /\s/.test(text[i])) {
+    i++;
+  }
+
+  return text[i] === ":";
+};
+
+export const buildPropKeyHover = (word: string, path: string[]): string | null => {
+  const table = PROP_TABLE_BY_PATH(path);
+  const prop = table.find((p) => p.label === word);
+
+  if (!prop) {
+    return null;
+  }
+
+  return prop.docUrl
+    ? `${prop.detail}\n\n[\ud83d\udcd6 Documentation](${prop.docUrl})`
+    : prop.detail;
+};
+
+// ---------------------------------------------------------------------------
+// Type value hover builders (for hovering over source/transform/system type values)
+// ---------------------------------------------------------------------------
+
+const buildTypeHoverContent = (
+  label: string,
+  categoryLabel: string,
+  doc: string,
+  docUrl: string,
+): string =>
+  `**\`${label}\`**\n\n${categoryLabel}\n\n${doc}\n\n[\ud83d\udcd6 Documentation](${docUrl})`;
+
+export const buildSourceTypeHover = (word: string): string | null => {
+  const info = PIPE_SOURCE_TYPES.find((t) => t.label === word);
+
+  return info ? buildTypeHoverContent(info.label, "pipe source type", info.doc, info.docUrl) : null;
+};
+
+export const buildSystemTypeHover = (word: string): string | null => {
+  const info = SYSTEM_TYPES.find((t) => t.label === word);
+
+  return info ? buildTypeHoverContent(info.label, "system type", info.doc, info.docUrl) : null;
+};
+
+export const buildTransformTypeHover = (word: string): string | null => {
+  const info = PIPE_TRANSFORM_TYPES.find((t) => t.label === word);
+
+  return info
+    ? buildTypeHoverContent(info.label, "pipe transform type", info.doc, info.docUrl)
+    : null;
+};
+
+// ---------------------------------------------------------------------------
 // Completion item builders
 // ---------------------------------------------------------------------------
 export const buildSystemTypeCompletions = (): CompletionItem[] => {
-  return SYSTEM_TYPES.map(({ label, detail, doc }) => ({
+  return SYSTEM_TYPES.map(({ label, detail, doc, docUrl }) => ({
     label,
     kind: CompletionItemKind.EnumMember,
     detail,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**\`${label}\`** — ${detail}\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/systems/configuration-systems.html)`,
+      value: `**\`${label}\`**\n\n${detail}\n\n${doc}\n\n[📖 Documentation](${docUrl})`,
     },
     insertText: label,
     sortText: label,
@@ -668,13 +1506,27 @@ export const buildSystemTypeCompletions = (): CompletionItem[] => {
 };
 
 export const buildSourceTypeCompletions = (): CompletionItem[] => {
-  return PIPE_SOURCE_TYPES.map(({ label, detail, doc }) => ({
+  return PIPE_SOURCE_TYPES.map(({ label, detail, doc, docUrl }) => ({
     label,
     kind: CompletionItemKind.EnumMember,
     detail,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**\`${label}\`** — pipe source type\n\n${doc}\n\n[📖 Documentation](https://docs.sesam.io/hub/documentation/service-configuration/pipes/configuration-sources.html)`,
+      value: `**\`${label}\`**\n\npipe source type\n\n${doc}\n\n[📖 Documentation](${docUrl})`,
+    },
+    insertText: label,
+    sortText: label,
+  }));
+};
+
+export const buildTransformTypeCompletions = (): CompletionItem[] => {
+  return PIPE_TRANSFORM_TYPES.map(({ label, detail, doc, docUrl }) => ({
+    label,
+    kind: CompletionItemKind.EnumMember,
+    detail,
+    documentation: {
+      kind: MarkupKind.Markdown,
+      value: `**\`${label}\`**\n\npipe transform type\n\n${doc}\n\n[📖 Documentation](${docUrl})`,
     },
     insertText: label,
     sortText: label,
@@ -682,18 +1534,31 @@ export const buildSourceTypeCompletions = (): CompletionItem[] => {
 };
 
 export const buildFunctionCompletions = (): CompletionItem[] => {
-  return getAllFunctions().map((fn: DtlFunction) => ({
-    label: fn.name,
-    kind: fn.kind === "transform" ? CompletionItemKind.Method : CompletionItemKind.Function,
-    detail: fn.description,
-    labelDetails: { description: fn.signature },
-    documentation: {
-      kind: MarkupKind.Markdown,
-      value: buildFunctionMarkdown(fn),
-    },
-    sortText: fn.kind === "transform" ? `0_${fn.name}` : `1_${fn.name}`,
-    insertText: fn.name,
-  }));
+  return getAllFunctions().map((fn: DtlFunction) => {
+    // The user has already typed `[` (which VS Code auto-closes to `[]`).
+    // We only fill in the content between the brackets, e.g.:
+    //   "add", "${1:property}", "${2:value}"
+    // so the final result is ["add", "property", "value"].
+    const required = fn.params.filter((p) => !p.optional);
+    const paramSnippets = required.map((p, i) => `"\${${i + 1}:${p.name}}"`);
+    const insertText =
+      paramSnippets.length > 0 ? `"${fn.name}", ${paramSnippets.join(", ")}` : `"${fn.name}"`;
+
+    return {
+      label: fn.name,
+      kind: fn.kind === "transform" ? CompletionItemKind.Method : CompletionItemKind.Function,
+      detail: fn.description,
+      labelDetails: { description: fn.signature },
+      documentation: {
+        kind: MarkupKind.Markdown,
+        value: buildFunctionMarkdown(fn),
+      },
+      sortText: fn.kind === "transform" ? `0_${fn.name}` : `1_${fn.name}`,
+      insertText,
+      insertTextFormat: InsertTextFormat.Snippet,
+      filterText: fn.name,
+    };
+  });
 };
 
 export const buildVariableCompletions = (): CompletionItem[] => {
@@ -703,7 +1568,7 @@ export const buildVariableCompletions = (): CompletionItem[] => {
     detail: desc,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**${name}** — DTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/dtl-variables.html)`,
+      value: `**${name}**\n\nDTL built-in variable\n\n${desc}\n\n[📖 Documentation](https://docs.sesam.io/hub/dtl/variables.html)`,
     },
     insertText: name,
     sortText: `0_${name}`,
@@ -755,6 +1620,8 @@ export const buildFunctionMarkdown = (fn: DtlFunction): string => {
       : fn.minArgs === fn.maxArgs
         ? `${fn.minArgs} argument${fn.minArgs !== 1 ? "s" : ""}`
         : `${fn.minArgs}–${fn.maxArgs} arguments`;
+  const docUrl = fn.docUrl.includes("#") ? fn.docUrl : `${fn.docUrl}#${fn.name}`;
+
   return [
     `**\`${fn.name}\`** — ${fn.category} · ${kindLabel}`,
     "",
@@ -764,7 +1631,7 @@ export const buildFunctionMarkdown = (fn: DtlFunction): string => {
     "",
     params ? `**Parameters** (${argInfo}):\n${params}` : `*No arguments.*`,
     "",
-    `[📖 Documentation](${fn.docUrl})`,
+    `[📖 Documentation](${docUrl})`,
   ].join("\n");
 };
 
@@ -990,6 +1857,37 @@ export const buildDocumentSymbols = (
       transformChildren,
     ),
   );
+
+  // ── Properties outline ────────────────────────────────────────────────────
+  // Collect all property names defined via ["add"/"add-if", "propName", ...] and
+  // surface them as a "Properties" outline group with one child per unique name.
+  const definedProps = collectDocumentProperties(text);
+
+  if (definedProps.length > 0) {
+    const propSymbols: DocumentSymbol[] = definedProps.map(({ propName, start, end }) => {
+      const startPos = document.positionAt(start);
+      const endPos = document.positionAt(end);
+      const range = Range.create(startPos, endPos);
+      return DocumentSymbol.create(propName, undefined, SymbolKind.Property, range, range, []);
+    });
+
+    // The Properties group spans from the first to the last property definition.
+    const groupRange = Range.create(
+      propSymbols[0].range.start,
+      propSymbols[propSymbols.length - 1].range.end,
+    );
+
+    symbols.push(
+      DocumentSymbol.create(
+        "Properties",
+        `${propSymbols.length} defined`,
+        SymbolKind.Struct,
+        groupRange,
+        groupRange,
+        propSymbols,
+      ),
+    );
+  }
 
   return symbols;
 };

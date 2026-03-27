@@ -2372,12 +2372,12 @@ export const isKnownFunction = (name: string): boolean => INDEX.has(name);
 
 /** Built-in DTL variable descriptions. */
 export const DTL_VARIABLES: Record<string, string> = {
-  _S: "Source entity — the input entity being processed by the transform.",
-  _T: "Target entity — the entity being constructed by the transform.",
-  _P: "Parent context — available inside `apply` functions, refers to the parent entity.",
-  _R: "Root context — contains both `_S` and `_T`, accessible at any nesting depth.",
-  _B: "Request context — holds variables defined by URL parameters in HTTP endpoint sinks.",
-  _: "Current value — refers to the current element in functional expressions like `map` and `filter`.",
+  _S: "Refers to the source entity.",
+  _T: "Refers to the target entity.",
+  _P: "Appears inside the `apply` function and refers to the parent context.",
+  _R: "Used to refer to the root context containing both `_S` and `_T`.",
+  _B: "Used by the HTTP endpoint sinks to hold variables defined by URL parameters.",
+  _: "Refers to the current value in functional expressions.",
 };
 
 /** Sesam entity reserved fields. */

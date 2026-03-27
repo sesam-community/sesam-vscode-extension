@@ -71,10 +71,6 @@
       {
         "language": "json",
         "path": "./snippets/dtl.code-snippets.json"
-      },
-      {
-        "language": "sesam-config",
-        "path": "./snippets/dtl.code-snippets.json"
       }
     ],
     "commands": [

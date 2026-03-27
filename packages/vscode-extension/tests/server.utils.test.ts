@@ -14,6 +14,7 @@ import {
   isSystemTypeContext,
   isVariableContext,
   isFunctionNameContext,
+  isDtlRuleArrayContext,
   buildSystemTypeCompletions,
   buildSourceTypeCompletions,
   buildFunctionCompletions,
@@ -194,6 +195,56 @@ describe("isFunctionNameContext", () => {
 
   it("returns false for non-function positions", () => {
     expect(isFunctionNameContext('{"_id": "')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isDtlRuleArrayContext
+// ---------------------------------------------------------------------------
+
+describe("isDtlRuleArrayContext", () => {
+  const dtlObj = (rule = '{"default":[') => `{"transform":{"type":"dtl","rules":${rule}`;
+
+  const dtlArr = (rule = '{"default":[') => `{"transform":[{"type":"dtl","rules":${rule}`;
+
+  it("returns true inside object-transform rule array", () => {
+    expect(isDtlRuleArrayContext(dtlObj())).toBe(true);
+  });
+
+  it("returns true with a partial function quote", () => {
+    expect(isDtlRuleArrayContext(dtlObj('{"default":["add'))).toBe(true);
+  });
+
+  it("returns true inside array-transform rule array", () => {
+    expect(isDtlRuleArrayContext(dtlArr())).toBe(true);
+  });
+
+  it("returns true for nested array inside rule (DTL sub-expression)", () => {
+    expect(isDtlRuleArrayContext(dtlObj('{"default":[['))).toBe(true);
+  });
+
+  it("returns true inside a non-default named rule", () => {
+    expect(isDtlRuleArrayContext(dtlObj('{"my-rule":['))).toBe(true);
+  });
+
+  it("returns false at pipe root level", () => {
+    expect(isDtlRuleArrayContext('{"_id":"p",')).toBe(false);
+  });
+
+  it("returns false inside source object", () => {
+    expect(isDtlRuleArrayContext('{"source":{"entities":[')).toBe(false);
+  });
+
+  it("returns false inside transform object (not yet in rules)", () => {
+    expect(isDtlRuleArrayContext('{"transform":{"type":"dtl",')).toBe(false);
+  });
+
+  it("returns false inside rules object key position", () => {
+    expect(isDtlRuleArrayContext('{"transform":{"rules":{')).toBe(false);
+  });
+
+  it("returns false when not after a bracket", () => {
+    expect(isDtlRuleArrayContext(dtlObj('{"default":"'))).toBe(false);
   });
 });
 

@@ -427,3 +427,152 @@ describe("buildPropCompletions — snippet insertText (hasOpenQuote=false)", () 
     expect(items.every((i) => i.filterText === i.label)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// getPropKeyContext — typeAtCurrentDepth (Phase C)
+// ---------------------------------------------------------------------------
+
+describe("getPropKeyContext — typeAtCurrentDepth", () => {
+  it("returns null when type has not been set yet", () => {
+    const ctx = getPropKeyContext('{"source":{"');
+    expect(ctx).not.toBeNull();
+    expect(ctx!.typeAtCurrentDepth).toBeNull();
+  });
+
+  it("captures source type value", () => {
+    const ctx = getPropKeyContext('{"source":{"type":"sql","');
+    expect(ctx!.typeAtCurrentDepth).toBe("sql");
+  });
+
+  it("captures transform type value", () => {
+    const ctx = getPropKeyContext('{"transform":{"type":"dtl","');
+    expect(ctx!.typeAtCurrentDepth).toBe("dtl");
+  });
+
+  it("captures sink type value", () => {
+    const ctx = getPropKeyContext('{"sink":{"type":"dataset","');
+    expect(ctx!.typeAtCurrentDepth).toBe("dataset");
+  });
+
+  it("does not leak parent type into nested depth", () => {
+    // Root has "type":"pipe" but that should not appear at source depth
+    const ctx = getPropKeyContext('{"type":"pipe","source":{"');
+    expect(ctx!.typeAtCurrentDepth).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildPropCompletions — Phase C type-aware narrowing
+// ---------------------------------------------------------------------------
+
+describe("buildPropCompletions — Phase C source type narrowing", () => {
+  const empty = new Set<string>(["type"]);
+
+  it("sql source shows system, table, query and excludes entities, supports_signalling", () => {
+    const labels = buildPropCompletions(["source"], "pipe", empty, true, "sql").map((i) => i.label);
+    expect(labels).toContain("system");
+    expect(labels).toContain("table");
+    expect(labels).toContain("query");
+    expect(labels).not.toContain("entities");
+    expect(labels).not.toContain("supports_signalling");
+  });
+
+  it("embedded source shows entities and excludes system, table", () => {
+    const labels = buildPropCompletions(["source"], "pipe", empty, true, "embedded").map(
+      (i) => i.label,
+    );
+    expect(labels).toContain("entities");
+    expect(labels).not.toContain("system");
+    expect(labels).not.toContain("table");
+  });
+
+  it("dataset source shows dataset, completeness, supports_signalling", () => {
+    const labels = buildPropCompletions(["source"], "pipe", empty, true, "dataset").map(
+      (i) => i.label,
+    );
+    expect(labels).toContain("dataset");
+    expect(labels).toContain("completeness");
+    expect(labels).toContain("supports_signalling");
+    expect(labels).not.toContain("table");
+    expect(labels).not.toContain("entities");
+  });
+
+  it("union_datasets source shows datasets only", () => {
+    const labels = buildPropCompletions(["source"], "pipe", empty, true, "union_datasets").map(
+      (i) => i.label,
+    );
+    expect(labels).toContain("datasets");
+    expect(labels).not.toContain("system");
+    expect(labels).not.toContain("dataset");
+  });
+
+  it("unknown source type falls back to full SOURCE_PROPS", () => {
+    const labels = buildPropCompletions(["source"], "pipe", empty, true, "custom_type").map(
+      (i) => i.label,
+    );
+    expect(labels).toContain("system");
+    expect(labels).toContain("entities");
+    expect(labels).toContain("datasets");
+  });
+
+  it("null typeAtCurrentDepth returns full SOURCE_PROPS", () => {
+    const labels = buildPropCompletions(["source"], "pipe", empty, true, null).map((i) => i.label);
+    expect(labels).toContain("system");
+    expect(labels).toContain("entities");
+    expect(labels).toContain("dataset");
+  });
+});
+
+describe("buildPropCompletions — Phase C transform type narrowing", () => {
+  const empty = new Set<string>(["type"]);
+
+  it("dtl transform shows rules and excludes xml_config, template", () => {
+    const labels = buildPropCompletions(["transform"], "pipe", empty, true, "dtl").map(
+      (i) => i.label,
+    );
+    expect(labels).toContain("rules");
+    expect(labels).not.toContain("xml_config");
+    expect(labels).not.toContain("template");
+  });
+
+  it("conditional transform shows transform and condition", () => {
+    const labels = buildPropCompletions(["transform"], "pipe", empty, true, "conditional").map(
+      (i) => i.label,
+    );
+    expect(labels).toContain("transform");
+    expect(labels).toContain("condition");
+    expect(labels).not.toContain("rules");
+  });
+
+  it("xml transform shows xml_config", () => {
+    const labels = buildPropCompletions(["transform"], "pipe", empty, true, "xml").map(
+      (i) => i.label,
+    );
+    expect(labels).toContain("xml_config");
+    expect(labels).not.toContain("rules");
+  });
+});
+
+describe("buildPropCompletions — Phase C sink type narrowing", () => {
+  const empty = new Set<string>(["type"]);
+
+  it("dataset sink shows dataset, deletion_tracking but not table, primary_key", () => {
+    const labels = buildPropCompletions(["sink"], "pipe", empty, true, "dataset").map(
+      (i) => i.label,
+    );
+    expect(labels).toContain("dataset");
+    expect(labels).toContain("deletion_tracking");
+    expect(labels).toContain("enable_optimistic_locking");
+    expect(labels).not.toContain("table");
+    expect(labels).not.toContain("primary_key");
+  });
+
+  it("sql sink shows system, table, primary_key but not deletion_tracking", () => {
+    const labels = buildPropCompletions(["sink"], "pipe", empty, true, "sql").map((i) => i.label);
+    expect(labels).toContain("system");
+    expect(labels).toContain("table");
+    expect(labels).toContain("primary_key");
+    expect(labels).not.toContain("deletion_tracking");
+    expect(labels).not.toContain("dataset");
+  });
+});
