@@ -156,7 +156,12 @@ describe("undefined-rule diagnostics", () => {
 const configOptions = { ...defaultOptions, validateConfigStructure: true };
 
 const pipeJson = (overrides: Record<string, unknown> = {}): string =>
-  JSON.stringify({ _id: "my-pipe", type: "pipe", source: { type: "dataset" }, ...overrides });
+  JSON.stringify({
+    _id: "my-pipe",
+    type: "pipe",
+    source: { type: "dataset", dataset: "test-dataset" },
+    ...overrides,
+  });
 
 const systemJson = (overrides: Record<string, unknown> = {}): string =>
   JSON.stringify({ _id: "my-system", type: "system:rest", ...overrides });
@@ -350,7 +355,7 @@ describe("validateConfigStructure — array of configs", () => {
 
   it("emits no diagnostics for an array of valid configs", () => {
     const text = JSON.stringify([
-      { _id: "pipe-a", type: "pipe", source: { type: "dataset" } },
+      { _id: "pipe-a", type: "pipe", source: { type: "dataset", dataset: "test-dataset" } },
       { _id: "sys-a", type: "system:rest" },
     ]);
     const diags = validateConfigStructure(text, configOptions);
@@ -414,5 +419,125 @@ describe("validateConfigStructure — missing default rule", () => {
     });
     const diags = validateConfigStructure(text, configOptions);
     expect(diags.every((d) => d.code !== "missing-default-rule")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Source field validation
+// ---------------------------------------------------------------------------
+
+describe("validateConfigStructure — source field validation", () => {
+  it("errors when embedded source is missing required 'entities'", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "embedded" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    const diag = diags.find((d) => d.code === "missing-source-property");
+    expect(diag).toBeDefined();
+    expect(diag?.severity).toBe(DiagnosticSeverity.Error);
+    expect(diag?.message).toContain('"entities"');
+  });
+
+  it("errors when dataset source is missing required 'dataset'", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "dataset" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    const diag = diags.find((d) => d.code === "missing-source-property");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain('"dataset"');
+  });
+
+  it("errors when sql source is missing required 'system' and 'table'", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "sql" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    const codes = diags.filter((d) => d.code === "missing-source-property").map((d) => d.message);
+    expect(codes.some((m) => m.includes('"system"'))).toBe(true);
+    expect(codes.some((m) => m.includes('"table"'))).toBe(true);
+  });
+
+  it("no error when embedded source has 'entities'", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "embedded", entities: [] },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.every((d) => d.code !== "missing-source-property")).toBe(true);
+  });
+
+  it("warns when source has an invalid property for its type", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "embedded", entities: [], table: "foo" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    const diag = diags.find((d) => d.code === "invalid-source-property");
+    expect(diag).toBeDefined();
+    expect(diag?.severity).toBe(DiagnosticSeverity.Warning);
+    expect(diag?.message).toContain('"table"');
+  });
+
+  it("no warning for valid properties on dataset source", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "dataset", dataset: "foo", completeness: true, if_source_empty: "fail" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.every((d) => d.code !== "invalid-source-property")).toBe(true);
+  });
+
+  it("no errors for empty source (no known schema constraints)", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "empty" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.every((d) => d.code !== "missing-source-property")).toBe(true);
+    expect(diags.every((d) => d.code !== "invalid-source-property")).toBe(true);
+  });
+
+  it("no errors for http_endpoint source with no extra fields", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "http_endpoint" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.every((d) => d.code !== "missing-source-property")).toBe(true);
+  });
+
+  it("errors when source object has no 'type' property", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { dataset: "foo" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    const diag = diags.find((d) => d.code === "missing-source-type");
+    expect(diag).toBeDefined();
+    expect(diag?.severity).toBe(DiagnosticSeverity.Error);
+    expect(diag?.message).toContain('"type"');
+  });
+
+  it("errors when source type is an empty string", () => {
+    const text = JSON.stringify({
+      _id: "my-pipe",
+      type: "pipe",
+      source: { type: "" },
+    });
+    const diags = validateConfigStructure(text, configOptions);
+    expect(diags.find((d) => d.code === "missing-source-type")).toBeDefined();
   });
 });
