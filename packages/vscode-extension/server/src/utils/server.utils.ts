@@ -64,9 +64,13 @@ export const isSourceTypeContext = (prefix: string): boolean => {
 
 export const isTransformTypeContext = (prefix: string): boolean => {
   // Single transform object: "transform": { "type": "
-  if (/"transform"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix)) return true;
+  if (/"transform"\s*:\s*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix)) {
+    return true;
+  }
   // Array of transforms: "transform": [{ "type": "
-  if (/"transform"\s*:\s*\[[^{}\[\]]*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix)) return true;
+  if (/"transform"\s*:\s*\[[^{}[\]]*\{[^{}]*"type"\s*:\s*"[^"]*$/.test(prefix)) {
+    return true;
+  }
 
   return false;
 };
@@ -848,7 +852,9 @@ export const buildPropKeyHover = (word: string, path: string[]): string | null =
   const table = PROP_TABLE_BY_PATH(path);
   const prop = table.find((p) => p.label === word);
 
-  if (!prop) return null;
+  if (!prop) {
+    return null;
+  }
 
   return prop.docUrl
     ? `${prop.detail}\n\n[\ud83d\udcd6 Documentation](${prop.docUrl})`
