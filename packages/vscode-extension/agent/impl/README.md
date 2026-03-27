@@ -29,10 +29,11 @@
 | F15 | Interactive Pipe Graph (canvas / webview) | Phase 4 | `planned` | [interactive-pipe-graph.prompt.md](../plans/interactive-pipe-graph.prompt.md) |
 | F16 | Pipe DAG Tree Views (Lineage + Dependents) | — | `implemented` | [pipe-dag-tree.prompt.md](../plans/pipe-dag-tree.prompt.md) |
 | F17 | System Pipes View | — | `implemented` | [system-pipes-view.prompt.md](../plans/system-pipes-view.prompt.md) |
-| F18 | Dataset Alias Support (highlight + hover + rename) | — | `done` | [dataset-alias-support.prompt.md](../plans/dataset-alias-support.prompt.md) |
+| F18 | Dataset Alias Support (highlight + hover + rename) | — | `implemented` | [dataset-alias-support.prompt.md](../plans/dataset-alias-support.prompt.md) |
 | F19 | DTL Syntax Linting | Phase 1 | `implemented` | [impl-f19-syntax-linting.prompt.md](impl-f19-syntax-linting.prompt.md) |
 | F20 | Extension Language Model Tools API | Phase 1 | `planned` | [impl-f20-lm-tools-api.prompt.md](impl-f20-lm-tools-api.prompt.md) |
 | F21 | Config Property Completions | Phase 1 | `phase A+B+D implemented` | [impl-f21-config-prop-completions.prompt.md](impl-f21-config-prop-completions.prompt.md) |
+| F22 | Sesam Panel (Errors / Warnings View) | Phase 1 | `implemented` | — |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
 | F04 | Node-Connected Live Preview | Phase 3 | `planned` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
@@ -65,8 +66,11 @@
 | F14: Cross-file Dataset Navigation | `implemented` |
 | F16: Pipe DAG Tree Views | `implemented` |
 | F17: System Pipes View | `implemented` |
+| F18: Dataset Alias Support | `implemented` |
 | F19: DTL Syntax Linting | `implemented` |
 | F20: Extension Language Model Tools API | `planned` |
+| F21: Config Property Completions (Phases A+B+D) | `phase A+B+D implemented` |
+| F22: Sesam Panel (Errors / Warnings View) | `implemented` |
 
 ### Phase 2: Testing & Diff Loop
 

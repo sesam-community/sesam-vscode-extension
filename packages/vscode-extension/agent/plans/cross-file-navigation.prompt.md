@@ -1,6 +1,6 @@
 # F14: Cross-file Pipe / Dataset / System Navigation
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 1 - MVP
 > **Tracking**: [README.md](../impl/README.md)
 

@@ -1,6 +1,6 @@
 # F17: System Pipes View
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 2
 > **Tracking**: [README.md](../impl/README.md)
 > **Depends on**: [F16 — Pipe DAG Views](pipe-dag-tree.prompt.md) (`FullPipeInfo`,
