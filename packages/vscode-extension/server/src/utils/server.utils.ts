@@ -401,7 +401,7 @@ const TRANSFORM_PROPS: readonly PropInfo[] = [
     label: "type",
     detail: "string — transform type (required)",
     sortText: "0_01",
-    docUrl: `${PIPE_DOCS}/configuration-transforms.html`,
+    docUrl: `${PIPE_DOCS}/configuration-transforms.html#type-of-transforms`,
   },
   {
     label: "rules",
