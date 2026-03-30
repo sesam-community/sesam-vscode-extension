@@ -1517,6 +1517,20 @@ const MathFns = [
     docUrl: `${BASE_DOC_URL}/dtl-functions-math.html`,
   },
   {
+    name: "subtract",
+    category: "Math",
+    kind: "expression",
+    signature: "subtract(a, b)",
+    description: "Subtracts b from a. With one argument, negates a. Word-form alias of `-`.",
+    params: [
+      { name: "a", description: "Minuend." },
+      { name: "b", description: "Subtrahend.", optional: true },
+    ],
+    minArgs: 1,
+    maxArgs: 2,
+    docUrl: `${BASE_DOC_URL}/dtl-functions-math.html`,
+  },
+  {
     name: "*",
     category: "Math",
     kind: "expression",

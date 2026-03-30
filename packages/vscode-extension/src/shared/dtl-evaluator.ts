@@ -481,6 +481,7 @@ const evalFunction = (arr: unknown[], ctx: EvalContext): DtlValue => {
       return (evalExpr(args[0], ctx) as number) + (evalExpr(args[1], ctx) as number);
     case "-":
     case "minus":
+    case "subtract":
       return args.length === 1
         ? -(evalExpr(args[0], ctx) as number)
         : (evalExpr(args[0], ctx) as number) - (evalExpr(args[1], ctx) as number);
