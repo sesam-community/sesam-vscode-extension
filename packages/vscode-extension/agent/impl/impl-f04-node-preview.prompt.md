@@ -9,9 +9,44 @@
 ## Summary
 
 The existing offline Pipe Preview panel (`client/src/preview/PreviewPanel.ts`) evaluates DTL locally using
-static entity data from `.test.json` files. Many DTL functions (`hops`, `apply-hops`, `lookup-entity`) require
-a live Sesam node to resolve cross-dataset lookups. This feature adds a toggle that switches Preview from
-offline mode to node-connected mode, fetching real entities from the configured Sesam node.
+the built-in `dtl-evaluator.ts` and loads input entities from `source.entities` (embedded source) or
+`testdata/<pipe-id>.json`. The offline evaluator cannot handle `hops`, `apply-hops`, or `lookup-entity`.
+
+This feature adds a **Live** mode that replaces the offline evaluation path with a call to the Sesam node's
+pipe preview API:
+
+```
+POST https://{node-url}/api/pipes/{pipe-id}/preview
+```
+
+This gives exact, node-side evaluation for all DTL functions using the current pipe config and real data.
+
+---
+
+## API Contract
+
+### Endpoint
+```
+POST https://{node-url}/api/pipes/{pipe-id}/preview
+Authorization: Bearer {jwt}
+Content-Type: application/json
+```
+
+### Request body
+```json
+[                      // array of input entities (_S)
+  { "_id": "...", ... }
+]
+```
+
+### Response
+```json
+[                      // array of output entities (_T), one per input (may be empty if discarded)
+  { "_id": "...", ... }
+]
+```
+
+Errors are returned as HTTP 4xx/5xx with a JSON body `{ "message": "..." }`.
 
 ---
 
@@ -26,30 +61,34 @@ offline mode to node-connected mode, fetching real entities from the configured 
    - Show a lock icon when authenticated, a warning when credentials are missing (with a "Set credentials"
      link that triggers `sesam.setToken`).
 
-### Phase B: Entity Fetching from Node
+### Phase B: Live Evaluation via Pipe Preview API
 
 1. Create `client/src/nodeClient.ts`:
+   - `previewPipe(nodeUrl: string, jwt: string, pipeId: string, entities: Entity[]): Promise<Entity[]>`
+   - Uses the Node `https` module (no extra deps) to `POST /api/pipes/{pipeId}/preview`.
    - `fetchEntities(nodeUrl: string, jwt: string, datasetId: string, limit?: number): Promise<Entity[]>`
-   - Uses `node-fetch` (or `https` module) to call `GET /datasets/<id>/entities?limit=N`.
-   - Handles pagination via `since` parameter to support loading more entities.
+   - Uses `GET /api/datasets/{id}/entities?limit=N` with `since` cursor for pagination.
 2. In `PreviewPanel`, when `mode === 'live'`:
-   - Replace the static entity array loaded from `.test.json` with a call to `fetchEntities`.
-   - Add a "Dataset ID" input in the panel toolbar to specify which dataset to fetch from.
+   - Replace the `evaluate(rules, inputEntity)` call with `nodeClient.previewPipe(...)`.
+   - Extract `pipe-id` from `_id` in the active document to build the API URL.
+   - Evaluation now sends the full entity array (all embedded/testdata entities, or just the selected one).
    - Add a "Refresh" button and auto-refresh on pipe save.
-3. Cache fetched entities in memory for the session; invalidate on refresh or pipe change.
+3. Cache the last response per pipe-id in memory; invalidate on refresh or pipe change.
 
-### Phase C: Full DTL Evaluation with Node Data
+### Phase C: Input Entity Sourcing for Live Mode
 
-1. Update the shared evaluator (`src/shared/dtl-evaluator.ts`) so `hops`, `apply-hops`, and
-   `lookup-entity` resolve via a pluggable `DatasetResolver` interface instead of returning `null`.
-2. Implement `NodeDatasetResolver` in `client/src/nodeDatasetResolver.ts` using `nodeClient.fetchEntities`.
-3. Implement `LocalDatasetResolver` (existing behavior, reads from `.test.json` files).
-4. Pass the appropriate resolver to the evaluator based on `PreviewPanel.mode`.
+When `mode === 'live'`, the input entities are sourced as follows (same priority as offline mode):
+1. `source.type === "embedded"` → use inline `entities` array
+2. `testdata/<pipe-id>.json` → load from workspace filesystem (already implemented for offline mode)
+3. Manual input → use what the user has typed in the textarea
+
+All entities are sent as the request body array; the API returns one output per input.
 
 ### Phase D: Error Handling & UX Polish
 
-1. Show a spinner in the preview panel while fetching.
-2. Display node-side errors (HTTP 401, 403, network timeout) as styled banners inside the webview.
+1. Show a spinner in the preview panel while the API call is in flight.
+2. Display node-side errors (HTTP 401, 403, network timeout, 400 DTL error) as styled banners inside
+   the webview, preserving the error `message` from the response body.
 3. Truncate entity lists with a "Load more" button (default limit 50 entities).
 4. Add "Copy entity JSON" button per row in the entity list view.
 
@@ -59,10 +98,12 @@ offline mode to node-connected mode, fetching real entities from the configured 
 
 | File | Change |
 |---|---|
-| `client/src/preview/PreviewPanel.ts` | Mode toggle, toolbar, live-mode conditional logic |
-| `client/src/nodeClient.ts` (new) | REST client for `GET /datasets/<id>/entities` |
-| `client/src/nodeDatasetResolver.ts` (new) | `DatasetResolver` impl using nodeClient |
-| `src/shared/dtl-evaluator.ts` | Accept pluggable `DatasetResolver`; refactor `hops`/`lookup-entity` |
+| `client/src/preview/PreviewPanel.ts` | Mode toggle, toolbar, live-mode evaluation path |
+| `client/src/nodeClient.ts` (new) | `previewPipe()` → `POST /api/pipes/{id}/preview`; `fetchEntities()` → `GET /api/datasets/{id}/entities` |
+
+> **Note**: The `DatasetResolver` abstraction and changes to `dtl-evaluator.ts` are **no longer needed**
+> for live mode — the node evaluates the full pipe server-side. The offline evaluator stays as-is for
+> `mode === 'offline'`.
 
 ---
 
