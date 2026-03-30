@@ -74,7 +74,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     middleware: {
       handleDiagnostics(uri, diagnostics, next) {
         // Also store in our private map so the Sesam panel can display them.
-        diagnosticsStore.set(uri, diagnostics);
+        diagnosticsStore.set(uri.toString(), diagnostics);
         _onDiagnosticsChanged.fire();
         // Call next() so VS Code also gets squiggly lines, file badges, and the Problems panel.
         next(uri, diagnostics);
@@ -194,7 +194,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("dtl.previewPipe", () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
-        vscode.window.showWarningMessage("DTL Preview: No active editor.");
+        vscode.window.showWarningMessage("Pipe preview: No active editor.");
         return;
       }
       PreviewPanel.createOrShow(context.extensionUri, editor.document);
@@ -499,7 +499,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     vscode.workspace.onDidChangeTextDocument((event) => {
-      if (PreviewPanel.currentPanel) {
+      if (
+        PreviewPanel.currentPanel &&
+        event.document === vscode.window.activeTextEditor?.document
+      ) {
         PreviewPanel.currentPanel.updateDocument(event.document);
       }
     }),

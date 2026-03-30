@@ -33,7 +33,7 @@ export class PreviewPanel {
 
     const panel = vscode.window.createWebviewPanel(
       PreviewPanel.viewType,
-      "DTL Preview",
+      "Pipe preview",
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
@@ -67,13 +67,22 @@ export class PreviewPanel {
       null,
       this._disposables,
     );
+
+    this._sendDocumentState();
   }
 
   updateDocument(document: vscode.TextDocument): void {
-    if (document.languageId !== "dtl" && document.languageId !== "json") {
+    if (
+      document.languageId !== "sesam-config" &&
+      document.languageId !== "dtl" &&
+      document.languageId !== "json"
+    ) {
       return;
     }
+
+    const isSwitch = document.uri.toString() !== this._document.uri.toString();
     this._document = document;
+    this._sendDocumentState(isSwitch);
   }
 
   private _runEvaluation(inputJson: string): void {
@@ -103,6 +112,14 @@ export class PreviewPanel {
     this._panel.webview.postMessage({ type: "result", result });
   }
 
+  private _sendDocumentState(resetOutput = false): void {
+    const text = this._document.getText();
+    const fileName = vscode.workspace.asRelativePath(this._document.uri, false);
+    const entities = extractEmbeddedEntities(text);
+
+    this._panel.webview.postMessage({ type: "documentState", fileName, entities, resetOutput });
+  }
+
   dispose(): void {
     PreviewPanel.currentPanel = undefined;
     this._panel.dispose();
@@ -117,7 +134,7 @@ export class PreviewPanel {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DTL Preview</title>
+  <title>Pipe preview</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -155,6 +172,27 @@ export class PreviewPanel {
       font-size: 13px;
     }
     .run-btn:hover { background: var(--vscode-button-hoverBackground); }
+    .entity-nav {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      background: var(--vscode-sideBar-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+      flex-shrink: 0;
+    }
+    .entity-nav button {
+      padding: 1px 6px;
+      cursor: pointer;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-radius: 2px;
+      font-size: 11px;
+    }
+    .entity-nav button:disabled { opacity: 0.4; cursor: default; }
 
     .panes {
       flex: 1;
@@ -218,7 +256,8 @@ export class PreviewPanel {
 </head>
 <body>
   <header>
-    <h1>DTL Preview</h1>
+    <h1>Pipe preview</h1>
+    <span class="file-name" id="file-name"></span>
     <button class="run-btn" id="run-btn" onclick="runEval()">▶ Evaluate</button>
   </header>
 
@@ -226,6 +265,12 @@ export class PreviewPanel {
     <!-- Input Entity -->
     <div class="pane">
       <div class="pane-header">Input Entity (_S)</div>
+      <div id="entity-nav" class="entity-nav">
+        <span>Embedded:</span>
+        <button id="prev-btn" onclick="prevEntity()">&#9664;</button>
+        <span id="entity-counter">1 / 1</span>
+        <button id="next-btn" onclick="nextEntity()">&#9654;</button>
+      </div>
       <textarea id="input-entity" spellcheck="false" placeholder='{\n  "_id": "example-1",\n  "name": "Alice"\n}'>{
   "_id": "example-1",
   "name": "Alice",
@@ -248,6 +293,30 @@ export class PreviewPanel {
   <script>
     const vscode = acquireVsCodeApi();
 
+    let embeddedEntities = [];
+    let entityIndex = 0;
+
+    function prevEntity() {
+      if (entityIndex > 0) {
+        entityIndex--;
+        showEntity();
+      }
+    }
+
+    function nextEntity() {
+      if (entityIndex < embeddedEntities.length - 1) {
+        entityIndex++;
+        showEntity();
+      }
+    }
+
+    function showEntity() {
+      document.getElementById('input-entity').value = JSON.stringify(embeddedEntities[entityIndex], null, 2);
+      document.getElementById('entity-counter').textContent = (entityIndex + 1) + ' / ' + embeddedEntities.length;
+      document.getElementById('prev-btn').disabled = entityIndex === 0;
+      document.getElementById('next-btn').disabled = entityIndex === embeddedEntities.length - 1;
+    }
+
     function runEval() {
       const inputJson = document.getElementById('input-entity').value;
       vscode.postMessage({ type: 'evaluate', inputJson });
@@ -263,6 +332,25 @@ export class PreviewPanel {
 
     window.addEventListener('message', (event) => {
       const msg = event.data;
+
+      if (msg.type === 'documentState') {
+        document.getElementById('file-name').textContent = msg.fileName;
+        embeddedEntities = msg.entities ?? [];
+        entityIndex = 0;
+        const nav = document.getElementById('entity-nav');
+        nav.style.display = embeddedEntities.length > 1 ? 'flex' : 'none';
+        if (embeddedEntities.length > 0) { showEntity(); }
+        if (msg.resetOutput) {
+          const outputBox = document.getElementById('output-box');
+          outputBox.style.color = 'var(--vscode-descriptionForeground)';
+          outputBox.textContent = 'Press \u25ba Evaluate to see output.';
+          document.getElementById('status-bar').className = 'status-bar';
+          document.getElementById('status-bar').textContent = 'Ready.';
+          document.getElementById('warnings-box').style.display = 'none';
+          document.getElementById('warnings-box').innerHTML = '';
+        }
+        return;
+      }
 
       if (msg.type === 'result') {
         const r = msg.result;
@@ -356,5 +444,33 @@ function extractRules(text: string): unknown[] | null {
   } catch {
     // Not valid JSON
   }
+  return null;
+}
+
+function extractEmbeddedEntities(text: string): unknown[] | null {
+  try {
+    const parsed = JSON.parse(text);
+
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return null;
+    }
+
+    const source = (parsed as Record<string, unknown>)["source"] as
+      | Record<string, unknown>
+      | undefined;
+
+    if (!source || source["type"] !== "embedded") {
+      return null;
+    }
+
+    const entities = source["entities"];
+
+    if (Array.isArray(entities) && entities.length > 0) {
+      return entities as unknown[];
+    }
+  } catch {
+    // Not valid JSON
+  }
+
   return null;
 }
