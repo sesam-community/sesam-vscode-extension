@@ -499,7 +499,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     vscode.workspace.onDidChangeTextDocument((event) => {
-      if (PreviewPanel.currentPanel) {
+      if (
+        PreviewPanel.currentPanel &&
+        event.document === vscode.window.activeTextEditor?.document
+      ) {
         PreviewPanel.currentPanel.updateDocument(event.document);
       }
     }),

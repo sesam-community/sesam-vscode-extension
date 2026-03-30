@@ -68,7 +68,7 @@ export class PreviewPanel {
       this._disposables,
     );
 
-    this._sendEmbeddedEntities();
+    this._sendDocumentState();
   }
 
   updateDocument(document: vscode.TextDocument): void {
@@ -79,8 +79,10 @@ export class PreviewPanel {
     ) {
       return;
     }
+
+    const isSwitch = document.uri.toString() !== this._document.uri.toString();
     this._document = document;
-    this._sendEmbeddedEntities();
+    this._sendDocumentState(isSwitch);
   }
 
   private _runEvaluation(inputJson: string): void {
@@ -110,12 +112,12 @@ export class PreviewPanel {
     this._panel.webview.postMessage({ type: "result", result });
   }
 
-  private _sendEmbeddedEntities(): void {
-    const entities = extractEmbeddedEntities(this._document.getText());
+  private _sendDocumentState(resetOutput = false): void {
+    const text = this._document.getText();
+    const fileName = vscode.workspace.asRelativePath(this._document.uri, false);
+    const entities = extractEmbeddedEntities(text);
 
-    if (entities) {
-      this._panel.webview.postMessage({ type: "embeddedEntities", entities });
-    }
+    this._panel.webview.postMessage({ type: "documentState", fileName, entities, resetOutput });
   }
 
   dispose(): void {
@@ -255,6 +257,7 @@ export class PreviewPanel {
 <body>
   <header>
     <h1>Pipe preview</h1>
+    <span class="file-name" id="file-name"></span>
     <button class="run-btn" id="run-btn" onclick="runEval()">▶ Evaluate</button>
   </header>
 
@@ -330,12 +333,22 @@ export class PreviewPanel {
     window.addEventListener('message', (event) => {
       const msg = event.data;
 
-      if (msg.type === 'embeddedEntities') {
-        embeddedEntities = msg.entities;
+      if (msg.type === 'documentState') {
+        document.getElementById('file-name').textContent = msg.fileName;
+        embeddedEntities = msg.entities ?? [];
         entityIndex = 0;
         const nav = document.getElementById('entity-nav');
         nav.style.display = embeddedEntities.length > 1 ? 'flex' : 'none';
         if (embeddedEntities.length > 0) { showEntity(); }
+        if (msg.resetOutput) {
+          const outputBox = document.getElementById('output-box');
+          outputBox.style.color = 'var(--vscode-descriptionForeground)';
+          outputBox.textContent = 'Press \u25ba Evaluate to see output.';
+          document.getElementById('status-bar').className = 'status-bar';
+          document.getElementById('status-bar').textContent = 'Ready.';
+          document.getElementById('warnings-box').style.display = 'none';
+          document.getElementById('warnings-box').innerHTML = '';
+        }
         return;
       }
 
