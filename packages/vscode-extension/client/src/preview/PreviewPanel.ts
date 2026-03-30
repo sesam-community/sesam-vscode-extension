@@ -33,7 +33,7 @@ export class PreviewPanel {
 
     const panel = vscode.window.createWebviewPanel(
       PreviewPanel.viewType,
-      "DTL Preview",
+      "Pipe preview",
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
@@ -132,7 +132,7 @@ export class PreviewPanel {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DTL Preview</title>
+  <title>Pipe preview</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -254,7 +254,7 @@ export class PreviewPanel {
 </head>
 <body>
   <header>
-    <h1>DTL Preview</h1>
+    <h1>Pipe preview</h1>
     <button class="run-btn" id="run-btn" onclick="runEval()">▶ Evaluate</button>
   </header>
 
