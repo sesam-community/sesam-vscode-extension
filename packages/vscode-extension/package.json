@@ -186,6 +186,14 @@
         "command": "sesam.clearErrors",
         "title": "Sesam: Clear Errors",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "dtl.duplicatePipe",
+        "title": "Sesam: Duplicate Config File"
+      },
+      {
+        "command": "dtl.createDownstreamPipe",
+        "title": "Sesam: Create Downstream Pipe"
       }
     ],
     "menus": {
@@ -201,6 +209,16 @@
           "command": "dtl.newConfFile",
           "when": "workspaceFolderCount > 0",
           "group": "2_workspace@99"
+        },
+        {
+          "command": "dtl.duplicatePipe",
+          "when": "resourceLangId == sesam-config",
+          "group": "2_workspace@99"
+        },
+        {
+          "command": "dtl.createDownstreamPipe",
+          "when": "resourceLangId == sesam-config",
+          "group": "2_workspace@99"
         }
       ],
       "commandPalette": [
@@ -215,6 +233,14 @@
         {
           "command": "sesam.clearErrors",
           "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "dtl.duplicatePipe",
+          "when": "editorLangId == sesam-config"
+        },
+        {
+          "command": "dtl.createDownstreamPipe",
+          "when": "editorLangId == sesam-config"
         }
       ],
       "view/title": [
