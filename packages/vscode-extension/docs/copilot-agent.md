@@ -226,13 +226,22 @@ Open a pipe config in the editor, then:
 
 **Generate test data**
 
-With a pipe config open:
+Open the pipe config you want to test in the editor, then:
 
 ```
 @sesam /test
 ```
 
-`@sesam` outputs matching `input.json` and `expected.json` content with suggested file paths.
+`@sesam` reads the active pipe config and generates `input.json` and `expected.json` content for it:
+
+```
+testdata/
+  <pipe-id>/
+    input.json    ← sample source entities fed into the transform
+    expected.json ← what the transform must output for the test to pass
+```
+
+Save the files to `testdata/<pipe-id>/`, then run `sesam test` from the CLI to verify.
 
 ---
 
