@@ -238,10 +238,15 @@ With a pipe config open:
 
 **Attach a file as context**
 
-Drag a `.conf.json` file into the chat input, then:
+Drag a `.conf.json` file into the chat input, then send one message per intent:
 
 ```
 @sesam /explain
+```
+
+or
+
+```
 @sesam /test
 ```
 
@@ -249,9 +254,17 @@ Drag a `.conf.json` file into the chat input, then:
 
 **Natural language (intent is auto-detected)**
 
+Each of these is a separate chat message:
+
 ```
 @sesam what does the "hops" function do?
+```
+
+```
 @sesam create a pipe that merges two datasets
+```
+
+```
 @sesam how do I run a single pipe with sesam-py?
 ```
 
