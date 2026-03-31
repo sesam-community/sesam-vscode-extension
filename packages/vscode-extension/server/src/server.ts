@@ -890,7 +890,6 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
           idHit.name,
           params.newName,
           params.textDocument.uri,
-          document.version,
           document,
           text,
           idHit.range.start,
@@ -923,7 +922,6 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
         refHitRen.name,
         params.newName,
         targetEntry.uri,
-        targetDoc?.version ?? null,
         targetDoc ?? null,
         targetRawText,
         targetEntry.idOffset,
@@ -952,7 +950,6 @@ function buildIdRenameDocumentChanges(
   oldId: string,
   newId: string,
   targetUri: string,
-  targetVersion: number | null,
   targetDoc: TextDocument | null,
   targetText: string,
   idValueOffset: number,
@@ -977,7 +974,7 @@ function buildIdRenameDocumentChanges(
   );
 
   const documentChanges: (TextDocumentEdit | RenameFile)[] = [
-    TextDocumentEdit.create({ uri: targetUri, version: targetVersion }, [idTextEdit]),
+    TextDocumentEdit.create({ uri: targetUri, version: null }, [idTextEdit]),
     RenameFile.create(targetUri, newUri),
   ];
 
@@ -996,7 +993,8 @@ function buildIdRenameDocumentChanges(
   const explicitSinkDataset = typeof sinkObj["dataset"] === "string" ? sinkObj["dataset"] : null;
 
   if (explicitSinkDataset === null) {
-    const datasetRefs = findAllDatasetCrossRefs(oldId, workspaceIndex.fileTexts, targetUri);
+    // Include all files — even targetUri itself (self-referencing dataset uses).
+    const datasetRefs = findAllDatasetCrossRefs(oldId, workspaceIndex.fileTexts, "");
     const refsByUri = new Map<string, Array<{ start: number; end: number }>>();
 
     for (const ref of datasetRefs) {
@@ -1006,31 +1004,25 @@ function buildIdRenameDocumentChanges(
     }
 
     for (const [refUri, ranges] of refsByUri) {
-      const refDoc = documents.get(refUri);
-      const refRawText = refDoc ? "" : (workspaceIndex.fileTexts.get(refUri) ?? "");
-      const edits = ranges.map((r) => {
-        if (refDoc) {
-          return TextEdit.replace(
-            Range.create(refDoc.positionAt(r.start), refDoc.positionAt(r.end)),
-            newId,
-          );
-        }
-
-        const linesBefore = refRawText.slice(0, r.start).split("\n");
-        const line = linesBefore.length - 1;
-        const character = linesBefore[line].length;
-        const linesBefore2 = refRawText.slice(0, r.end).split("\n");
-        const endLine = linesBefore2.length - 1;
-        const endCharacter = linesBefore2[endLine].length;
-
-        return TextEdit.replace(
-          Range.create(Position.create(line, character), Position.create(endLine, endCharacter)),
+      const refRawText = workspaceIndex.fileTexts.get(refUri) ?? "";
+      const crossEdits = ranges.map((r) =>
+        TextEdit.replace(
+          Range.create(offsetToPosition(refRawText, r.start), offsetToPosition(refRawText, r.end)),
           newId,
-        );
-      });
-      documentChanges.push(
-        TextDocumentEdit.create({ uri: refUri, version: refDoc?.version ?? null }, edits),
+        ),
       );
+
+      if (refUri === targetUri) {
+        // Merge self-references into the existing _id TextDocumentEdit so VS Code
+        // doesn't receive two edits for the same URI (it would drop the second).
+        const existing = documentChanges[0] as TextDocumentEdit;
+        documentChanges[0] = TextDocumentEdit.create({ uri: targetUri, version: null }, [
+          ...existing.edits,
+          ...crossEdits,
+        ]);
+      } else {
+        documentChanges.push(TextDocumentEdit.create({ uri: refUri, version: null }, crossEdits));
+      }
     }
   }
 
