@@ -494,6 +494,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const doc = await vscode.workspace.openTextDocument(fileUri);
       await vscode.window.showTextDocument(doc);
     }),
+
+    vscode.commands.registerCommand(
+      "sesam.saveGeneratedPipe",
+      async (jsonContent: string, suggestedName: string) => {
+        const wsFolder = vscode.workspace.workspaceFolders?.[0];
+        const defaultUri = wsFolder
+          ? vscode.Uri.joinPath(wsFolder.uri, "pipes", suggestedName)
+          : vscode.Uri.file(suggestedName);
+
+        const saveUri = await vscode.window.showSaveDialog({
+          defaultUri,
+          filters: { "Sesam config": ["conf.json", "conf.pipe", "json"] },
+          title: "Save generated pipe",
+        });
+
+        if (!saveUri) {
+          return;
+        }
+
+        await vscode.workspace.fs.writeFile(saveUri, Buffer.from(jsonContent, "utf-8"));
+        const doc = await vscode.workspace.openTextDocument(saveUri);
+        await vscode.window.showTextDocument(doc);
+      },
+    ),
   );
 
   // Keep the PreviewPanel updated when the active document changes

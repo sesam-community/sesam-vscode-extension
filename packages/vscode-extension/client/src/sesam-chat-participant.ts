@@ -97,7 +97,10 @@ ${buildFunctionReference()}
 
 const GENERATE_PIPE_SYSTEM_PROMPT = `
 You are an expert in Sesam DTL (Data Transformation Language) pipe configuration.
-Generate valid Sesam pipe JSON configs following these rules:
+Your task is to generate a BRAND NEW Sesam pipe config from scratch, based ONLY on the user's description.
+Do NOT reference, analyse, or modify any existing file. The user is asking for new content.
+
+Rules for the generated config:
 - Every config MUST have "_id" (string) and "type": "pipe"
 - "source" object must have a valid "type" field
 - DTL transforms belong in "transform": {"type": "dtl", "rules": {"default": [...]}}
@@ -108,7 +111,7 @@ Available system types: ${SESAM_SYSTEM_TYPES.join(", ")}
 
 ${DTL_REFERENCE}
 
-Always return the pipe as a fenced JSON code block. After the code block, briefly explain what it does.
+Return the new pipe as a fenced JSON code block. After the code block, briefly describe what it does.
 `.trim();
 
 const EXPLAIN_SYSTEM_PROMPT = `
@@ -258,11 +261,23 @@ const handleGeneratePipe = async (
   client: LanguageClient,
   token: vscode.CancellationToken,
 ): Promise<vscode.ChatResult> => {
+  const description = request.prompt.trim();
+
+  if (description.length < 5) {
+    stream.markdown(
+      "Please describe the pipe you want to generate. For example:\n\n" +
+        '`@sesam /generate a pipe that reads from a REST system "hr-api" and maps employeeId to _T.id`',
+    );
+    return {};
+  }
+
   stream.progress("Generating pipe config…");
 
+  // Explicitly pass only the description — do not forward request.references so that
+  // any implicitly injected workspace context (Agent mode) cannot misdirect the model.
   const messages = [
     vscode.LanguageModelChatMessage.User(GENERATE_PIPE_SYSTEM_PROMPT),
-    vscode.LanguageModelChatMessage.User(request.prompt),
+    vscode.LanguageModelChatMessage.User(`Generate a new pipe: ${description}`),
   ];
 
   const response = await request.model.sendRequest(messages, {}, token);
@@ -281,6 +296,21 @@ const handleGeneratePipe = async (
   const generated = extractFirstCodeBlock(full);
 
   if (generated) {
+    // Extract _id for the suggested filename
+    let pipeId = "generated-pipe";
+
+    try {
+      const parsed = JSON.parse(generated) as Record<string, unknown>;
+
+      if (typeof parsed._id === "string") {
+        pipeId = parsed._id;
+      }
+    } catch {
+      // ignore — use default
+    }
+
+    const suggestedName = `${pipeId}.conf.json`;
+
     try {
       const lintRequest: LintContentRequest = { content: generated };
       const lintResult = await client.sendRequest<LintContentResponse>(
@@ -301,6 +331,12 @@ const handleGeneratePipe = async (
     } catch {
       // Lint unavailable — don't block the response
     }
+
+    stream.button({
+      command: "sesam.saveGeneratedPipe",
+      title: `$(save) Save as ${suggestedName}`,
+      arguments: [generated, suggestedName],
+    });
   }
 
   return {};
