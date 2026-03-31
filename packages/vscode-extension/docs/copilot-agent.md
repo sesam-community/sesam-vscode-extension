@@ -199,13 +199,16 @@ generate pipes, explain transforms, write test data, and answer CLI questions di
 
 ### Example Prompts
 
-**Generate a pipe (with auto-lint)**
+**Generate a pipe (with auto-lint and save)**
 
 ```
 @sesam /generate a pipe that reads from a REST system "hr-api" and maps employeeId to _T.id
 ```
 
 `@sesam` generates the JSON, calls the lint tool on the output, and reports any issues inline.
+A **`Save as hr-api.conf.json`** button appears below the response — click it to open a Save Dialog
+pre-filled with `pipes/<pipe-id>.conf.json` inside your workspace. Confirm to write the file and
+open it in the editor.
 
 ---
 
