@@ -23,6 +23,7 @@ import { PipeLineageProvider } from "./graph/PipeLineageProvider";
 import { SystemPipesProvider } from "./graph/SystemPipesProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
+import { registerSesamLmTools } from "./lm-tools";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
 
@@ -90,6 +91,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   await client.start();
+
+  registerSesamLmTools(context, client);
 
   // ── Pipe DAG Views (Lineage + Dependents) ───────────────────────────────
   const dagRef: { current: DagIndex | null } = { current: null };

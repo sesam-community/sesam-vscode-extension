@@ -99,6 +99,14 @@ import { findAddPropertyAtOffset, findAllAddPropertyDefinitions } from "./utils/
 
 import type { DtlSettings } from "./server.types";
 import type { ValidatorOptions } from "../../types/dtl-validator.types";
+import type {
+  LintContentRequest,
+  LintContentResponse,
+  LintDiagnostic,
+  LintSeverity,
+  LintWorkspaceRequest,
+  LintWorkspaceResponse,
+} from "../../types/lint.types";
 
 // ---------------------------------------------------------------------------
 // Connection & document store
@@ -826,5 +834,147 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Custom request: sesam/lintContent
+// ---------------------------------------------------------------------------
+
+async function lintText(text: string, uri: string): Promise<LintDiagnostic[]> {
+  const settings = await getDocumentSettings(uri);
+  const parseResult = parseDtlText(text, "json");
+  const diagnostics: Diagnostic[] = [];
+
+  const validatorOptions: ValidatorOptions = {
+    maxProblems: settings.maxNumberOfProblems ?? defaultSettings.maxNumberOfProblems,
+    validateUnknownFunctions: settings.validate?.unknownFunctions ?? true,
+    validateArgCount: settings.validate?.argCount ?? true,
+    validateJsonSyntax: settings.validate?.jsonSyntax ?? true,
+    validateDtlStructure: settings.validate?.dtlStructure ?? true,
+    validateTransformInExpression: settings.validate?.transformInExpression ?? true,
+    validatePathExpressions: settings.validate?.pathExpressions ?? false,
+    validateConfigStructure: settings.validate?.configStructure ?? true,
+    ruleNames: parseResult.ruleNames,
+  };
+
+  if (parseResult.parseError !== null && validatorOptions.validateJsonSyntax) {
+    const offset = parseResult.parseError.offset;
+    const pos = offset >= 0 ? offsetToPosition(text, offset) : { line: 0, character: 0 };
+    diagnostics.push({
+      range: Range.create(
+        pos.line,
+        pos.character,
+        pos.line,
+        Math.max(pos.character + 1, pos.character),
+      ),
+      severity: DiagnosticSeverity.Error,
+      message: `Invalid JSON: ${parseResult.parseError.message}`,
+      source: "dtl",
+      code: "invalid-json",
+    });
+  } else {
+    diagnostics.push(
+      ...validateStructure(parseResult.calls, parseResult.structuralErrors, validatorOptions),
+    );
+    diagnostics.push(...validateCalls(parseResult.calls, validatorOptions));
+    diagnostics.push(...validatePathStrings(parseResult.calls, validatorOptions));
+    diagnostics.push(...validateConfigStructure(text, validatorOptions));
+  }
+
+  return diagnostics.map((d) => ({
+    range: {
+      start: { line: d.range.start.line, character: d.range.start.character },
+      end: { line: d.range.end.line, character: d.range.end.character },
+    },
+    severity: (d.severity ?? DiagnosticSeverity.Information) as LintSeverity,
+    message: d.message,
+    code: typeof d.code === "string" ? d.code : d.code !== undefined ? String(d.code) : undefined,
+    source: d.source,
+  }));
+}
+
+connection.onRequest(
+  "sesam/lintContent",
+  async (params: LintContentRequest): Promise<LintContentResponse> => {
+    try {
+      let text: string;
+      let fileLabel: string;
+
+      if (params.content !== undefined) {
+        text = params.content;
+        fileLabel = "inline content";
+      } else if (params.uri) {
+        const openDoc = documents.get(params.uri);
+
+        if (openDoc) {
+          text = openDoc.getText();
+        } else {
+          text = fs.readFileSync(fileURLToPath(params.uri), "utf-8");
+        }
+
+        fileLabel = params.uri.split("/").pop() ?? params.uri;
+      } else {
+        return {
+          diagnostics: [],
+          fileLabel: "unknown",
+          error: "Either 'uri' or 'content' must be provided.",
+        };
+      }
+
+      const diagnostics = await lintText(text, params.uri ?? "untitled:lint");
+
+      return { diagnostics, fileLabel };
+    } catch (e) {
+      return { diagnostics: [], fileLabel: "unknown", error: String(e) };
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Custom request: sesam/lintWorkspace
+// ---------------------------------------------------------------------------
+
+connection.onRequest(
+  "sesam/lintWorkspace",
+  async (params: LintWorkspaceRequest): Promise<LintWorkspaceResponse> => {
+    try {
+      const maxProblems = params.maxProblems ?? 100;
+      const minSeverity: LintSeverity = params.minSeverity ?? 4;
+      const results: LintWorkspaceResponse["results"] = [];
+      let totalCollected = 0;
+
+      for (const uri of workspaceIndex.allFileUris()) {
+        if (totalCollected >= maxProblems) {
+          break;
+        }
+
+        try {
+          const text = workspaceIndex.fileTexts.get(uri);
+
+          if (text === undefined) {
+            continue;
+          }
+
+          const allDiags = await lintText(text, uri);
+          const filtered = allDiags.filter((d) => d.severity <= minSeverity);
+
+          if (filtered.length > 0) {
+            results.push({
+              uri,
+              fileLabel: uri.split("/").pop() ?? uri,
+              diagnostics: filtered.slice(0, maxProblems - totalCollected),
+            });
+            totalCollected += filtered.length;
+          }
+        } catch {
+          // Skip unreadable files silently
+        }
+      }
+
+      return { results };
+    } catch (e) {
+      return { results: [], error: String(e) };
+    }
+  },
+);
+
 documents.listen(connection);
 connection.listen();
