@@ -37,7 +37,8 @@ sesam-py. Users can ask questions like `@sesam generate a pipe that fetches from
 3. Add an intent router inside `handleRequest`:
    - Detect keywords `generate`, `create`, `new pipe` -> `handleGeneratePipe`
    - Detect keywords `explain`, `what does` -> `handleExplain`
-   - Detect keywords `test`, `write test` -> `handleGenerateTest`
+   - Detect keywords `test`, `write test` -> `handleGenerateTest` (renamed `/generate-test`)
+   - Slash command `/test` -> `handleRunTests` (runs F05 pipe tests)
    - Detect keywords `run`, `upload`, `download`, `sesam-py` -> `handleCliGuidance`
    - Fallback: general DTL Q&A with RAG over `dtl-registry.ts` data
 4. Add `package.json` contribution:
@@ -70,7 +71,19 @@ sesam-py. Users can ask questions like `@sesam generate a pipe that fetches from
 3. Add `@sesam` as a CodeLens action on transform arrays: "Explain with @sesam" -> opens chat
    with the current pipe pre-pasted.
 
-### Phase D: Generate Test Intent
+### Phase D: Test Intents — `/test` (run) and `/generate-test` (generate)
+
+There are **two distinct test intents**:
+
+#### `/test` — Run actual pipe tests (depends on F05)
+
+1. Resolve credentials via `credential-resolver.ts` (SecretStorage → `.syncconfig`).
+2. Call `testPipes(creds, workspaceRoot)` from `@sesam/core` (F05).
+3. Stream a Markdown summary to the chat: ✅ passed / ❌ failed per pipe.
+4. On failure, stream the unified diff inline and add a `$(diff) Open diff` button that
+   executes `sesam.openTestDiff` for that pipe.
+
+#### `/generate-test` — AI-generated test data (renamed from the original `/test`)
 
 1. Accept a pipe name or active file as context.
 2. Generate:
@@ -78,16 +91,9 @@ sesam-py. Users can ask questions like `@sesam generate a pipe that fetches from
    - `expected/<pipe-name>.json` with the expected transformation output
 3. Offer to write both files directly via "Save test files" button in the chat response.
 
-> **Future refactor (depends on F04):** The current implementation generates test data using the
-> language model only (offline, best-effort). Once F04 (Node-Connected Live Preview) is implemented,
-> `/test` should be refactored to use the same `POST /api/pipes/{pipe-id}/preview` API that the
-> Pipe Preview panel uses:
->
-> 1. Feed the generated `input.json` entities into the live node via the preview API.
-> 2. Capture the actual transform output as the ground-truth `expected.json`.
-> 3. This avoids model hallucination in expected values and makes tests immediately reliable.
->
-> The same `nodeClient.ts` helper introduced in F04 (`previewPipe()`) should be reused here.
+> **Future refactor (depends on F04):** Once F04 is implemented, `/generate-test` should optionally
+> feed generated input entities into the live node via the preview API and capture the actual
+> transform output as ground-truth `expected.json`. Reuse `nodeClient.previewPipe()` from F04.
 
 ### Phase E: CLI Guidance Intent
 
@@ -115,4 +121,5 @@ sesam-py. Users can ask questions like `@sesam generate a pipe that fetches from
 - VS Code 1.90+ (Chat Participant API + Language Model API)
 - **F02** - DTL registry as RAG source
 - **F01** - "Run command" actions delegate to sesam commands (F01)
+- **F05** - `testPipes()` from `@sesam/core` powers the `/test` slash command
 - GitHub Copilot extension must be installed (API provided by Copilot)
