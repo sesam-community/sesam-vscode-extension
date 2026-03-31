@@ -168,7 +168,7 @@ ${DTL_REFERENCE}
 // Intent detection
 // ---------------------------------------------------------------------------
 
-type Intent = "generate" | "explain" | "test" | "cli" | "default";
+type Intent = "generate" | "explain" | "test" | "run-tests" | "cli" | "default";
 
 const detectIntent = (prompt: string, command: string | undefined): Intent => {
   if (command === "generate") {
@@ -179,6 +179,12 @@ const detectIntent = (prompt: string, command: string | undefined): Intent => {
     return "explain";
   }
 
+  if (command === "run-tests") {
+    return "run-tests";
+  }
+
+  // TODO (F05): rename this intent to "generate-test" once the real
+  // /test command is wired to testPipes() from @sesam/core.
   if (command === "test") {
     return "test";
   }
@@ -523,6 +529,14 @@ const makeHandler =
         return handleExplain(request, stream, token);
       case "test":
         return handleGenerateTest(request, stream, token);
+      case "run-tests":
+        // TODO (F05): replace this stub with a call to testPipes() from @sesam/core.
+        // See agent/impl/impl-f05-test-management.prompt.md Phase 6.
+        stream.markdown(
+          "⚠️ **Run tests** is not yet implemented. See F05 for the implementation plan.\n\n" +
+            "Use `@sesam /generate-test` to generate test data for a pipe using AI.",
+        );
+        return {};
       case "cli":
         return handleCliGuidance(request, stream, token);
       default:
