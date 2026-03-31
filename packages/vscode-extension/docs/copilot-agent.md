@@ -145,6 +145,83 @@ You can also watch the raw IPC traffic in **Output → DTL Language Server (Trac
 
 ---
 
+## @sesam Chat Participant
+
+The extension also registers an **`@sesam` chat participant** — a Sesam-aware assistant that can
+generate pipes, explain transforms, write test data, and answer CLI questions directly in Copilot Chat.
+
+### How to Use @sesam
+
+1. Open Copilot Chat (`Ctrl+Alt+I`) and switch the mode selector to **Agent**.
+2. Type `@sesam` — *Sesam Assistant* appears in the autocomplete.
+3. Use a slash command or ask naturally.
+
+### Slash Commands
+
+| Command | What it does |
+|---|---|
+| `/generate` | Generate a new Sesam pipe config |
+| `/explain` | Explain the active pipe config or a file dragged into chat |
+| `/test` | Generate `testdata/<pipe-id>-input.json` + `testdata/<pipe-id>-expected.json` |
+| `/cli` | Get sesam-py CLI command syntax and examples |
+
+### Example Prompts
+
+**Generate a pipe (with auto-lint)**
+
+```
+@sesam /generate a pipe that reads from a REST system "hr-api" and maps employeeId to _T.id
+```
+
+`@sesam` generates the JSON, calls the lint tool on the output, and reports any issues inline.
+
+---
+
+**Explain the active file**
+
+Open a pipe config in the editor, then:
+
+```
+@sesam /explain
+```
+
+`@sesam` reads the active file and explains each transform rule in plain language.
+
+---
+
+**Generate test data**
+
+With a pipe config open:
+
+```
+@sesam /test
+```
+
+`@sesam` outputs matching `input.json` and `expected.json` content with suggested file paths.
+
+---
+
+**Attach a file as context**
+
+Drag a `.conf.json` file into the chat input, then:
+
+```
+@sesam /explain
+@sesam /test
+```
+
+---
+
+**Natural language (intent is auto-detected)**
+
+```
+@sesam what does the "hops" function do?
+@sesam create a pipe that merges two datasets
+@sesam how do I run a single pipe with sesam-py?
+```
+
+---
+
 ## Troubleshooting
 
 **`#sesamLintWorkspace` doesn't autocomplete**
@@ -154,6 +231,9 @@ or run `Developer: Restart Extension Host` from the Command Palette.
 **Copilot uses `get_errors` instead of the Sesam tools**
 Be more explicit: type `#sesamLintWorkspace` directly in the input, or phrase your request as
 *"Use the Sesam lint tool to check my workspace"*.
+
+**`@sesam` doesn't appear in autocomplete**
+Run `Developer: Restart Extension Host` from the Command Palette, then re-open the chat.
 
 **Tools don't appear after F5**
 Make sure you are asking in the **Extension Development Host** window (the one opened by F5),
