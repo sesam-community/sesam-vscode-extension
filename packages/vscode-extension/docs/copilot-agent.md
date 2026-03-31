@@ -1,8 +1,26 @@
 # Using GitHub Copilot Agent with the Sesam Extension
 
-The extension registers two **Language Model Tools** that GitHub Copilot (and any VS Code-hosted AI agent)
-can call automatically. This lets you ask Copilot questions about your Sesam configs and have it validate,
-fix, and generate DTL pipes with full awareness of Sesam-specific rules.
+## Table of Contents
+
+- [Requirements](#requirements)
+- [Available Tools](#available-tools)
+- [How to Use](#how-to-use)
+  - [1. Open Copilot Chat in Agent Mode](#1-open-copilot-chat-in-agent-mode)
+  - [2. Ask naturally — Copilot selects the tool automatically](#2-ask-naturally--copilot-selects-the-tool-automatically)
+  - [3. Reference a tool explicitly with `#`](#3-reference-a-tool-explicitly-with-)
+- [Example Prompts](#example-prompts)
+  - [Audit the whole workspace](#audit-the-whole-workspace)
+  - [Validate a single file](#validate-a-single-file)
+  - [Fix errors automatically](#fix-errors-automatically)
+  - [Generate a valid pipe](#generate-a-valid-pipe)
+  - [Filter by severity](#filter-by-severity)
+  - [Explain errors](#explain-errors)
+- [Seeing the Tool Calls](#seeing-the-tool-calls)
+- [@sesam Chat Participant](#sesam-chat-participant)
+  - [How to Use @sesam](#how-to-use-sesam)
+  - [Slash Commands](#slash-commands)
+  - [Example Prompts](#example-prompts-1)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
