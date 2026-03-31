@@ -27,10 +27,94 @@
   },
   "main": "./dist/client/extension.js",
   "activationEvents": [
+    "onStartupFinished",
     "onLanguage:json",
-    "onLanguage:sesam-config"
+    "onLanguage:sesam-config",
+    "onLanguageModelTool:sesam_lint_document",
+    "onLanguageModelTool:sesam_lint_workspace",
+    "onChatParticipant:sesam.agent"
   ],
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "sesam.agent",
+        "name": "sesam",
+        "fullName": "Sesam Assistant",
+        "description": "Sesam DTL and sesam-py expert — generate pipes, explain transforms, write tests",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "generate",
+            "description": "Generate a new Sesam pipe config"
+          },
+          {
+            "name": "explain",
+            "description": "Explain the active DTL transform or pipe config"
+          },
+          {
+            "name": "test",
+            "description": "Generate test input/expected entities for the active pipe"
+          },
+          {
+            "name": "cli",
+            "description": "Get guidance on sesam-py CLI commands"
+          }
+        ]
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "sesam_lint_document",
+        "displayName": "Sesam: Lint Document",
+        "toolReferenceName": "sesamLintDocument",
+        "modelDescription": "Validates a Sesam DTL config file and returns structured diagnostics (errors and warnings). Accepts either a file URI / workspace-relative path or inline JSON content. Use this before suggesting fixes, writing configs to disk, or uploading to a Sesam node.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(check)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string",
+              "description": "File URI (file:///…) or workspace-relative path to the Sesam config file."
+            },
+            "content": {
+              "type": "string",
+              "description": "Raw JSON content to validate inline. Use when the file is unsaved or generated."
+            },
+            "filename": {
+              "type": "string",
+              "description": "Optional human-readable filename for inline content (display only)."
+            }
+          }
+        }
+      },
+      {
+        "name": "sesam_lint_workspace",
+        "displayName": "Sesam: Lint Workspace",
+        "toolReferenceName": "sesamLintWorkspace",
+        "modelDescription": "Scans all Sesam config files in the workspace and returns a summary of all validation issues grouped by file. Use to audit the full config set before a sesam upload.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(list-errors)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "maxProblems": {
+              "type": "number",
+              "description": "Maximum total diagnostics to return. Default: 100."
+            },
+            "severity": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "all"
+              ],
+              "description": "Minimum severity to include. Default: 'all'."
+            }
+          }
+        }
+      }
+    ],
     "iconThemes": [
       {
         "id": "sesam-icons",

@@ -173,4 +173,7 @@ export const workspaceIndex = {
     }
     _fileTexts.delete(uri);
   },
+  allFileUris(): IterableIterator<string> {
+    return _fileTexts.keys();
+  },
 };

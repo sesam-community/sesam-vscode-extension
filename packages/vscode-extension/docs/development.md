@@ -99,7 +99,7 @@ pnpm install
 │   └── pipe-dag-builder.test.ts        # Unit tests for DAG builder (lineage, dependents, system index)
 │
 └── docs/
-    └── DEVELOPMENT.md                  # This file — developer setup, workflow, testing, packaging, and publishing guide
+    └── development.md                  # This file — developer setup, workflow, testing, packaging, and publishing guide
 ```
 
 ---

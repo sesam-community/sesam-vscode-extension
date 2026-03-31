@@ -31,14 +31,14 @@
 | F17 | System Pipes View | — | `implemented` | [system-pipes-view.prompt.md](../plans/system-pipes-view.prompt.md) |
 | F18 | Dataset Alias Support (highlight + hover + rename) | — | `implemented` | [dataset-alias-support.prompt.md](../plans/dataset-alias-support.prompt.md) |
 | F19 | DTL Syntax Linting | Phase 1 | `implemented` | [impl-f19-syntax-linting.prompt.md](impl-f19-syntax-linting.prompt.md) |
-| F20 | Extension Language Model Tools API | Phase 1 | `planned` | [impl-f20-lm-tools-api.prompt.md](impl-f20-lm-tools-api.prompt.md) |
+| F20 | Extension Language Model Tools API | Phase 1 | `implemented` | [impl-f20-lm-tools-api.prompt.md](impl-f20-lm-tools-api.prompt.md) |
 | F21 | Config Property Completions | Phase 1 | `implemented` | [impl-f21-config-prop-completions.prompt.md](impl-f21-config-prop-completions.prompt.md) |
 | F22 | Sesam Panel (Errors / Warnings View) | Phase 1 | `implemented` | — |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
 | F04 | Node-Connected Live Preview | Phase 3 | `planned` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
 | F10 | Inline Output & Diagnostics from Node | Phase 3 | `planned` | [impl-f10-inline-diagnostics.prompt.md](impl-f10-inline-diagnostics.prompt.md) |
-| F09 | Copilot Agent Participant (@sesam) | Phase 4 | `planned` | [impl-f09-copilot-agent.prompt.md](impl-f09-copilot-agent.prompt.md) |
+| F09 | Copilot Agent Participant (@sesam) | Phase 4 | `implemented` | [impl-f09-copilot-agent.prompt.md](impl-f09-copilot-agent.prompt.md) |
 | F07 | Interactive Pipe Graph (canvas) | Phase 4 | `planned` (tracked as F15) | [impl-f07-pipe-graph.prompt.md](impl-f07-pipe-graph.prompt.md) |
 | F08 | Connector Development Tools | Phase 4 | `planned` | [impl-f08-connector-tools.prompt.md](impl-f08-connector-tools.prompt.md) |
 | F11 | Management Studio Functionalities | Phase 5 | `planned` | [impl-f11-management-studio.prompt.md](impl-f11-management-studio.prompt.md) |
@@ -68,7 +68,7 @@
 | F17: System Pipes View | `implemented` |
 | F18: Dataset Alias Support | `implemented` |
 | F19: DTL Syntax Linting | `implemented` |
-| F20: Extension Language Model Tools API | `planned` |
+| F20: Extension Language Model Tools API | `implemented` |
 | F21: Config Property Completions (all phases) | `implemented` |
 | F22: Sesam Panel (Errors / Warnings View) | `implemented` |
 

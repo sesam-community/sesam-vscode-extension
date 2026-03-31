@@ -74,6 +74,7 @@ Press **F5** in VS Code to launch the extension in a new Extension Development H
 | Utility / helper functions only | `*.utils.ts` | `string.utils.ts`, `range.utils.ts` |
 | Constants only | `*.constants.ts` or `constants.ts` | `constants.ts` |
 | Test file | mirrors source, `*.test.ts` | `dtl-validator.ts` → `validator.test.ts` |
+| Docs / guides | kebab-case `.md` (except root `README.md`) | `copilot-agent.md`, `development.md` |
 
 ## Coding Conventions
 

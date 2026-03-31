@@ -78,6 +78,17 @@ sesam-py. Users can ask questions like `@sesam generate a pipe that fetches from
    - `expected/<pipe-name>.json` with the expected transformation output
 3. Offer to write both files directly via "Save test files" button in the chat response.
 
+> **Future refactor (depends on F04):** The current implementation generates test data using the
+> language model only (offline, best-effort). Once F04 (Node-Connected Live Preview) is implemented,
+> `/test` should be refactored to use the same `POST /api/pipes/{pipe-id}/preview` API that the
+> Pipe Preview panel uses:
+>
+> 1. Feed the generated `input.json` entities into the live node via the preview API.
+> 2. Capture the actual transform output as the ground-truth `expected.json`.
+> 3. This avoids model hallucination in expected values and makes tests immediately reliable.
+>
+> The same `nodeClient.ts` helper introduced in F04 (`previewPipe()`) should be reused here.
+
 ### Phase E: CLI Guidance Intent
 
 1. For questions about sesam-py commands, answer from a built-in knowledge base
