@@ -31,9 +31,37 @@
     "onLanguage:json",
     "onLanguage:sesam-config",
     "onLanguageModelTool:sesam_lint_document",
-    "onLanguageModelTool:sesam_lint_workspace"
+    "onLanguageModelTool:sesam_lint_workspace",
+    "onChatParticipant:sesam.agent"
   ],
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "sesam.agent",
+        "name": "sesam",
+        "fullName": "Sesam Assistant",
+        "description": "Sesam DTL and sesam-py expert — generate pipes, explain transforms, write tests",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "generate",
+            "description": "Generate a new Sesam pipe config"
+          },
+          {
+            "name": "explain",
+            "description": "Explain the active DTL transform or pipe config"
+          },
+          {
+            "name": "test",
+            "description": "Generate test input/expected entities for the active pipe"
+          },
+          {
+            "name": "cli",
+            "description": "Get guidance on sesam-py CLI commands"
+          }
+        ]
+      }
+    ],
     "languageModelTools": [
       {
         "name": "sesam_lint_document",
