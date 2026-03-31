@@ -63,12 +63,66 @@ export const findAllCrossReferences = (
     while ((m = datasetsRe.exec(text)) !== null) {
       const arrayContent = m[1];
       const arrayStart = m.index + m[0].indexOf("[") + 1;
-      const itemRe = new RegExp(`"(${esc}(?:\\s+\\w+)?)"`, "g");
+      const itemRe = new RegExp(`"(${esc}(?:\\s+[^"]+)?)"`, "g");
       let im: RegExpExecArray | null;
       while ((im = itemRe.exec(arrayContent)) !== null) {
         const name = im[1].split(/\s+/)[0];
         if (name === targetId) {
           const nameStart = arrayStart + im.index + 1; // +1 to skip opening quote
+          results.push({ uri, nameStart, nameEnd: nameStart + targetId.length });
+        }
+      }
+    }
+  }
+
+  return results;
+};
+
+// ---------------------------------------------------------------------------
+// findAllDatasetCrossRefs
+// ---------------------------------------------------------------------------
+
+/**
+ * Like `findAllCrossReferences` but restricted to **dataset** references only
+ * (`"dataset": "targetId"` and `"datasets": [...]` array items).
+ * Does NOT match `"system"` references.
+ *
+ * Pass `excludeUri` to skip the file that defines the pipe being renamed
+ * (its `_id` text edit is handled separately).
+ */
+export const findAllDatasetCrossRefs = (
+  targetId: string,
+  fileTexts: ReadonlyMap<string, string>,
+  excludeUri: string,
+): CrossRef[] => {
+  const results: CrossRef[] = [];
+  const esc = targetId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  for (const [uri, text] of fileTexts) {
+    if (uri === excludeUri) {
+      continue;
+    }
+
+    let m: RegExpExecArray | null;
+
+    // "dataset": "targetId"
+    const datasetRe = new RegExp(`"dataset"\\s*:\\s*"(${esc})"`, "g");
+    while ((m = datasetRe.exec(text)) !== null) {
+      const nameStart = m.index + m[0].length - targetId.length - 1;
+      results.push({ uri, nameStart, nameEnd: nameStart + targetId.length });
+    }
+
+    // "datasets": [..., "targetId", ...] or "targetId ALIAS"
+    const datasetsRe = /"datasets"\s*:\s*\[([^\]]*)\]/gs;
+    while ((m = datasetsRe.exec(text)) !== null) {
+      const arrayContent = m[1];
+      const arrayStart = m.index + m[0].indexOf("[") + 1;
+      const itemRe = new RegExp(`"(${esc}(?:\\s+[^"]+)?)"`, "g");
+      let im: RegExpExecArray | null;
+      while ((im = itemRe.exec(arrayContent)) !== null) {
+        const name = im[1].split(/\s+/)[0];
+        if (name === targetId) {
+          const nameStart = arrayStart + im.index + 1;
           results.push({ uri, nameStart, nameEnd: nameStart + targetId.length });
         }
       }

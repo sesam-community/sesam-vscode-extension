@@ -90,7 +90,7 @@ import {
   findIdAtOffset,
 } from "./utils/reference-detection.utils";
 import { collectDocumentLinks } from "./utils/document-links.utils";
-import { findAllCrossReferences } from "./utils/cross-references.utils";
+import { findAllCrossReferences, findAllDatasetCrossRefs } from "./utils/cross-references.utils";
 import {
   findAliasAtOffset,
   findAliasUsageAtOffset,
@@ -632,19 +632,28 @@ connection.onReferences((params: ReferenceParams): Location[] | null => {
   const ruleName = keyHit?.ruleName ?? applyHit?.ruleName ?? null;
 
   if (!ruleName) {
-    // Cross-file: cursor on pipe/system _id value → find all files referencing it
+    // Cross-file: cursor on _id, dataset ref, or system ref → find all files referencing it
     const idHit = findIdAtOffset(text, offset);
-    if (idHit) {
-      const crossRefs = findAllCrossReferences(idHit.name, workspaceIndex.fileTexts);
-      const locations: Location[] = crossRefs.map(({ uri, nameStart, nameEnd }) => {
-        const refText = workspaceIndex.fileTexts.get(uri) ?? "";
-        return Location.create(
-          uri,
-          Range.create(offsetToPosition(refText, nameStart), offsetToPosition(refText, nameEnd)),
-        );
-      });
+    const dsHit = !idHit ? findDatasetReference(text, offset) : null;
+    const sysHit = !idHit && !dsHit ? findSystemReference(text, offset) : null;
+    const refName = idHit?.name ?? dsHit?.name ?? sysHit?.name ?? null;
 
-      if (params.context.includeDeclaration) {
+    if (!refName) {
+      return null;
+    }
+
+    const crossRefs = findAllCrossReferences(refName, workspaceIndex.fileTexts);
+    const locations: Location[] = crossRefs.map(({ uri, nameStart, nameEnd }) => {
+      const refText = workspaceIndex.fileTexts.get(uri) ?? "";
+      return Location.create(
+        uri,
+        Range.create(offsetToPosition(refText, nameStart), offsetToPosition(refText, nameEnd)),
+      );
+    });
+
+    if (params.context.includeDeclaration) {
+      if (idHit) {
+        // Cursor IS on the declaration
         locations.push(
           Location.create(
             document.uri,
@@ -654,11 +663,27 @@ connection.onReferences((params: ReferenceParams): Location[] | null => {
             ),
           ),
         );
-      }
+      } else {
+        // Cursor is on a reference — add the defining _id location
+        const entry =
+          workspaceIndex.pipeIndex.get(refName) ?? workspaceIndex.systemIndex.get(refName);
 
-      return locations.length > 0 ? locations : null;
+        if (entry) {
+          const entryText = workspaceIndex.fileTexts.get(entry.uri) ?? "";
+          locations.push(
+            Location.create(
+              entry.uri,
+              Range.create(
+                offsetToPosition(entryText, entry.idOffset),
+                offsetToPosition(entryText, entry.idOffset + refName.length),
+              ),
+            ),
+          );
+        }
+      }
     }
-    return null;
+
+    return locations.length > 0 ? locations : null;
   }
 
   const refs = findAllApplyReferences(text, ruleName);
@@ -758,7 +783,29 @@ connection.onPrepareRename(
       const idHit = findIdAtOffset(text, offset);
 
       if (!idHit) {
-        return null;
+        // Also allow rename from a dataset/system reference site
+        const dsHitPR = findDatasetReference(text, offset);
+        const sysHitPR = !dsHitPR ? findSystemReference(text, offset) : null;
+        const refHitPR = dsHitPR ?? sysHitPR;
+
+        if (!refHitPR) {
+          return null;
+        }
+
+        if (
+          !workspaceIndex.pipeIndex.has(refHitPR.name) &&
+          !workspaceIndex.systemIndex.has(refHitPR.name)
+        ) {
+          return null;
+        }
+
+        return {
+          range: Range.create(
+            document.positionAt(refHitPR.range.start),
+            document.positionAt(refHitPR.range.end),
+          ),
+          placeholder: refHitPR.name,
+        };
       }
 
       return {
@@ -835,32 +882,52 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
   const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
 
   if (!aliasHit) {
-    // _id rename — updates the value and renames the file.
     const idHit = findIdAtOffset(text, offset);
 
-    if (!idHit) {
+    if (idHit) {
+      return {
+        documentChanges: buildIdRenameDocumentChanges(
+          idHit.name,
+          params.newName,
+          params.textDocument.uri,
+          document.version,
+          document,
+          text,
+          idHit.range.start,
+        ),
+      };
+    }
+
+    // Rename from a dataset/system reference site — renames the target pipe/system.
+    const dsHitRen = findDatasetReference(text, offset);
+    const sysHitRen = !dsHitRen ? findSystemReference(text, offset) : null;
+    const refHitRen = dsHitRen ?? sysHitRen;
+
+    if (!refHitRen) {
       return null;
     }
 
-    const oldUri = params.textDocument.uri;
-    const lastSlash = oldUri.lastIndexOf("/");
-    const ext = oldUri.endsWith(".conf.pipe")
-      ? ".conf.pipe"
-      : oldUri.endsWith(".conf.system")
-        ? ".conf.system"
-        : ".conf.json";
-    const newUri = oldUri.slice(0, lastSlash + 1) + params.newName + ext;
+    const targetEntry =
+      workspaceIndex.pipeIndex.get(refHitRen.name) ??
+      workspaceIndex.systemIndex.get(refHitRen.name);
 
-    const textEdit = TextEdit.replace(
-      Range.create(document.positionAt(idHit.range.start), document.positionAt(idHit.range.end)),
-      params.newName,
-    );
+    if (!targetEntry) {
+      return null;
+    }
+
+    const targetRawText = workspaceIndex.fileTexts.get(targetEntry.uri) ?? "";
+    const targetDoc = documents.get(targetEntry.uri);
 
     return {
-      documentChanges: [
-        TextDocumentEdit.create({ uri: oldUri, version: document.version }, [textEdit]),
-        RenameFile.create(oldUri, newUri),
-      ],
+      documentChanges: buildIdRenameDocumentChanges(
+        refHitRen.name,
+        params.newName,
+        targetEntry.uri,
+        targetDoc?.version ?? null,
+        targetDoc ?? null,
+        targetRawText,
+        targetEntry.idOffset,
+      ),
     };
   }
 
@@ -871,6 +938,104 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
 
   return { changes: { [params.textDocument.uri]: edits } };
 });
+
+// ---------------------------------------------------------------------------
+// Rename helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the full documentChanges array for renaming a config _id:
+ * updates the _id value in the target file, renames the file, and updates
+ * all cross-file dataset references (unless sink.dataset is explicit).
+ */
+function buildIdRenameDocumentChanges(
+  oldId: string,
+  newId: string,
+  targetUri: string,
+  targetVersion: number | null,
+  targetDoc: TextDocument | null,
+  targetText: string,
+  idValueOffset: number,
+): (TextDocumentEdit | RenameFile)[] {
+  const lastSlash = targetUri.lastIndexOf("/");
+  const ext = targetUri.endsWith(".conf.pipe")
+    ? ".conf.pipe"
+    : targetUri.endsWith(".conf.system")
+      ? ".conf.system"
+      : ".conf.json";
+  const newUri = targetUri.slice(0, lastSlash + 1) + newId + ext;
+
+  const idEnd = idValueOffset + oldId.length;
+  const idTextEdit = TextEdit.replace(
+    targetDoc
+      ? Range.create(targetDoc.positionAt(idValueOffset), targetDoc.positionAt(idEnd))
+      : Range.create(
+          offsetToPosition(targetText, idValueOffset),
+          offsetToPosition(targetText, idEnd),
+        ),
+    newId,
+  );
+
+  const documentChanges: (TextDocumentEdit | RenameFile)[] = [
+    TextDocumentEdit.create({ uri: targetUri, version: targetVersion }, [idTextEdit]),
+    RenameFile.create(targetUri, newUri),
+  ];
+
+  let parsedConfig: Record<string, unknown> = {};
+
+  try {
+    parsedConfig = JSON.parse(targetText) as Record<string, unknown>;
+  } catch {
+    // ignore
+  }
+
+  const sinkObj =
+    typeof parsedConfig["sink"] === "object" && parsedConfig["sink"] !== null
+      ? (parsedConfig["sink"] as Record<string, unknown>)
+      : {};
+  const explicitSinkDataset = typeof sinkObj["dataset"] === "string" ? sinkObj["dataset"] : null;
+
+  if (explicitSinkDataset === null) {
+    const datasetRefs = findAllDatasetCrossRefs(oldId, workspaceIndex.fileTexts, targetUri);
+    const refsByUri = new Map<string, Array<{ start: number; end: number }>>();
+
+    for (const ref of datasetRefs) {
+      const existing = refsByUri.get(ref.uri) ?? [];
+      existing.push({ start: ref.nameStart, end: ref.nameEnd });
+      refsByUri.set(ref.uri, existing);
+    }
+
+    for (const [refUri, ranges] of refsByUri) {
+      const refDoc = documents.get(refUri);
+      const refRawText = refDoc ? "" : (workspaceIndex.fileTexts.get(refUri) ?? "");
+      const edits = ranges.map((r) => {
+        if (refDoc) {
+          return TextEdit.replace(
+            Range.create(refDoc.positionAt(r.start), refDoc.positionAt(r.end)),
+            newId,
+          );
+        }
+
+        const linesBefore = refRawText.slice(0, r.start).split("\n");
+        const line = linesBefore.length - 1;
+        const character = linesBefore[line].length;
+        const linesBefore2 = refRawText.slice(0, r.end).split("\n");
+        const endLine = linesBefore2.length - 1;
+        const endCharacter = linesBefore2[endLine].length;
+
+        return TextEdit.replace(
+          Range.create(Position.create(line, character), Position.create(endLine, endCharacter)),
+          newId,
+        );
+      });
+      documentChanges.push(
+        TextDocumentEdit.create({ uri: refUri, version: refDoc?.version ?? null }, edits),
+      );
+    }
+  }
+
+  return documentChanges;
+}
 
 // ---------------------------------------------------------------------------
 // Start
