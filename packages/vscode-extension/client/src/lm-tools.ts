@@ -159,6 +159,11 @@ export const registerSesamLmTools = (
   context: vscode.ExtensionContext,
   client: LanguageClient,
 ): void => {
+  if (!vscode.lm?.registerTool) {
+    console.warn("[sesam] vscode.lm.registerTool not available — skipping LM tool registration");
+    return;
+  }
+
   context.subscriptions.push(
     vscode.lm.registerTool("sesam_lint_document", makeLintDocumentTool(client)),
     vscode.lm.registerTool("sesam_lint_workspace", makeLintWorkspaceTool(client)),

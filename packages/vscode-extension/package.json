@@ -27,6 +27,7 @@
   },
   "main": "./dist/client/extension.js",
   "activationEvents": [
+    "onStartupFinished",
     "onLanguage:json",
     "onLanguage:sesam-config",
     "onLanguageModelTool:sesam_lint_document",
@@ -37,6 +38,7 @@
       {
         "name": "sesam_lint_document",
         "displayName": "Sesam: Lint Document",
+        "toolReferenceName": "sesamLintDocument",
         "modelDescription": "Validates a Sesam DTL config file and returns structured diagnostics (errors and warnings). Accepts either a file URI / workspace-relative path or inline JSON content. Use this before suggesting fixes, writing configs to disk, or uploading to a Sesam node.",
         "canBeReferencedInPrompt": true,
         "icon": "$(check)",
@@ -61,6 +63,7 @@
       {
         "name": "sesam_lint_workspace",
         "displayName": "Sesam: Lint Workspace",
+        "toolReferenceName": "sesamLintWorkspace",
         "modelDescription": "Scans all Sesam config files in the workspace and returns a summary of all validation issues grouped by file. Use to audit the full config set before a sesam upload.",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-errors)",
