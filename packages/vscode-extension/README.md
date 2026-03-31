@@ -319,7 +319,7 @@ Fix all DTL errors in my workspace.
 Generate a pipe that reads from REST and maps employeeId — make sure it has no DTL errors.
 ```
 
-See **[docs/COPILOT-AGENT.md](docs/COPILOT-AGENT.md)** for the full usage guide, example sessions, and troubleshooting.
+See **[docs/copilot-agent.md](docs/copilot-agent.md)** for the full usage guide, example sessions, and troubleshooting.
 
 ---
 
@@ -432,7 +432,7 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 
 ## Development
 
-For information on setting up the development environment, running tests, and contributing, see the [Development Guide](docs/DEVELOPMENT.md).
+For information on setting up the development environment, running tests, and contributing, see the [Development Guide](docs/development.md).
 
 ---
 
