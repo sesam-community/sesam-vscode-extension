@@ -538,10 +538,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
 
       const originalId = typeof parsed["_id"] === "string" ? parsed["_id"] : "";
+      const suggestedId = originalId ? `${originalId}-copy` : "copy";
 
       const newId = await vscode.window.showInputBox({
         prompt: `Enter the config _id for the duplicate (used as filename: <id>${sourceUri.fsPath.endsWith(".conf.pipe") ? ".conf.pipe" : sourceUri.fsPath.endsWith(".conf.system") ? ".conf.system" : ".conf.json"})`,
-        placeHolder: originalId || "my-config-id",
+        value: suggestedId,
         validateInput: (v) => {
           if (!v.trim()) {
             return "_id cannot be empty";
@@ -649,6 +650,81 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         Buffer.from(JSON.stringify(content, null, 2) + "\n", "utf-8"),
       );
       const doc = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(doc);
+    }),
+
+    vscode.commands.registerCommand("dtl.renamePipe", async (contextUri?: vscode.Uri) => {
+      const targetUri = contextUri ?? vscode.window.activeTextEditor?.document.uri;
+
+      if (!targetUri) {
+        vscode.window.showWarningMessage("Sesam: No config file to rename.");
+        return;
+      }
+
+      let parsed: Record<string, unknown>;
+
+      try {
+        const raw = await vscode.workspace.fs.readFile(targetUri);
+        parsed = JSON.parse(Buffer.from(raw).toString("utf-8")) as Record<string, unknown>;
+      } catch {
+        vscode.window.showErrorMessage("Sesam: Could not read or parse the config file.");
+        return;
+      }
+
+      const currentId = typeof parsed["_id"] === "string" ? parsed["_id"] : "";
+
+      const newId = await vscode.window.showInputBox({
+        prompt: "Enter the new _id (the file will be renamed to match)",
+        value: currentId,
+        validateInput: (v) => {
+          if (!v.trim()) {
+            return "_id cannot be empty";
+          }
+
+          if (v.includes("/")) {
+            return 'Cannot contain "/"';
+          }
+
+          if (v === currentId) {
+            return "New _id must be different from the current one";
+          }
+
+          return null;
+        },
+      });
+
+      if (!newId) {
+        return;
+      }
+
+      const fsPath = targetUri.fsPath;
+      const ext = fsPath.endsWith(".conf.pipe")
+        ? ".conf.pipe"
+        : fsPath.endsWith(".conf.system")
+          ? ".conf.system"
+          : ".conf.json";
+      const newFileUri = vscode.Uri.joinPath(
+        vscode.Uri.file(path.dirname(fsPath)),
+        `${newId}${ext}`,
+      );
+      const renamedContent = { ...parsed, _id: newId };
+      const reorderKeys =
+        vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+      const formatted = formatSesamJson(renamedContent, 2, { reorderKeys });
+
+      // Close the current editor before deleting the file
+      const activeEditor = vscode.window.visibleTextEditors.find(
+        (e) => e.document.uri.toString() === targetUri.toString(),
+      );
+
+      if (activeEditor) {
+        await vscode.window.showTextDocument(activeEditor.document, { preview: false });
+        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      }
+
+      await vscode.workspace.fs.writeFile(newFileUri, Buffer.from(formatted, "utf-8"));
+      await vscode.workspace.fs.delete(targetUri);
+      const doc = await vscode.workspace.openTextDocument(newFileUri);
       await vscode.window.showTextDocument(doc);
     }),
   );

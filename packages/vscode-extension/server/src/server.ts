@@ -34,6 +34,8 @@ import {
   RenameParams,
   PrepareRenameParams,
   WorkspaceEdit,
+  RenameFile,
+  TextDocumentEdit,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
@@ -752,7 +754,20 @@ connection.onPrepareRename(
     const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
 
     if (!aliasHit) {
-      return null;
+      // Fall through to _id check as last resort.
+      const idHit = findIdAtOffset(text, offset);
+
+      if (!idHit) {
+        return null;
+      }
+
+      return {
+        range: Range.create(
+          document.positionAt(idHit.range.start),
+          document.positionAt(idHit.range.end),
+        ),
+        placeholder: idHit.name,
+      };
     }
 
     return {
@@ -820,7 +835,33 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
   const aliasHit = findAliasAtOffset(text, offset) ?? findAliasUsageAtOffset(text, offset);
 
   if (!aliasHit) {
-    return null;
+    // _id rename — updates the value and renames the file.
+    const idHit = findIdAtOffset(text, offset);
+
+    if (!idHit) {
+      return null;
+    }
+
+    const oldUri = params.textDocument.uri;
+    const lastSlash = oldUri.lastIndexOf("/");
+    const ext = oldUri.endsWith(".conf.pipe")
+      ? ".conf.pipe"
+      : oldUri.endsWith(".conf.system")
+        ? ".conf.system"
+        : ".conf.json";
+    const newUri = oldUri.slice(0, lastSlash + 1) + params.newName + ext;
+
+    const textEdit = TextEdit.replace(
+      Range.create(document.positionAt(idHit.range.start), document.positionAt(idHit.range.end)),
+      params.newName,
+    );
+
+    return {
+      documentChanges: [
+        TextDocumentEdit.create({ uri: oldUri, version: document.version }, [textEdit]),
+        RenameFile.create(oldUri, newUri),
+      ],
+    };
   }
 
   const aliasRanges = collectAliasRanges(text, aliasHit.alias);

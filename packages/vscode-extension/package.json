@@ -194,6 +194,10 @@
       {
         "command": "dtl.createDownstreamPipe",
         "title": "Sesam: Create Downstream Pipe"
+      },
+      {
+        "command": "dtl.renamePipe",
+        "title": "Sesam: Rename Config File"
       }
     ],
     "menus": {
@@ -219,6 +223,11 @@
           "command": "dtl.createDownstreamPipe",
           "when": "resourceLangId == sesam-config",
           "group": "2_workspace@99"
+        },
+        {
+          "command": "dtl.renamePipe",
+          "when": "resourceLangId == sesam-config",
+          "group": "2_workspace@99"
         }
       ],
       "commandPalette": [
@@ -240,6 +249,10 @@
         },
         {
           "command": "dtl.createDownstreamPipe",
+          "when": "editorLangId == sesam-config"
+        },
+        {
+          "command": "dtl.renamePipe",
           "when": "editorLangId == sesam-config"
         }
       ],
