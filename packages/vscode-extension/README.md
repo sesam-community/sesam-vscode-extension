@@ -18,6 +18,7 @@
   - [Sesam Panel](#sesam-panel)
   - [Pipe Preview](#pipe-preview)
   - [New Sesam Config File](#new-sesam-config-file)
+  - [Copilot Agent Integration](#copilot-agent-integration)
 - [Getting Started](#getting-started)
 - [DTL Primer](#dtl-primer)
 - [Extension Settings](#extension-settings)
@@ -301,7 +302,26 @@ The file is written to the target folder and opened immediately.
 
 ---
 
-## Getting Started
+### Copilot Agent Integration
+
+The extension registers two **Language Model Tools** that GitHub Copilot can call automatically in agent mode:
+
+| Tool | Prompt reference | What it does |
+|---|---|---|
+| Sesam: Lint Document | `#sesamLintDocument` | Validates a single pipe/system config |
+| Sesam: Lint Workspace | `#sesamLintWorkspace` | Audits all Sesam configs in the workspace |
+
+Example prompts:
+
+```
+Are there any errors across all my Sesam pipe configs?
+Fix all DTL errors in my workspace.
+Generate a pipe that reads from REST and maps employeeId — make sure it has no DTL errors.
+```
+
+See **[docs/COPILOT-AGENT.md](docs/COPILOT-AGENT.md)** for the full usage guide, example sessions, and troubleshooting.
+
+---
 
 ### Supported File Types
 
@@ -333,6 +353,8 @@ my-sesam-project/
 | `DTL: New Sesam Config File` | Create a new pipe or system config file from a template |
 | `Sesam: Format Document` | Format the active Sesam config file |
 | `Sesam: Clear Errors` | Clear all entries from the Sesam panel |
+| `#sesamLintDocument` | (Copilot agent) Lint a single Sesam config file |
+| `#sesamLintWorkspace` | (Copilot agent) Audit all Sesam configs in the workspace |
 
 ---
 
