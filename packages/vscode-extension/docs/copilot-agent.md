@@ -147,6 +147,20 @@ You can also watch the raw IPC traffic in **Output → DTL Language Server (Trac
 
 ## @sesam Chat Participant
 
+> **Copilot only** — Chat participants use the VS Code Chat Participant API, which is provided
+> exclusively by the GitHub Copilot extension. Other AI extensions (Continue, Cline, Codex, etc.)
+> cannot invoke `@sesam`.
+
+A **chat participant** is a named assistant persona your extension registers in Copilot Chat.
+Users address it explicitly with `@sesam`, and the extension handles the full conversational turn:
+it builds a context-aware system prompt (embedding the DTL function reference, the active file
+content, or any attached files), calls the language model, streams the response as markdown, and
+can perform follow-up actions like auto-linting the generated output.
+
+This is different from the `#sesamLintDocument` / `#sesamLintWorkspace` tools: those are
+invoked **automatically** by Copilot's agent when it decides they're relevant, whereas `@sesam`
+is **always user-initiated** and supports richer, multi-step interaction.
+
 The extension also registers an **`@sesam` chat participant** — a Sesam-aware assistant that can
 generate pipes, explain transforms, write test data, and answer CLI questions directly in Copilot Chat.
 
