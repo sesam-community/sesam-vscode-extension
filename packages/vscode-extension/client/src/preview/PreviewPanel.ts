@@ -736,6 +736,16 @@ export class PreviewPanel {
 
     // ── Entity navigation ────────────────────────────────────────────────────
 
+    function clearOutput() {
+      const outputBox = document.getElementById('output-box');
+      outputBox.style.color = 'var(--vscode-descriptionForeground)';
+      outputBox.textContent = 'Press \u25ba Evaluate to see output.';
+      document.getElementById('status-bar').className = 'status-bar';
+      document.getElementById('status-bar').textContent = 'Ready.';
+      setErrorBanner('');
+      lastOutputText = null;
+    }
+
     function prevEntity() {
       if (entityIndex > 0) { entityIndex--; showEntity(); }
     }
@@ -749,6 +759,7 @@ export class PreviewPanel {
       document.getElementById('entity-counter').textContent = (entityIndex + 1) + ' / ' + embeddedEntities.length;
       document.getElementById('prev-btn').disabled = entityIndex === 0;
       document.getElementById('next-btn').disabled = entityIndex === embeddedEntities.length - 1;
+      clearOutput();
     }
 
     // ── Evaluation ───────────────────────────────────────────────────────────
