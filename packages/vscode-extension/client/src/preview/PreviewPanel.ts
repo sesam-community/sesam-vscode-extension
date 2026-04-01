@@ -14,6 +14,7 @@ import * as vscode from "vscode";
 import { evaluate } from "../../../src/shared/dtl-evaluator";
 import { resolveCredentials } from "../credential-resolver";
 import { fetchDatasetEntities, previewPipe } from "../node-client";
+import { logNodeRequest } from "../sesam-channel";
 
 import type { EvalEntity } from "../../../src/shared/dtl-evaluator";
 import type { Entity } from "../node-client";
@@ -285,9 +286,13 @@ export class PreviewPanel {
     this._panel.webview.postMessage({ type: "loading" });
 
     try {
-      const outputEntities = await previewPipe(credentials.nodeUrl, credentials.jwt, pipeConfig, [
-        inputEntity,
-      ]);
+      const outputEntities = await previewPipe(
+        credentials.nodeUrl,
+        credentials.jwt,
+        pipeConfig,
+        [inputEntity],
+        logNodeRequest,
+      );
 
       const output = outputEntities[0] ?? null;
       this._lastOutputJson = output !== null ? JSON.stringify(output, null, 2) : undefined;
@@ -370,6 +375,9 @@ export class PreviewPanel {
         credentials.nodeUrl,
         credentials.jwt,
         sourceDataset,
+        undefined,
+        undefined,
+        logNodeRequest,
       );
 
       if (entities.length > 0) {

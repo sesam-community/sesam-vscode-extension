@@ -25,6 +25,7 @@ import { PreviewPanel } from "./preview/PreviewPanel";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
 import { registerSesamChatParticipant } from "./sesam-chat-participant";
+import { disposeSesamChannel } from "./sesam-channel";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
 
@@ -798,6 +799,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export function deactivate(): Thenable<void> | undefined {
+  disposeSesamChannel();
+
   return client?.stop();
 }
 

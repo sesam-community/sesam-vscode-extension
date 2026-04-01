@@ -22,6 +22,16 @@ import * as https from "node:https";
 
 export type Entity = Record<string, unknown>;
 
+export interface NodeRequestLogEntry {
+  method: "GET" | "POST";
+  url: string;
+  statusCode: number;
+  durationMs: number;
+  error?: string;
+}
+
+export type NodeRequestLogger = (entry: NodeRequestLogEntry) => void;
+
 // ---------------------------------------------------------------------------
 // Typed error classes
 // ---------------------------------------------------------------------------
@@ -90,8 +100,21 @@ const request = (
   jwt: string,
   body?: string,
   contentType = "application/json",
+  logger?: NodeRequestLogger,
 ): Promise<string> =>
   new Promise((resolve, reject) => {
+    const startMs = Date.now();
+    let logged = false;
+
+    const log = (statusCode: number, error?: string): void => {
+      if (logged) {
+        return;
+      }
+
+      logged = true;
+      logger?.({ method, url: url.href, statusCode, durationMs: Date.now() - startMs, error });
+    };
+
     const isHttps = url.protocol === "https:";
     const transport = isHttps ? https : http;
 
@@ -125,39 +148,38 @@ const request = (
           const statusCode = res.statusCode ?? 0;
 
           if (statusCode === 401 || statusCode === 403) {
-            reject(
-              new NodeAuthError(
-                statusCode,
-                tryParseMessage(responseText) ?? `Authentication failed (HTTP ${statusCode}).`,
-              ),
-            );
+            const msg =
+              tryParseMessage(responseText) ?? `Authentication failed (HTTP ${statusCode}).`;
+            log(statusCode, msg);
+            reject(new NodeAuthError(statusCode, msg));
 
             return;
           }
 
           if (statusCode < 200 || statusCode >= 300) {
-            reject(
-              new NodeApiError(
-                statusCode,
-                tryParseMessage(responseText) ?? `Node returned HTTP ${statusCode}.`,
-              ),
-            );
+            const msg = tryParseMessage(responseText) ?? `Node returned HTTP ${statusCode}.`;
+            log(statusCode, msg);
+            reject(new NodeApiError(statusCode, msg));
 
             return;
           }
 
+          log(statusCode);
           resolve(responseText);
         });
       },
     );
 
     req.on("error", (err: NodeJS.ErrnoException) => {
+      log(0, err.message);
       reject(new NodeNetworkError(err.message));
     });
 
     req.setTimeout(30_000, () => {
+      const msg = "Request timed out after 30 s.";
+      log(0, msg);
       req.destroy();
-      reject(new NodeNetworkError(`Request timed out after 30 s.`));
+      reject(new NodeNetworkError(msg));
     });
 
     if (body !== undefined) {
@@ -218,6 +240,7 @@ export const previewPipe = async (
   jwt: string,
   pipeConfig: Record<string, unknown>,
   inputEntities: Entity[],
+  logger?: NodeRequestLogger,
 ): Promise<Entity[]> => {
   const base = validateUrl(nodeUrl);
   const url = new URL("/preview", base);
@@ -239,6 +262,7 @@ export const previewPipe = async (
     jwt,
     formBody,
     "application/x-www-form-urlencoded",
+    logger,
   );
 
   const parsed: unknown = JSON.parse(responseText);
@@ -277,6 +301,7 @@ export const fetchDatasetEntities = async (
   datasetId: string,
   limit = 50,
   since?: string | number,
+  logger?: NodeRequestLogger,
 ): Promise<Entity[]> => {
   const base = validateUrl(nodeUrl);
   const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}/entities`, base);
@@ -287,7 +312,7 @@ export const fetchDatasetEntities = async (
     url.searchParams.set("since", String(since));
   }
 
-  const responseText = await request("GET", url, jwt);
+  const responseText = await request("GET", url, jwt, undefined, undefined, logger);
 
   return JSON.parse(responseText) as Entity[];
 };
