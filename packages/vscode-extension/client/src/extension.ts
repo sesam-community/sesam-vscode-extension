@@ -184,6 +184,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   context.subscriptions.push(confWatcher);
 
+  // Clear the references view when a sesam config file is renamed so stale
+  // results from before the rename don't persist.
+  context.subscriptions.push(
+    vscode.workspace.onDidRenameFiles((event) => {
+      const affectsSesam = event.files.some(
+        ({ oldUri }) =>
+          oldUri.fsPath.endsWith(".conf.json") ||
+          oldUri.fsPath.endsWith(".conf.pipe") ||
+          oldUri.fsPath.endsWith(".conf.system"),
+      );
+
+      if (affectsSesam) {
+        // Re-run Find References on the renamed file so the view shows fresh
+        // results instead of going into an error/stale state.
+        setTimeout(() => {
+          const editor = vscode.window.activeTextEditor;
+
+          if (editor) {
+            void vscode.commands.executeCommand("references-view.findReferences");
+          }
+        }, 300);
+      }
+    }),
+  );
+
   // ── Commands ──────────────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand("sesam.clearErrors", () => {
@@ -518,6 +543,215 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await vscode.window.showTextDocument(doc);
       },
     ),
+
+    vscode.commands.registerCommand("dtl.duplicatePipe", async (contextUri?: vscode.Uri) => {
+      const sourceUri = contextUri ?? vscode.window.activeTextEditor?.document.uri;
+
+      if (!sourceUri) {
+        vscode.window.showWarningMessage("Sesam: No config file to duplicate.");
+        return;
+      }
+
+      let parsed: Record<string, unknown>;
+
+      try {
+        const raw = await vscode.workspace.fs.readFile(sourceUri);
+        parsed = JSON.parse(Buffer.from(raw).toString("utf-8")) as Record<string, unknown>;
+      } catch {
+        vscode.window.showErrorMessage("Sesam: Could not read or parse the config file.");
+        return;
+      }
+
+      const originalId = typeof parsed["_id"] === "string" ? parsed["_id"] : "";
+      const suggestedId = originalId ? `${originalId}-copy` : "copy";
+
+      const newId = await vscode.window.showInputBox({
+        prompt: `Enter the config _id for the duplicate (used as filename: <id>${sourceUri.fsPath.endsWith(".conf.pipe") ? ".conf.pipe" : sourceUri.fsPath.endsWith(".conf.system") ? ".conf.system" : ".conf.json"})`,
+        value: suggestedId,
+        validateInput: (v) => {
+          if (!v.trim()) {
+            return "_id cannot be empty";
+          }
+
+          if (v.includes("/")) {
+            return 'Cannot contain "/"';
+          }
+
+          return null;
+        },
+      });
+
+      if (!newId) {
+        return;
+      }
+
+      const newContent = { ...parsed, _id: newId };
+      const fsPath = sourceUri.fsPath;
+      const ext = fsPath.endsWith(".conf.pipe")
+        ? ".conf.pipe"
+        : fsPath.endsWith(".conf.system")
+          ? ".conf.system"
+          : ".conf.json";
+      const fileUri = vscode.Uri.joinPath(vscode.Uri.file(path.dirname(fsPath)), `${newId}${ext}`);
+      const reorderKeys =
+        vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+      const formatted = formatSesamJson(newContent, 2, { reorderKeys });
+
+      await vscode.workspace.fs.writeFile(fileUri, Buffer.from(formatted, "utf-8"));
+      const doc = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(doc);
+    }),
+
+    vscode.commands.registerCommand("dtl.createDownstreamPipe", async (contextUri?: vscode.Uri) => {
+      const sourceUri = contextUri ?? vscode.window.activeTextEditor?.document.uri;
+
+      if (!sourceUri) {
+        vscode.window.showWarningMessage("Sesam: No config file open.");
+        return;
+      }
+
+      let parsed: Record<string, unknown>;
+
+      try {
+        const raw = await vscode.workspace.fs.readFile(sourceUri);
+        parsed = JSON.parse(Buffer.from(raw).toString("utf-8")) as Record<string, unknown>;
+      } catch {
+        vscode.window.showErrorMessage("Sesam: Could not read or parse the config file.");
+        return;
+      }
+
+      const sourceId = typeof parsed["_id"] === "string" ? parsed["_id"] : "";
+
+      if (!sourceId) {
+        vscode.window.showWarningMessage("Sesam: Current config has no _id.");
+        return;
+      }
+
+      const newId = await vscode.window.showInputBox({
+        prompt: `Enter _id for the downstream pipe (source dataset: "${sourceId}")`,
+        placeHolder: `${sourceId}-downstream`,
+        validateInput: (v) => {
+          if (!v.trim()) {
+            return "_id cannot be empty";
+          }
+
+          if (v.includes("/")) {
+            return 'Cannot contain "/"';
+          }
+
+          return null;
+        },
+      });
+
+      if (!newId) {
+        return;
+      }
+
+      const content = {
+        _id: newId,
+        type: "pipe",
+        source: {
+          type: "dataset",
+          dataset: sourceId,
+        },
+      };
+
+      const workspaceRoot =
+        vscode.workspace.getWorkspaceFolder(sourceUri)?.uri ??
+        vscode.workspace.workspaceFolders?.[0]?.uri ??
+        vscode.Uri.file(path.dirname(sourceUri.fsPath));
+      const folder = vscode.Uri.joinPath(workspaceRoot, "pipes");
+
+      try {
+        await vscode.workspace.fs.createDirectory(folder);
+      } catch {
+        // already exists — ignore
+      }
+
+      const fileUri = vscode.Uri.joinPath(folder, `${newId}.conf.json`);
+
+      await vscode.workspace.fs.writeFile(
+        fileUri,
+        Buffer.from(JSON.stringify(content, null, 2) + "\n", "utf-8"),
+      );
+      const doc = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(doc);
+    }),
+
+    vscode.commands.registerCommand("dtl.renamePipe", async (contextUri?: vscode.Uri) => {
+      const targetUri = contextUri ?? vscode.window.activeTextEditor?.document.uri;
+
+      if (!targetUri) {
+        vscode.window.showWarningMessage("Sesam: No config file to rename.");
+        return;
+      }
+
+      let parsed: Record<string, unknown>;
+
+      try {
+        const raw = await vscode.workspace.fs.readFile(targetUri);
+        parsed = JSON.parse(Buffer.from(raw).toString("utf-8")) as Record<string, unknown>;
+      } catch {
+        vscode.window.showErrorMessage("Sesam: Could not read or parse the config file.");
+        return;
+      }
+
+      const currentId = typeof parsed["_id"] === "string" ? parsed["_id"] : "";
+
+      const newId = await vscode.window.showInputBox({
+        prompt: "Enter the new _id (the file will be renamed to match)",
+        value: currentId,
+        validateInput: (v) => {
+          if (!v.trim()) {
+            return "_id cannot be empty";
+          }
+
+          if (v.includes("/")) {
+            return 'Cannot contain "/"';
+          }
+
+          if (v === currentId) {
+            return "New _id must be different from the current one";
+          }
+
+          return null;
+        },
+      });
+
+      if (!newId) {
+        return;
+      }
+
+      const fsPath = targetUri.fsPath;
+      const ext = fsPath.endsWith(".conf.pipe")
+        ? ".conf.pipe"
+        : fsPath.endsWith(".conf.system")
+          ? ".conf.system"
+          : ".conf.json";
+      const newFileUri = vscode.Uri.joinPath(
+        vscode.Uri.file(path.dirname(fsPath)),
+        `${newId}${ext}`,
+      );
+      const renamedContent = { ...parsed, _id: newId };
+      const reorderKeys =
+        vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+      const formatted = formatSesamJson(renamedContent, 2, { reorderKeys });
+
+      // Close the current editor before deleting the file
+      const activeEditor = vscode.window.visibleTextEditors.find(
+        (e) => e.document.uri.toString() === targetUri.toString(),
+      );
+
+      if (activeEditor) {
+        await vscode.window.showTextDocument(activeEditor.document, { preview: false });
+        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      }
+
+      await vscode.workspace.fs.writeFile(newFileUri, Buffer.from(formatted, "utf-8"));
+      await vscode.workspace.fs.delete(targetUri);
+      const doc = await vscode.workspace.openTextDocument(newFileUri);
+      await vscode.window.showTextDocument(doc);
+    }),
   );
 
   // Keep the PreviewPanel updated when the active document changes

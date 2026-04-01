@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 
-import { findAllCrossReferences } from "../server/src/utils/cross-references.utils";
+import {
+  findAllCrossReferences,
+  findAllDatasetCrossRefs,
+} from "../server/src/utils/cross-references.utils";
 
 // ---------------------------------------------------------------------------
 // findAllCrossReferences
@@ -80,5 +83,56 @@ describe("findAllCrossReferences", () => {
     ]);
     const refs = findAllCrossReferences("shared-id", fileTexts);
     expect(refs).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findAllDatasetCrossRefs
+// ---------------------------------------------------------------------------
+
+describe("findAllDatasetCrossRefs", () => {
+  it("finds a plain dataset reference in another file", () => {
+    const fileTexts = new Map([
+      ["file:///target.json", `{"_id": "my-pipe"}`],
+      ["file:///consumer.json", `{"source": {"dataset": "my-pipe"}}`],
+    ]);
+    const refs = findAllDatasetCrossRefs("my-pipe", fileTexts, "file:///target.json");
+    expect(refs).toHaveLength(1);
+    expect(refs[0].uri).toBe("file:///consumer.json");
+  });
+
+  it("excludes the target file itself", () => {
+    const fileTexts = new Map([["file:///target.json", `{"source": {"dataset": "my-pipe"}}`]]);
+    const refs = findAllDatasetCrossRefs("my-pipe", fileTexts, "file:///target.json");
+    expect(refs).toHaveLength(0);
+  });
+
+  it("finds a datasets array item with a hyphenated alias", () => {
+    const text = `{"datasets": ["my-pipe-enrich my-pipe-alias"]}`;
+    const fileTexts = new Map([["file:///merge.json", text]]);
+    const refs = findAllDatasetCrossRefs("my-pipe-enrich", fileTexts, "file:///other.json");
+    expect(refs).toHaveLength(1);
+    expect(refs[0].uri).toBe("file:///merge.json");
+    expect(text.slice(refs[0].nameStart, refs[0].nameEnd)).toBe("my-pipe-enrich");
+  });
+
+  it("finds datasets array item with long hyphenated real-world alias", () => {
+    const text = `{"datasets": ["difi-enhetsregisteret-classification-enrich difi-enhetsregisteret-classification", "other-pipe other-alias"]}`;
+    const fileTexts = new Map([["file:///global.json", text]]);
+    const refs = findAllDatasetCrossRefs(
+      "difi-enhetsregisteret-classification-enrich",
+      fileTexts,
+      "file:///difi.json",
+    );
+    expect(refs).toHaveLength(1);
+    expect(text.slice(refs[0].nameStart, refs[0].nameEnd)).toBe(
+      "difi-enhetsregisteret-classification-enrich",
+    );
+  });
+
+  it("does not match a dataset ref to a system reference", () => {
+    const fileTexts = new Map([["file:///s.json", `{"source": {"system": "my-pipe"}}`]]);
+    const refs = findAllDatasetCrossRefs("my-pipe", fileTexts, "file:///other.json");
+    expect(refs).toHaveLength(0);
   });
 });

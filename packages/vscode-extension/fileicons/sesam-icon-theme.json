@@ -14,6 +14,18 @@
     },
     "_sesam_pipes_folder": {
       "iconPath": "./pipes-folder.png"
+    },
+    "_sesam_expected_folder": {
+      "iconPath": "./expected-folder.png"
+    },
+    "_sesam_testdata_folder": {
+      "iconPath": "./testdata-folder.png"
+    },
+    "_sesam_test_spec": {
+      "iconPath": "./test-spec-file.png"
+    },
+    "_sesam_testdata_file": {
+      "iconPath": "./testdata-file.png"
     }
   },
   "languageIds": {
@@ -22,7 +34,9 @@
   "fileExtensions": {
     "conf.pipe": "_sesam_config",
     "conf.system": "_sesam_config",
-    "conf.json": "_sesam_config"
+    "conf.json": "_sesam_config",
+    "test.json": "_sesam_test_spec",
+    "json": "_sesam_testdata_file"
   },
   "fileNames": {
     ".syncconfig": "_sesam_settings",
@@ -32,10 +46,14 @@
   },
   "folderNames": {
     "systems": "_sesam_systems_folder",
-    "pipes": "_sesam_pipes_folder"
+    "pipes": "_sesam_pipes_folder",
+    "expected": "_sesam_expected_folder",
+    "testdata": "_sesam_testdata_folder"
   },
   "folderNamesExpanded": {
     "systems": "_sesam_systems_folder",
-    "pipes": "_sesam_pipes_folder"
+    "pipes": "_sesam_pipes_folder",
+    "expected": "_sesam_expected_folder",
+    "testdata": "_sesam_testdata_folder"
   }
 }
