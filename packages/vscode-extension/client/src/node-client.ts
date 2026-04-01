@@ -227,7 +227,7 @@ const tryParseMessage = (text: string): string | null => {
  * source containing `inputEntities` so the exact entity the user is editing
  * gets evaluated, regardless of the original source type.
  *
- * API: POST {nodeUrl}/preview
+ * API: POST {nodeUrl}/api/pipes/{pipeId}/preview
  *   Content-Type: application/x-www-form-urlencoded
  *   Body: operation=preview-pipe&pipe-config=<encoded JSON>&trace=true&source=<encoded entity>
  *
@@ -238,12 +238,13 @@ const tryParseMessage = (text: string): string | null => {
 export const previewPipe = async (
   nodeUrl: string,
   jwt: string,
+  pipeId: string,
   pipeConfig: Record<string, unknown>,
   inputEntities: Entity[],
   logger?: NodeRequestLogger,
 ): Promise<Entity[]> => {
   const base = validateUrl(nodeUrl);
-  const url = new URL("/preview", base);
+  const url = new URL(`/api/pipes/${encodeURIComponent(pipeId)}/preview`, base);
 
   // The API takes the pipe config unchanged and the input entity as a
   // separate `source` form field (a single entity JSON, not an array).

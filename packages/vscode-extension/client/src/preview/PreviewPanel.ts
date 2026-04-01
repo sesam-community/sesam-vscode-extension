@@ -271,13 +271,24 @@ export class PreviewPanel {
     }
 
     let pipeConfig: Record<string, unknown>;
+    let pipeId: string | null;
 
     try {
       pipeConfig = JSON.parse(this._document.getText()) as Record<string, unknown>;
+      pipeId = extractPipeId(this._document.getText());
     } catch {
       this._panel.webview.postMessage({
         type: "error",
         message: "Could not parse the active document as JSON.",
+      });
+
+      return;
+    }
+
+    if (!pipeId) {
+      this._panel.webview.postMessage({
+        type: "error",
+        message: "Could not determine pipe _id from the active document.",
       });
 
       return;
@@ -289,6 +300,7 @@ export class PreviewPanel {
       const outputEntities = await previewPipe(
         credentials.nodeUrl,
         credentials.jwt,
+        pipeId,
         pipeConfig,
         [inputEntity],
         logNodeRequest,
