@@ -184,6 +184,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   context.subscriptions.push(confWatcher);
 
+  // Clear the references view when a sesam config file is renamed so stale
+  // results from before the rename don't persist.
+  context.subscriptions.push(
+    vscode.workspace.onDidRenameFiles((event) => {
+      const affectsSesam = event.files.some(
+        ({ oldUri }) =>
+          oldUri.fsPath.endsWith(".conf.json") ||
+          oldUri.fsPath.endsWith(".conf.pipe") ||
+          oldUri.fsPath.endsWith(".conf.system"),
+      );
+
+      if (affectsSesam) {
+        // Re-run Find References on the renamed file so the view shows fresh
+        // results instead of going into an error/stale state.
+        setTimeout(() => {
+          const editor = vscode.window.activeTextEditor;
+
+          if (editor) {
+            void vscode.commands.executeCommand("references-view.findReferences");
+          }
+        }, 300);
+      }
+    }),
+  );
+
   // ── Commands ──────────────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand("sesam.clearErrors", () => {

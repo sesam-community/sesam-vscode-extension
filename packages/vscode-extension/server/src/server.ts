@@ -271,6 +271,7 @@ async function validateDocument(document: TextDocument): Promise<void> {
 }
 
 documents.onDidChangeContent((change) => {
+  workspaceIndex.updateFile(change.document.uri, change.document.getText());
   validateDocument(change.document);
 });
 
