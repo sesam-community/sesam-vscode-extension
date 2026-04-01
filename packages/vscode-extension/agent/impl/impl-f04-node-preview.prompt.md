@@ -300,6 +300,24 @@ The `PreviewPanel` constructor already receives `context`, so the only change is
 - **F03** (SecretStorage) — adds Step 11 on top of Phase 1; Phase 1 works without it
 - Existing `PreviewPanel` offline functionality must remain intact when `mode === 'offline'`
 
+## Relationship to `@sesam/core` (F00)
+
+`previewPipe()` and `fetchDatasetEntities()` are Sesam node API calls that logically belong in
+`@sesam/core` (alongside the planned `uploadPipes`, `runPipe`, `getStatus`, etc.). However, F00 is
+currently a placeholder and is a separate, large body of work.
+
+**For this impl**, the two functions are built in `client/src/node-client.ts` inside the extension.
+When F00 is eventually implemented:
+- The node API functions migrate into `@sesam/core`.
+- `node-client.ts` becomes either a thin re-export wrapper or is deleted, with the extension importing
+  from `@sesam/core` directly.
+
+`credential-resolver.ts` stays in the extension regardless — it reads VS Code settings/SecretStorage,
+which is UI-layer infrastructure not suitable for a pure library.
+
+**F04 does not depend on F00.** The extension can call the Sesam REST API directly without any
+sesam-py bundling work.
+
 ---
 
 ## Verification
