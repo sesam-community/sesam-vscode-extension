@@ -187,10 +187,8 @@ export class PreviewPanel {
     }
 
     if (message.type === "openSettings") {
-      await vscode.commands.executeCommand(
-        "workbench.action.openSettings",
-        "sesam.nodeUrl sesam.jwt",
-      );
+      await vscode.commands.executeCommand("sesam.setCredentials");
+      this._sendModeState();
 
       return;
     }
@@ -696,8 +694,8 @@ export class PreviewPanel {
   </header>
 
   <div class="no-creds-banner" id="no-creds-banner">
-    ⚠ Set <code>sesam.nodeUrl</code> and <code>sesam.jwt</code> in Settings to enable Live mode.
-    <a onclick="openSettings()">Open Settings</a>
+    ⚠ Live mode requires a node URL and JWT.
+    <a onclick="openSettings()">Set credentials…</a>
   </div>
 
   <div class="panes">

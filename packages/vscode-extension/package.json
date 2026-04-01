@@ -159,6 +159,10 @@
     ],
     "commands": [
       {
+        "command": "sesam.setCredentials",
+        "title": "Sesam: Set Credentials"
+      },
+      {
         "command": "dtl.previewPipe",
         "title": "Sesam: Preview Pipe Output",
         "icon": "$(play)"

@@ -231,6 +231,39 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       PreviewPanel.createOrShow(context.extensionUri, editor.document, context);
     }),
 
+    vscode.commands.registerCommand("sesam.setCredentials", async () => {
+      const config = vscode.workspace.getConfiguration("sesam");
+
+      const nodeUrl = await vscode.window.showInputBox({
+        title: "Sesam node URL",
+        prompt: "Enter your Sesam node URL",
+        value: config.get<string>("nodeUrl", ""),
+        placeHolder: "https://datahub-xxxxxxxx.sesam.cloud",
+        ignoreFocusOut: true,
+      });
+
+      if (nodeUrl === undefined) {
+        return;
+      }
+
+      const jwt = await vscode.window.showInputBox({
+        title: "Sesam JWT",
+        prompt: "Enter your JWT token",
+        value: config.get<string>("jwt", ""),
+        placeHolder: "eyJ…",
+        password: true,
+        ignoreFocusOut: true,
+      });
+
+      if (jwt === undefined) {
+        return;
+      }
+
+      await config.update("nodeUrl", nodeUrl.trim(), vscode.ConfigurationTarget.Workspace);
+      await config.update("jwt", jwt.trim(), vscode.ConfigurationTarget.Global);
+      vscode.window.showInformationMessage("Sesam credentials saved.");
+    }),
+
     vscode.commands.registerCommand("dtl.openDocs", () => {
       vscode.env.openExternal(
         vscode.Uri.parse("https://docs.sesam.io/hub/data-transformation-language.html"),
