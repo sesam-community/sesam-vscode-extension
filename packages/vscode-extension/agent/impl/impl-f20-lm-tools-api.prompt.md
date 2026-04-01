@@ -1,6 +1,6 @@
 # F20: Extension Language Model Tools API
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 1 - MVP (prerequisite for F09)
 > **Depends on**: F19 (DTL Syntax Linting — `implemented`)
 > **Enables**: [F09 — Copilot Agent Participant `@sesam`](impl-f09-copilot-agent.prompt.md)

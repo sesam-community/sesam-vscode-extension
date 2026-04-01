@@ -1,8 +1,8 @@
 # F09: Copilot Agent Participant (@sesam)
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 4 - AI & Visual Polish
-> **Depends on**: [F20 — Language Model Tools API](impl-f20-lm-tools-api.prompt.md) (`planned`)
+> **Depends on**: [F20 — Language Model Tools API](impl-f20-lm-tools-api.prompt.md) (`implemented`)
 > **Tracking**: [README.md](README.md)
 
 ---
