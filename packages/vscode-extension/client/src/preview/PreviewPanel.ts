@@ -294,7 +294,7 @@ export class PreviewPanel {
         logNodeRequest,
       );
 
-      const output = outputEntities[0] ?? null;
+      const output = outputEntities.length > 0 ? outputEntities : null;
       this._lastOutputJson = output !== null ? JSON.stringify(output, null, 2) : undefined;
 
       this._panel.webview.postMessage({ type: "liveResult", output });
@@ -874,17 +874,18 @@ export class PreviewPanel {
         const statusBar = document.getElementById('status-bar');
         outputBox.style.color = '';
 
-        if (msg.output === null) {
+        if (msg.output === null || msg.output.length === 0) {
           outputBox.textContent = '(entity discarded by filter/discard)';
           statusBar.className = 'status-bar discard';
           statusBar.textContent = '✓ Entity discarded.';
           lastOutputText = null;
         } else {
-          const text = JSON.stringify(msg.output, null, 2);
+          const text = JSON.stringify(msg.output.length === 1 ? msg.output[0] : msg.output, null, 2);
           outputBox.textContent = text;
           lastOutputText = text;
           statusBar.className = 'status-bar ok';
-          statusBar.textContent = '✓ Live — ' + Object.keys(msg.output).length + ' properties.';
+          const count = msg.output.length;
+          statusBar.textContent = '✓ Live — ' + count + (count === 1 ? ' entity.' : ' entities.');
         }
         return;
       }

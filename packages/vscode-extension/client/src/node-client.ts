@@ -229,7 +229,7 @@ const tryParseMessage = (text: string): string | null => {
  *
  * API: POST {nodeUrl}/preview
  *   Content-Type: application/x-www-form-urlencoded
- *   Body: operation=preview-pipe&pipe-config=<encoded JSON>&trace=true
+ *   Body: operation=preview-pipe&pipe-config=<encoded JSON>&trace=true&source=<encoded entity>
  *
  * @throws {NodeAuthError}    HTTP 401/403 — bad or missing JWT
  * @throws {NodeApiError}     HTTP 4xx/5xx — node-side error (message preserved)
@@ -245,16 +245,13 @@ export const previewPipe = async (
   const base = validateUrl(nodeUrl);
   const url = new URL("/preview", base);
 
-  // Override the source so only the user's selected entity is evaluated
-  const effectiveConfig: Record<string, unknown> = {
-    ...pipeConfig,
-    source: { type: "embedded", entities: inputEntities },
-  };
-
+  // The API takes the pipe config unchanged and the input entity as a
+  // separate `source` form field (a single entity JSON, not an array).
   const formBody =
     `operation=preview-pipe` +
-    `&pipe-config=${encodeURIComponent(JSON.stringify(effectiveConfig))}` +
-    `&trace=true`;
+    `&pipe-config=${encodeURIComponent(JSON.stringify(pipeConfig))}` +
+    `&trace=true` +
+    `&source=${encodeURIComponent(JSON.stringify(inputEntities[0] ?? {}))}`;
 
   const responseText = await request(
     "POST",
@@ -267,20 +264,35 @@ export const previewPipe = async (
 
   const parsed: unknown = JSON.parse(responseText);
 
-  // The API may return an array directly or wrap it in an object
-  if (Array.isArray(parsed)) {
-    return parsed as Entity[];
-  }
-
-  // Wrapped response: { entities: [...], ... } or { result: [...], ... }
-  if (typeof parsed === "object" && parsed !== null) {
+  if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
     const obj = parsed as Record<string, unknown>;
 
+    // Standard response shape: { transformed: [[...entities...]], sink: [...], source: {...} }
+    // `transformed` is an array-of-arrays, one inner array per input entity.
+    if (Array.isArray(obj["transformed"])) {
+      const first = (obj["transformed"] as unknown[])[0];
+
+      if (Array.isArray(first)) {
+        return first as Entity[];
+      }
+    }
+
+    // Fallback: flat sink array
+    if (Array.isArray(obj["sink"])) {
+      return obj["sink"] as Entity[];
+    }
+
+    // Legacy / other wrapped shapes
     for (const field of ["entities", "result", "results", "output"]) {
       if (Array.isArray(obj[field])) {
         return obj[field] as Entity[];
       }
     }
+  }
+
+  // Plain array response
+  if (Array.isArray(parsed)) {
+    return parsed as Entity[];
   }
 
   return [];
