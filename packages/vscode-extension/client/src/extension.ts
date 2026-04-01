@@ -227,7 +227,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.window.showWarningMessage("Pipe preview: No active editor.");
         return;
       }
-      PreviewPanel.createOrShow(context.extensionUri, editor.document);
+      PreviewPanel.createOrShow(context.extensionUri, editor.document, context);
     }),
 
     vscode.commands.registerCommand("dtl.openDocs", () => {

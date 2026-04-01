@@ -1,0 +1,293 @@
+/**
+ * Sesam Node HTTP Client
+ *
+ * Thin wrapper around the Sesam node REST API. Uses Node.js built-in
+ * `https`/`http` modules — no extra npm dependencies.
+ *
+ * Two exported functions:
+ *   - previewPipe()          POST /api/pipes/{id}/preview
+ *   - fetchDatasetEntities() GET  /api/datasets/{id}/entities
+ *
+ * NOTE: These functions logically belong in @sesam/core once F00 is
+ * implemented. At that point this module becomes either a thin re-export
+ * wrapper or is removed and the extension imports from @sesam/core directly.
+ */
+
+import * as http from "node:http";
+import * as https from "node:https";
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
+export type Entity = Record<string, unknown>;
+
+// ---------------------------------------------------------------------------
+// Typed error classes
+// ---------------------------------------------------------------------------
+
+export class NodeAuthError extends Error {
+  readonly kind = "auth" as const;
+
+  constructor(
+    readonly statusCode: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "NodeAuthError";
+  }
+}
+
+export class NodeApiError extends Error {
+  readonly kind = "api" as const;
+
+  constructor(
+    readonly statusCode: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "NodeApiError";
+  }
+}
+
+export class NodeNetworkError extends Error {
+  readonly kind = "network" as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "NodeNetworkError";
+  }
+}
+
+export type NodeError = NodeAuthError | NodeApiError | NodeNetworkError;
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+const isLocalhost = (hostname: string): boolean =>
+  hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
+const validateUrl = (rawUrl: string): URL => {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new NodeNetworkError(`Invalid node URL: "${rawUrl}"`);
+  }
+
+  if (parsed.protocol !== "https:" && !isLocalhost(parsed.hostname)) {
+    throw new NodeNetworkError(`Node URL must use HTTPS for non-localhost hosts ("${rawUrl}").`);
+  }
+
+  return parsed;
+};
+
+const request = (
+  method: "GET" | "POST",
+  url: URL,
+  jwt: string,
+  body?: string,
+  contentType = "application/json",
+): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const isHttps = url.protocol === "https:";
+    const transport = isHttps ? https : http;
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${jwt}`,
+      Accept: "application/json",
+    };
+
+    if (body !== undefined) {
+      headers["Content-Type"] = contentType;
+      headers["Content-Length"] = String(Buffer.byteLength(body, "utf8"));
+    }
+
+    const req = transport.request(
+      {
+        hostname: url.hostname,
+        port: url.port || (isHttps ? 443 : 80),
+        path: url.pathname + url.search,
+        method,
+        headers,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+
+        res.on("data", (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+
+        res.on("end", () => {
+          const responseText = Buffer.concat(chunks).toString("utf8");
+          const statusCode = res.statusCode ?? 0;
+
+          if (statusCode === 401 || statusCode === 403) {
+            reject(
+              new NodeAuthError(
+                statusCode,
+                tryParseMessage(responseText) ?? `Authentication failed (HTTP ${statusCode}).`,
+              ),
+            );
+
+            return;
+          }
+
+          if (statusCode < 200 || statusCode >= 300) {
+            reject(
+              new NodeApiError(
+                statusCode,
+                tryParseMessage(responseText) ?? `Node returned HTTP ${statusCode}.`,
+              ),
+            );
+
+            return;
+          }
+
+          resolve(responseText);
+        });
+      },
+    );
+
+    req.on("error", (err: NodeJS.ErrnoException) => {
+      reject(new NodeNetworkError(err.message));
+    });
+
+    req.setTimeout(30_000, () => {
+      req.destroy();
+      reject(new NodeNetworkError(`Request timed out after 30 s.`));
+    });
+
+    if (body !== undefined) {
+      req.write(body, "utf8");
+    }
+
+    req.end();
+  });
+
+const tryParseMessage = (text: string): string | null => {
+  const trimmed = text.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+
+    if (typeof parsed === "object" && parsed !== null) {
+      const obj = parsed as Record<string, unknown>;
+
+      // Check common error field names used by Sesam and general REST APIs
+      for (const field of ["message", "error", "description", "detail", "reason"]) {
+        if (typeof obj[field] === "string") {
+          return obj[field] as string;
+        }
+      }
+    }
+  } catch {
+    // not JSON — fall through to raw text
+  }
+
+  // Return raw body truncated to 300 chars so the user can see what the node said
+  return trimmed.length > 300 ? `${trimmed.slice(0, 300)}…` : trimmed;
+};
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Send a pipe config to the node's preview endpoint and return the output
+ * entities. The `source` block in the config is replaced with an embedded
+ * source containing `inputEntities` so the exact entity the user is editing
+ * gets evaluated, regardless of the original source type.
+ *
+ * API: POST {nodeUrl}/preview
+ *   Content-Type: application/x-www-form-urlencoded
+ *   Body: operation=preview-pipe&pipe-config=<encoded JSON>&trace=true
+ *
+ * @throws {NodeAuthError}    HTTP 401/403 — bad or missing JWT
+ * @throws {NodeApiError}     HTTP 4xx/5xx — node-side error (message preserved)
+ * @throws {NodeNetworkError} DNS/timeout/connection failure
+ */
+export const previewPipe = async (
+  nodeUrl: string,
+  jwt: string,
+  pipeConfig: Record<string, unknown>,
+  inputEntities: Entity[],
+): Promise<Entity[]> => {
+  const base = validateUrl(nodeUrl);
+  const url = new URL("/preview", base);
+
+  // Override the source so only the user's selected entity is evaluated
+  const effectiveConfig: Record<string, unknown> = {
+    ...pipeConfig,
+    source: { type: "embedded", entities: inputEntities },
+  };
+
+  const formBody =
+    `operation=preview-pipe` +
+    `&pipe-config=${encodeURIComponent(JSON.stringify(effectiveConfig))}` +
+    `&trace=true`;
+
+  const responseText = await request(
+    "POST",
+    url,
+    jwt,
+    formBody,
+    "application/x-www-form-urlencoded",
+  );
+
+  const parsed: unknown = JSON.parse(responseText);
+
+  // The API may return an array directly or wrap it in an object
+  if (Array.isArray(parsed)) {
+    return parsed as Entity[];
+  }
+
+  // Wrapped response: { entities: [...], ... } or { result: [...], ... }
+  if (typeof parsed === "object" && parsed !== null) {
+    const obj = parsed as Record<string, unknown>;
+
+    for (const field of ["entities", "result", "results", "output"]) {
+      if (Array.isArray(obj[field])) {
+        return obj[field] as Entity[];
+      }
+    }
+  }
+
+  return [];
+};
+
+/**
+ * Fetch entities from a dataset on the node.
+ *
+ * @param since  The `_ts` value of the last received entity — used as a
+ *               pagination cursor. Omit for the first page.
+ * @throws {NodeAuthError}    HTTP 401/403
+ * @throws {NodeApiError}     HTTP 4xx/5xx
+ * @throws {NodeNetworkError} DNS/timeout/connection failure
+ */
+export const fetchDatasetEntities = async (
+  nodeUrl: string,
+  jwt: string,
+  datasetId: string,
+  limit = 50,
+  since?: string | number,
+): Promise<Entity[]> => {
+  const base = validateUrl(nodeUrl);
+  const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}/entities`, base);
+
+  url.searchParams.set("limit", String(limit));
+
+  if (since !== undefined) {
+    url.searchParams.set("since", String(since));
+  }
+
+  const responseText = await request("GET", url, jwt);
+
+  return JSON.parse(responseText) as Entity[];
+};
