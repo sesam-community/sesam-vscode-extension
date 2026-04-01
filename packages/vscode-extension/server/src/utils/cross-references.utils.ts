@@ -131,3 +131,31 @@ export const findAllDatasetCrossRefs = (
 
   return results;
 };
+
+// ---------------------------------------------------------------------------
+// findAllSystemCrossRefs
+// ---------------------------------------------------------------------------
+
+/**
+ * Searches all cached file texts for occurrences of `targetId` used as a
+ * system reference: `"system": "targetId"`.
+ */
+export const findAllSystemCrossRefs = (
+  targetId: string,
+  fileTexts: ReadonlyMap<string, string>,
+): CrossRef[] => {
+  const results: CrossRef[] = [];
+  const esc = escapeRegex(targetId);
+
+  for (const [uri, text] of fileTexts) {
+    const systemRe = new RegExp(`"system"\\s*:\\s*"(${esc})"`, "g");
+    let m: RegExpExecArray | null;
+
+    while ((m = systemRe.exec(text)) !== null) {
+      const nameStart = m.index + m[0].length - targetId.length - 1;
+      results.push({ uri, nameStart, nameEnd: nameStart + targetId.length });
+    }
+  }
+
+  return results;
+};

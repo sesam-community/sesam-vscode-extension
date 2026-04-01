@@ -90,7 +90,11 @@ import {
   findIdAtOffset,
 } from "./utils/reference-detection.utils";
 import { collectDocumentLinks } from "./utils/document-links.utils";
-import { findAllCrossReferences, findAllDatasetCrossRefs } from "./utils/cross-references.utils";
+import {
+  findAllCrossReferences,
+  findAllDatasetCrossRefs,
+  findAllSystemCrossRefs,
+} from "./utils/cross-references.utils";
 import {
   findAliasAtOffset,
   findAliasUsageAtOffset,
@@ -987,15 +991,22 @@ function buildIdRenameDocumentChanges(
     // ignore
   }
 
+  const configType = typeof parsedConfig["type"] === "string" ? parsedConfig["type"] : "";
+  const isSystem = configType === "system" || configType.startsWith("system:");
+
   const sinkObj =
     typeof parsedConfig["sink"] === "object" && parsedConfig["sink"] !== null
       ? (parsedConfig["sink"] as Record<string, unknown>)
       : {};
   const explicitSinkDataset = typeof sinkObj["dataset"] === "string" ? sinkObj["dataset"] : null;
 
-  if (explicitSinkDataset === null) {
-    // Include all files — even targetUri itself (self-referencing dataset uses).
-    const datasetRefs = findAllDatasetCrossRefs(oldId, workspaceIndex.fileTexts, "");
+  if (isSystem || explicitSinkDataset === null) {
+    // For systems: find all "system": "id" references.
+    // For pipes without explicit sink.dataset: find all dataset references.
+    // Include all files — even targetUri itself (self-referencing uses).
+    const datasetRefs = isSystem
+      ? findAllSystemCrossRefs(oldId, workspaceIndex.fileTexts)
+      : findAllDatasetCrossRefs(oldId, workspaceIndex.fileTexts, "");
     const refsByUri = new Map<string, Array<{ start: number; end: number }>>();
 
     for (const ref of datasetRefs) {
