@@ -141,6 +141,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(syncActivePipe));
   syncActivePipe(vscode.window.activeTextEditor);
 
+  // Keep sesam-config files in the left column (ViewColumn.One) so they don't
+  // open over the Preview panel in the right split.
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (!editor || editor.viewColumn === vscode.ViewColumn.One || !PreviewPanel.currentPanel) {
+        return;
+      }
+
+      const lang = editor.document.languageId;
+
+      if (lang !== "sesam-config" && lang !== "json") {
+        return;
+      }
+
+      void vscode.commands.executeCommand("workbench.action.moveEditorToFirstGroup");
+    }),
+  );
+
   // Initial DAG scan
   void buildDagFromWorkspace().then(({ index, systems }) => {
     dagRef.current = index;
