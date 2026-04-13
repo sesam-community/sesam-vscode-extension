@@ -183,9 +183,14 @@
         "title": "Sesam: Switch Profile"
       },
       {
+        "command": "sesam.runPipe",
+        "title": "Sesam: Run Pipe",
+        "icon": "$(play)"
+      },
+      {
         "command": "dtl.previewPipe",
         "title": "Sesam: Preview Pipe Output",
-        "icon": "$(play)"
+        "icon": "$(open-preview)"
       },
       {
         "command": "dtl.openDocs",
@@ -227,9 +232,14 @@
     "menus": {
       "editor/title": [
         {
+          "command": "sesam.runPipe",
+          "when": "resourceLangId == json || resourceLangId == sesam-config",
+          "group": "navigation@1"
+        },
+        {
           "command": "dtl.previewPipe",
           "when": "resourceLangId == json || resourceLangId == sesam-config",
-          "group": "navigation"
+          "group": "navigation@2"
         }
       ],
       "explorer/context": [
@@ -278,6 +288,10 @@
         {
           "command": "dtl.renamePipe",
           "when": "editorLangId == sesam-config"
+        },
+        {
+          "command": "sesam.runPipe",
+          "when": "editorLangId == sesam-config || editorLangId == json"
         }
       ],
       "view/title": [

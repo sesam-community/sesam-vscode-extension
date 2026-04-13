@@ -41,7 +41,9 @@ import {
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
 import { registerSesamChatParticipant } from "./sesam-chat-participant";
+import { resolveCredentials } from "./credential-resolver";
 import { disposeSesamChannel } from "./sesam-channel";
+import { SesamRunner } from "./sesam-runner";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
 
@@ -258,6 +260,48 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("dtl.refreshDag", () => {
       rescanDag();
       vscode.window.setStatusBarMessage("Sesam: DAG refreshed", 2000);
+    }),
+
+    vscode.commands.registerCommand("sesam.runPipe", async () => {
+      const editor = vscode.window.activeTextEditor;
+      const pipeId = getActivePipeId(editor);
+
+      if (!pipeId) {
+        vscode.window.showWarningMessage("Sesam: No _id found in the active document.");
+        return;
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage(
+          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        );
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Sesam: Running pipe '${pipeId}'…`,
+          cancellable: false,
+        },
+        async () => {
+          const runner = new SesamRunner();
+          const result = await runner.runPipe(
+            { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
+            pipeId,
+          );
+
+          if (result.success) {
+            vscode.window.showInformationMessage(`Sesam: Pipe '${pipeId}' started successfully.`);
+          } else {
+            vscode.window.showErrorMessage(
+              `Sesam: Failed to run '${pipeId}': ${result.message ?? "unknown error"}`,
+            );
+          }
+        },
+      );
     }),
 
     vscode.commands.registerCommand("dtl.previewPipe", () => {
