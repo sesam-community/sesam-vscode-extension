@@ -42,7 +42,11 @@ import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
 import { registerSesamChatParticipant } from "./sesam-chat-participant";
 import { resolveCredentials } from "./credential-resolver";
-import { fetchNodeStatusHint } from "./portal-client";
+import {
+  fetchNodeStatusHint,
+  startProvisioningPoller,
+  extractSubscriptionId,
+} from "./portal-client";
 import { disposeSesamChannel } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
 
@@ -50,7 +54,59 @@ import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-build
 
 let client: LanguageClient;
 
+// ---------------------------------------------------------------------------
+// Node provisioning state
+// ---------------------------------------------------------------------------
+
+/** Active provisioning poller — at most one at a time. */
+let _provisioningPoller: { stop: () => void } | null = null;
+
+/**
+ * Start polling the portal for the given credentials if the node is not ready.
+ * Sets the `sesam.nodeProvisioning` context key so menus can disable themselves.
+ * Calls `onReady` (and notifies PreviewPanel) when the node becomes available.
+ */
+const startPollerIfNeeded = (nodeUrl: string, jwt: string): void => {
+  const subId = extractSubscriptionId(jwt);
+
+  if (!subId) {
+    return;
+  }
+
+  if (_provisioningPoller) {
+    return; // already polling
+  }
+
+  void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", true);
+  PreviewPanel.currentPanel?.setNodeProvisioning(true);
+
+  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+  statusBarItem.text = "$(sync~spin) Sesam: node provisioning…";
+  statusBarItem.tooltip = "Waiting for Sesam node to become available";
+  statusBarItem.show();
+
+  _provisioningPoller = startProvisioningPoller(
+    jwt,
+    subId,
+    (hint) => {
+      statusBarItem.text = `$(sync~spin) Sesam: ${hint}`;
+    },
+    () => {
+      _provisioningPoller = null;
+      statusBarItem.dispose();
+      void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
+      PreviewPanel.currentPanel?.setNodeProvisioning(false);
+      void vscode.window.showInformationMessage(
+        "Sesam: Node is ready. You can now run pipes and use live preview.",
+      );
+    },
+  );
+};
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // Wire the provisioning poller into PreviewPanel live eval failures
+  PreviewPanel.onProvisioningNeeded = startPollerIfNeeded;
+
   // ── Credential & Profile Managers (F03) ──────────────────────────────────
   initCredentialManager(context);
   initProfileManager(context);
@@ -303,6 +359,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               vscode.window.showErrorMessage(
                 `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
               );
+
+              if (hint) {
+                startPollerIfNeeded(creds.nodeUrl, creds.jwt);
+              }
             }
           } catch (err) {
             const isAuth =
@@ -314,6 +374,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             vscode.window.showErrorMessage(
               `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
             );
+
+            if (hint) {
+              startPollerIfNeeded(creds.nodeUrl, creds.jwt);
+            }
           }
         },
       );

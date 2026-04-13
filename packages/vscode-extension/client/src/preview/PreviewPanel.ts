@@ -38,6 +38,8 @@ const DEBOUNCE_MS = 300;
 
 export class PreviewPanel {
   static currentPanel: PreviewPanel | undefined;
+  /** Set by extension.ts to start the provisioning poller when live preview fails. */
+  static onProvisioningNeeded: ((nodeUrl: string, jwt: string) => void) | undefined;
   private static readonly viewType = "dtlPreview";
 
   private readonly _panel: vscode.WebviewPanel;
@@ -45,6 +47,7 @@ export class PreviewPanel {
   private readonly _context: vscode.ExtensionContext;
   private _document: vscode.TextDocument;
   private _mode: PreviewMode;
+  private _nodeProvisioning = false;
   private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private _lastOutputJson: string | undefined;
   private _disposables: vscode.Disposable[] = [];
@@ -117,6 +120,11 @@ export class PreviewPanel {
     );
 
     this._sendDocumentState();
+    void this._sendModeState();
+  }
+
+  setNodeProvisioning(provisioning: boolean): void {
+    this._nodeProvisioning = provisioning;
     void this._sendModeState();
   }
 
@@ -232,6 +240,17 @@ export class PreviewPanel {
   // ---------------------------------------------------------------------------
 
   private async _runLiveEvaluation(inputJson: string): Promise<void> {
+    if (this._nodeProvisioning) {
+      this._panel.webview.postMessage({
+        type: "liveError",
+        kind: "provisioning",
+        message:
+          "Node is provisioning \u2014 live preview is unavailable. Please wait until the node is ready.",
+      });
+
+      return;
+    }
+
     const credentials = await resolveCredentials();
 
     if (!credentials) {
@@ -302,6 +321,7 @@ export class PreviewPanel {
 
         if (hint) {
           message += `\n\n${hint}`;
+          PreviewPanel.onProvisioningNeeded?.(credentials.nodeUrl, credentials.jwt);
         }
       }
 
@@ -315,7 +335,12 @@ export class PreviewPanel {
 
   private async _sendModeState(): Promise<void> {
     const hasCredentials = (await resolveCredentials()) !== null;
-    this._panel.webview.postMessage({ type: "modeChanged", mode: this._mode, hasCredentials });
+    this._panel.webview.postMessage({
+      type: "modeChanged",
+      mode: this._mode,
+      hasCredentials,
+      nodeProvisioning: this._nodeProvisioning,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -512,6 +537,15 @@ export class PreviewPanel {
       cursor: pointer;
       text-decoration: underline;
     }
+    .provisioning-banner {
+      display: none;
+      padding: 5px 12px;
+      font-size: 12px;
+      background: #1e3a5f;
+      color: #9cdcfe;
+      border-bottom: 1px solid #264f73;
+      flex-shrink: 0;
+    }
     .entity-nav {
       display: none;
       align-items: center;
@@ -664,6 +698,10 @@ export class PreviewPanel {
     <a onclick="openSettings()">Set credentials…</a>
   </div>
 
+  <div class="provisioning-banner" id="provisioning-banner">
+    ⟳ Node is provisioning — live preview is unavailable. Waiting for node to become ready…
+  </div>
+
   <div class="panes">
     <!-- Input Entity -->
     <div class="pane">
@@ -768,19 +806,31 @@ export class PreviewPanel {
       vscode.postMessage({ type: 'openSettings' });
     }
 
-    function applyMode(mode, hasCredentials) {
+    function applyMode(mode, hasCredentials, nodeProvisioning) {
       currentMode = mode;
       const btn = document.getElementById('mode-btn');
       const banner = document.getElementById('no-creds-banner');
+      const provBanner = document.getElementById('provisioning-banner');
 
       if (mode === 'live') {
         btn.textContent = '🌐 Live';
         btn.className = 'btn btn-live';
-        banner.style.display = (hasCredentials ? 'none' : 'block');
+
+        if (nodeProvisioning) {
+          btn.disabled = true;
+          banner.style.display = 'none';
+          provBanner.style.display = 'block';
+        } else {
+          btn.disabled = false;
+          banner.style.display = (hasCredentials ? 'none' : 'block');
+          provBanner.style.display = 'none';
+        }
       } else {
         btn.textContent = '🔌 Offline';
         btn.className = 'btn btn-secondary';
+        btn.disabled = false;
         banner.style.display = 'none';
+        provBanner.style.display = 'none';
       }
     }
 
@@ -847,7 +897,7 @@ export class PreviewPanel {
       }
 
       if (msg.type === 'modeChanged') {
-        applyMode(msg.mode, msg.hasCredentials);
+        applyMode(msg.mode, msg.hasCredentials, msg.nodeProvisioning ?? false);
         return;
       }
 

@@ -233,7 +233,7 @@
       "editor/title": [
         {
           "command": "sesam.runPipe",
-          "when": "resourceLangId == json || resourceLangId == sesam-config",
+          "when": "(resourceLangId == json || resourceLangId == sesam-config) && !sesam.nodeProvisioning",
           "group": "navigation@1"
         },
         {
@@ -396,6 +396,11 @@
           "default": "",
           "scope": "application",
           "markdownDescription": "JWT token for the Sesam node API. **Store this in user settings only — do NOT commit to `.vscode/settings.json`.**"
+        },
+        "sesam.portal.verboseLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log the full portal API response body in the Sesam output channel. Useful for debugging subscription/provisioning status issues."
         }
       }
     }

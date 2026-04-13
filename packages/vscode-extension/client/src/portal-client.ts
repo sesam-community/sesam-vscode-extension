@@ -13,6 +13,8 @@
 
 import * as https from "node:https";
 
+import * as vscode from "vscode";
+
 import { getSesamChannel } from "./sesam-channel";
 
 // ---------------------------------------------------------------------------
@@ -89,32 +91,54 @@ export const extractSubscriptionId = (jwt: string): string | null => {
  * Sesam-py does the same via `register_user_interaction()` — even if the node
  * is hibernated or not yet provisioned, this POST causes the portal to start
  * spinning it up.
- * Fire-and-forget: failures are silently ignored.
+ *
+ * Returns a Promise that resolves when the request completes (success or
+ * failure). Callers should await this before starting the provisioning poller
+ * so that the wake-up signal reaches the portal first.
  */
-const triggerNodeWakeUp = (jwt: string, subId: string): void => {
-  const body = JSON.stringify({ subscription_id: subId, action: "page_view" });
+const triggerNodeWakeUp = (jwt: string, subId: string): Promise<void> =>
+  new Promise((resolve) => {
+    const analyticsUrl = "https://portal.sesam.io/api/analytics";
+    const body = JSON.stringify({ subscription_id: subId, action: "page_view" });
+    const startMs = Date.now();
 
-  const req = https.request(
-    "https://portal.sesam.io/api/analytics",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        "Content-Type": "application/json",
-        "Content-Length": String(Buffer.byteLength(body, "utf8")),
+    const req = https.request(
+      analyticsUrl,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+          "Content-Length": String(Buffer.byteLength(body, "utf8")),
+        },
       },
-    },
-    () => {
-      // response intentionally ignored
-    },
-  );
+      (res) => {
+        res.resume();
+        res.on("end", () => {
+          const ch = getSesamChannel();
+          const ts = new Date();
+          const tsStr = [
+            ts.getHours().toString().padStart(2, "0"),
+            ts.getMinutes().toString().padStart(2, "0"),
+            ts.getSeconds().toString().padStart(2, "0"),
+          ].join(":");
+          ch.appendLine(
+            `[${tsStr}] POST ${analyticsUrl}  ${res.statusCode ?? 0}  ${Date.now() - startMs} ms  — wake-up sent`,
+          );
+          resolve();
+        });
+        res.on("error", resolve);
+      },
+    );
 
-  req.on("error", () => {
-    // best-effort — ignore failures
+    req.on("error", resolve);
+    req.setTimeout(10_000, () => {
+      req.destroy();
+      resolve();
+    });
+    req.write(body, "utf8");
+    req.end();
   });
-  req.write(body, "utf8");
-  req.end();
-};
 
 const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<SubscriptionStatus | null> =>
   new Promise((resolve) => {
@@ -146,7 +170,14 @@ const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<Subscripti
           const tsStr = `${hh}:${mm}:${ss}`;
 
           ch.appendLine(`[${tsStr}] GET ${url}  ${status}  ${durationMs} ms`);
-          ch.appendLine(`[${tsStr}] Portal response: ${body}`);
+
+          const verbose = vscode.workspace
+            .getConfiguration("sesam.portal")
+            .get<boolean>("verboseLogging", false);
+
+          if (verbose) {
+            ch.appendLine(`[${tsStr}] Portal response: ${body}`);
+          }
 
           try {
             resolve(JSON.parse(body) as SubscriptionStatus);
@@ -216,12 +247,77 @@ const buildStatusHint = (status: SubscriptionStatus): string | null => {
 // ---------------------------------------------------------------------------
 
 /**
+ * Poll the portal every 5 s until `provisioning_status === "completed"` and
+ * `was_hibernated_due_to_idleness` is no longer set (i.e. the node is ready).
+ *
+ * Mirrors Management Studio's `usePollHibernatedConnectFlow` /
+ * `usePollProvisioningConnectFlow` behaviour.
+ *
+ * Returns a `stop()` function — call it to cancel polling (e.g. on dispose).
+ */
+export const startProvisioningPoller = (
+  jwt: string,
+  subId: string,
+  onStatusChange: (hint: string) => void,
+  onReady: () => void,
+): { stop: () => void } => {
+  const POLL_INTERVAL_MS = 30_000;
+  let stopped = false;
+
+  const tick = async (): Promise<void> => {
+    if (stopped) {
+      return;
+    }
+
+    const status = await fetchSubscriptionStatus(jwt, subId);
+
+    if (stopped) {
+      return;
+    }
+
+    if (!status) {
+      return;
+    }
+
+    const isReady =
+      status.provisioning_status === "completed" && status.was_hibernated_due_to_idleness !== true;
+
+    if (isReady) {
+      stopped = true;
+      onReady();
+
+      return;
+    }
+
+    const hint = buildStatusHint(status);
+
+    if (hint) {
+      onStatusChange(hint);
+    }
+  };
+
+  const handle = setInterval(() => {
+    void tick();
+  }, POLL_INTERVAL_MS);
+
+  return {
+    stop: () => {
+      stopped = true;
+      clearInterval(handle);
+    },
+  };
+};
+
+/**
  * Convenience wrapper: extract sub-id from JWT → fetch status → build hint string.
  *
  * Returns null when:
  * - The JWT has no `principals` field (non-sesam.cloud tokens)
  * - The portal fetch fails for any reason
  * - The node status is normal (provisioning_status === "completed" or absent)
+ *
+ * Also triggers `POST /api/analytics` (page_view) for hibernated/provisioning
+ * nodes so the portal starts waking the node immediately.
  */
 export const fetchNodeStatusHint = async (nodeUrl: string, jwt: string): Promise<string | null> => {
   const subId = extractSubscriptionId(jwt);
@@ -243,7 +339,7 @@ export const fetchNodeStatusHint = async (nodeUrl: string, jwt: string): Promise
     status.provisioning_status === "provisioning";
 
   if (needsWakeUp) {
-    triggerNodeWakeUp(jwt, subId);
+    await triggerNodeWakeUp(jwt, subId);
   }
 
   return buildStatusHint(status);
