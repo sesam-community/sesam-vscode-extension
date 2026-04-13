@@ -90,7 +90,7 @@
 
 | Feature | Status |
 |---|---|
-| F09: Copilot Agent Participant | `planned` |
+| F09: Copilot Agent Participant | `implemented` |
 | F07/F15: Interactive Pipe Graph (canvas) | `planned` |
 | F08: Connector Development Tools | `planned` |
 
