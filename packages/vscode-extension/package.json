@@ -171,6 +171,10 @@
         "title": "Sesam: Add Profile"
       },
       {
+        "command": "sesam.deleteProfile",
+        "title": "Sesam: Delete Profile"
+      },
+      {
         "command": "sesam.listProfiles",
         "title": "Sesam: List Profiles"
       },

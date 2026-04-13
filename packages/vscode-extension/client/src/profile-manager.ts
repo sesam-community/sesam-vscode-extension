@@ -63,10 +63,11 @@ const ctx = (): vscode.ExtensionContext => {
 export const getActiveProfileName = (): string =>
   vscode.workspace.getConfiguration("sesam").get<string>("activeProfile", "default");
 
-export const setActiveProfileName = (name: string): Promise<void> =>
-  vscode.workspace
+export const setActiveProfileName = async (name: string): Promise<void> => {
+  await vscode.workspace
     .getConfiguration("sesam")
     .update("activeProfile", name, vscode.ConfigurationTarget.Workspace);
+};
 
 // ---------------------------------------------------------------------------
 // Profile metadata (nodeUrl per profile)
@@ -199,6 +200,54 @@ export const runAddProfile = async (): Promise<void> => {
   await setActiveProfileName(name.trim());
   _refreshStatusBar();
   vscode.window.showInformationMessage(`Sesam: profile '${name.trim()}' saved and set as active.`);
+};
+
+export const runDeleteProfile = async (): Promise<void> => {
+  const storedNames = listStoredProfileNames();
+  const profileMetas = getStoredProfiles();
+  const knownNames = [...new Set([...storedNames, ...profileMetas.map((p) => p.name)])];
+
+  if (knownNames.length === 0) {
+    vscode.window.showInformationMessage("Sesam: No profiles configured.");
+    return;
+  }
+
+  const activeProfile = getActiveProfileName();
+
+  const items: vscode.QuickPickItem[] = knownNames.map((name) => ({
+    label: name,
+    description: name === activeProfile ? "$(check) active" : undefined,
+  }));
+
+  const picked = await vscode.window.showQuickPick(items, {
+    title: "Sesam: Delete Profile — Select profile",
+    placeHolder: "Select a profile to delete",
+  });
+
+  if (!picked) {
+    return;
+  }
+
+  const confirmed = await vscode.window.showWarningMessage(
+    `Delete profile '${picked.label}'? This removes the stored JWT and node URL.`,
+    { modal: true },
+    "Delete",
+  );
+
+  if (confirmed !== "Delete") {
+    return;
+  }
+
+  await deleteToken(picked.label);
+  await removeProfile(picked.label);
+
+  // If the deleted profile was active, fall back to "default"
+  if (picked.label === activeProfile) {
+    await setActiveProfileName("default");
+    _refreshStatusBar();
+  }
+
+  vscode.window.showInformationMessage(`Sesam: profile '${picked.label}' deleted.`);
 };
 
 export const runListProfiles = (): void => {
