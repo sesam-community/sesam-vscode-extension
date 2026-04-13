@@ -30,9 +30,12 @@ import { SystemPipesProvider } from "./graph/SystemPipesProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
 import {
   initProfileManager,
+  getStoredProfiles,
   runAddProfile,
   runListProfiles,
   runSwitchProfile,
+  setActiveProfileName,
+  upsertProfile,
 } from "./profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
@@ -280,6 +283,32 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
+      const trimmedName = profileName.trim();
+
+      // If this profile has no nodeUrl stored and sesam.nodeUrl setting is also empty,
+      // prompt for one so resolveCredentials() can succeed.
+      const existingMeta = getStoredProfiles().find((p) => p.name === trimmedName);
+      const fallbackNodeUrl = vscode.workspace
+        .getConfiguration("sesam")
+        .get<string>("nodeUrl", "")
+        .trim();
+
+      if (!existingMeta?.nodeUrl && !fallbackNodeUrl) {
+        const nodeUrl = await vscode.window.showInputBox({
+          title: "Sesam: Store JWT — Node URL",
+          prompt: "No node URL found for this profile. Enter the Sesam node URL.",
+          placeHolder: "https://datahub-xxxxxxxx.sesam.cloud",
+          ignoreFocusOut: true,
+          validateInput: (v) => (v.trim() ? undefined : "Node URL cannot be empty"),
+        });
+
+        if (nodeUrl === undefined) {
+          return;
+        }
+
+        await upsertProfile({ name: trimmedName, nodeUrl: nodeUrl.trim() });
+      }
+
       const jwt = await vscode.window.showInputBox({
         title: "Sesam: Store JWT — Step 2 of 2",
         prompt: "Paste your JWT token (obtained from the Sesam portal)",
@@ -293,10 +322,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      await storeToken(profileName.trim(), jwt.trim());
-      vscode.window.showInformationMessage(
-        `Sesam: JWT stored for profile '${profileName.trim()}'.`,
-      );
+      await storeToken(trimmedName, jwt.trim());
+      await setActiveProfileName(trimmedName);
+      vscode.window.showInformationMessage(`Sesam: JWT stored for profile '${trimmedName}'.`);
     }),
 
     vscode.commands.registerCommand("sesam.deleteToken", async () => {

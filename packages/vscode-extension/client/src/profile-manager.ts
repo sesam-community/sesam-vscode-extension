@@ -66,7 +66,7 @@ export const getActiveProfileName = (): string =>
 export const setActiveProfileName = (name: string): Promise<void> =>
   vscode.workspace
     .getConfiguration("sesam")
-    .update(ACTIVE_PROFILE_SETTING, name, vscode.ConfigurationTarget.Workspace);
+    .update("activeProfile", name, vscode.ConfigurationTarget.Workspace);
 
 // ---------------------------------------------------------------------------
 // Profile metadata (nodeUrl per profile)
@@ -196,8 +196,9 @@ export const runAddProfile = async (): Promise<void> => {
 
   await upsertProfile({ name: name.trim(), nodeUrl: nodeUrl.trim() });
   await storeToken(name.trim(), jwt.trim());
+  await setActiveProfileName(name.trim());
   _refreshStatusBar();
-  vscode.window.showInformationMessage(`Sesam: profile '${name.trim()}' saved.`);
+  vscode.window.showInformationMessage(`Sesam: profile '${name.trim()}' saved and set as active.`);
 };
 
 export const runListProfiles = (): void => {
