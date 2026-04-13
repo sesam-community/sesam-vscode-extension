@@ -36,7 +36,7 @@
 | F22 | Sesam Panel (Errors / Warnings View) | Phase 1 | `implemented` | — |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
-| F04 | Node-Connected Live Preview | Phase 3 | `planned` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
+| F04 | Node-Connected Live Preview | Phase 3 | `implemented` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
 | F10 | Inline Output & Diagnostics from Node | Phase 3 | `planned` | [impl-f10-inline-diagnostics.prompt.md](impl-f10-inline-diagnostics.prompt.md) |
 | F09 | Copilot Agent Participant (@sesam) | Phase 4 | `implemented` | [impl-f09-copilot-agent.prompt.md](impl-f09-copilot-agent.prompt.md) |
 | F07 | Interactive Pipe Graph (canvas) | Phase 4 | `planned` (tracked as F15) | [impl-f07-pipe-graph.prompt.md](impl-f07-pipe-graph.prompt.md) |
@@ -83,7 +83,7 @@
 
 | Feature | Status |
 |---|---|
-| F04: Node-Connected Live Preview | `planned` |
+| F04: Node-Connected Live Preview | `implemented` |
 | F10: Inline Output & Diagnostics | `planned` |
 
 ### Phase 4: AI & Visual Polish

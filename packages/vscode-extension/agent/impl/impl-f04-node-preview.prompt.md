@@ -1,6 +1,6 @@
 # F04: Node-Connected Live Preview
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 3 - Node Connectivity
 > **Tracking**: [README.md](README.md)
 
