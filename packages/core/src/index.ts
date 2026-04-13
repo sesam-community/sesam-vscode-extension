@@ -12,7 +12,8 @@ export * from "./errors.js";
 // HTTP client (lower-level — use the operation functions for most cases)
 export { NodeClient } from "./node-client.js";
 
-// Config ZIP helper
+// Config file readers
+export { readSyncConfig } from "./syncconfig.js";
 export { zipWorkspaceConfig } from "./config-zipper.js";
 
 // High-level operations

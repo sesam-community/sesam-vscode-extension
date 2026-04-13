@@ -6,3 +6,6 @@ dist/
 packages/vscode-extension/client/src/**/*.js
 packages/vscode-extension/server/src/**/*.js
 packages/vscode-extension/src/**/*.js
+# Sesam credential files — never commit
+.syncconfig
+.authconfig

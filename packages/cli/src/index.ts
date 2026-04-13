@@ -11,6 +11,7 @@ import { Command } from "commander";
 import {
   downloadConfig,
   getStatus,
+  readSyncConfig,
   runAllPipes,
   runPipe,
   uploadConfig,
@@ -44,19 +45,26 @@ interface CredOpts {
   jwt?: string;
 }
 
-const resolveCredentials = (opts: CredOpts): NodeCredentials => {
-  const nodeUrl = opts.node ?? process.env["NODE"] ?? "";
-  const jwtToken = opts.jwt ?? process.env["JWT"] ?? "";
+const resolveCredentials = async (opts: CredOpts): Promise<NodeCredentials> => {
+  // 1. Explicit flags
+  // 2. Environment variables
+  // 3. .syncconfig file (walk up from cwd)
+  const syncconfig = await readSyncConfig();
+
+  const nodeUrl = opts.node ?? process.env["NODE"] ?? syncconfig?.nodeUrl ?? "";
+  const jwtToken = opts.jwt ?? process.env["JWT"] ?? syncconfig?.jwtToken ?? "";
 
   if (!nodeUrl) {
     console.error(
-      "Error: Sesam node URL required. Use --node or set the NODE environment variable.",
+      "Error: Sesam node URL required. Use --node, set NODE env var, or add a .syncconfig file.",
     );
     process.exit(1);
   }
 
   if (!jwtToken) {
-    console.error("Error: JWT token required. Use --jwt or set the JWT environment variable.");
+    console.error(
+      "Error: JWT token required. Use --jwt, set JWT env var, or add a .syncconfig file.",
+    );
     process.exit(1);
   }
 
@@ -72,7 +80,7 @@ addCredOptions(
 )
   .option("--force", "Force upload even if the node reports conflicts")
   .action(async (opts: CredOpts & { force?: boolean }) => {
-    const creds = resolveCredentials(opts);
+    const creds = await resolveCredentials(opts);
 
     try {
       const result = await uploadConfig(creds, process.cwd(), { force: opts.force });
@@ -92,7 +100,7 @@ addCredOptions(
 addCredOptions(
   program.command("download").description("Download pipe/system configs from the Sesam node"),
 ).action(async (opts: CredOpts) => {
-  const creds = resolveCredentials(opts);
+  const creds = await resolveCredentials(opts);
 
   try {
     const result = await downloadConfig(creds, { outDir: process.cwd() });
@@ -112,7 +120,7 @@ addCredOptions(
 addCredOptions(
   program.command("run [pipe-id]").description("Run all pipes, or a specific pipe by its _id"),
 ).action(async (pipeId: string | undefined, opts: CredOpts) => {
-  const creds = resolveCredentials(opts);
+  const creds = await resolveCredentials(opts);
 
   try {
     if (pipeId) {
@@ -132,29 +140,33 @@ addCredOptions(
 // sesam status
 // ---------------------------------------------------------------------------
 
-addCredOptions(program.command("status").description("Show execution status for all pipes")).action(
-  async (opts: CredOpts) => {
-    const creds = resolveCredentials(opts);
+addCredOptions(
+  program
+    .command("status [pipe-id]")
+    .description("Show execution status for all pipes, or a single pipe by its _id"),
+).action(async (pipeId: string | undefined, opts: CredOpts) => {
+  const creds = await resolveCredentials(opts);
 
-    try {
-      const statuses = await getStatus(creds);
+  try {
+    const statuses = await getStatus(creds);
 
-      if (statuses.length === 0) {
-        console.log("No pipes found.");
-        return;
-      }
+    const filtered = pipeId ? statuses.filter((s) => s.id === pipeId) : statuses;
 
-      for (const s of statuses) {
-        const id = s.id.padEnd(40);
-        const state = s.state.padEnd(12);
-        console.log(`${id} ${state} ok=${s.successCount} fail=${s.failureCount}`);
-      }
-    } catch (err) {
-      console.error(`Status failed: ${String(err)}`);
-      process.exit(1);
+    if (filtered.length === 0) {
+      console.log(pipeId ? `Pipe "${pipeId}" not found.` : "No pipes found.");
+      return;
     }
-  },
-);
+
+    for (const s of filtered) {
+      const id = s.id.padEnd(40);
+      const state = s.state.padEnd(12);
+      console.log(`${id} ${state} ok=${s.successCount} fail=${s.failureCount}`);
+    }
+  } catch (err) {
+    console.error(`Status failed: ${String(err)}`);
+    process.exit(1);
+  }
+});
 
 // ---------------------------------------------------------------------------
 // sesam validate
