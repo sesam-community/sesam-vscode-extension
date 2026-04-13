@@ -42,6 +42,7 @@ import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
 import { registerSesamChatParticipant } from "./sesam-chat-participant";
 import { resolveCredentials } from "./credential-resolver";
+import { fetchNodeStatusHint } from "./portal-client";
 import { disposeSesamChannel } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
 
@@ -287,17 +288,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           cancellable: false,
         },
         async () => {
-          const runner = new SesamRunner();
-          const result = await runner.runPipe(
-            { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
-            pipeId,
-          );
+          try {
+            const runner = new SesamRunner();
+            const result = await runner.runPipe(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
+              pipeId,
+            );
 
-          if (result.success) {
-            vscode.window.showInformationMessage(`Sesam: Pipe '${pipeId}' started successfully.`);
-          } else {
+            if (result.success) {
+              vscode.window.showInformationMessage(`Sesam: Pipe '${pipeId}' started successfully.`);
+            } else {
+              const hint = await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
+              const detail = result.message ?? "unknown error";
+              vscode.window.showErrorMessage(
+                `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
+              );
+            }
+          } catch (err) {
+            const isAuth =
+              typeof err === "object" &&
+              err !== null &&
+              (err as Record<string, unknown>)["kind"] === "auth";
+            const detail = err instanceof Error ? err.message : String(err);
+            const hint = isAuth ? null : await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
             vscode.window.showErrorMessage(
-              `Sesam: Failed to run '${pipeId}': ${result.message ?? "unknown error"}`,
+              `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
             );
           }
         },

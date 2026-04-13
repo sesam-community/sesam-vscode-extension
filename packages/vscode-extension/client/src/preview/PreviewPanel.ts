@@ -14,6 +14,7 @@ import * as vscode from "vscode";
 import { evaluate } from "../../../src/shared/dtl-evaluator";
 import { resolveCredentials } from "../credential-resolver";
 import { fetchDatasetEntities, previewPipe } from "../node-client";
+import { fetchNodeStatusHint } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
 
 import type { EvalEntity } from "../../../src/shared/dtl-evaluator";
@@ -293,8 +294,18 @@ export class PreviewPanel {
 
       this._panel.webview.postMessage({ type: "liveResult", output });
     } catch (err) {
-      const liveError = toLiveError(err);
-      this._panel.webview.postMessage({ type: "liveError", ...liveError });
+      const base = toLiveError(err);
+      let message = base.message;
+
+      if (base.kind !== "auth") {
+        const hint = await fetchNodeStatusHint(credentials.nodeUrl, credentials.jwt);
+
+        if (hint) {
+          message += `\n\n${hint}`;
+        }
+      }
+
+      this._panel.webview.postMessage({ type: "liveError", kind: base.kind, message });
     }
   }
 
