@@ -2,14 +2,19 @@
  * Credential Resolver
  *
  * Single integration point for resolving the active Sesam node URL and JWT.
- * Currently reads from VS Code settings (`sesam.nodeUrl`, `sesam.jwt`).
+ * Resolution order (first non-empty wins):
+ *   1. SecretStorage JWT for the active profile (F03)
+ *   2. Legacy `sesam.jwt` VS Code setting (backward compat)
  *
- * When F03 (SecretStorage) is implemented, extend this function to check
- * SecretStorage first and fall back to settings — no other file needs to
- * change.
+ * Node URL resolution order:
+ *   1. Profile metadata nodeUrl stored in workspaceState (F03)
+ *   2. `sesam.nodeUrl` VS Code setting (backward compat)
  */
 
 import * as vscode from "vscode";
+
+import { getToken } from "./credential-manager";
+import { getActiveProfileName, resolveNodeUrl } from "./profile-manager";
 
 export interface SesamCredentials {
   nodeUrl: string;
@@ -17,17 +22,30 @@ export interface SesamCredentials {
 }
 
 /**
- * Resolve the active Sesam node URL and JWT from VS Code settings.
+ * Resolve the active Sesam node URL and JWT.
  * Returns `null` if either value is absent or empty.
  */
-export const resolveCredentials = (): SesamCredentials | null => {
-  const config = vscode.workspace.getConfiguration("sesam");
-  const nodeUrl = config.get<string>("nodeUrl", "").trim();
-  const jwt = config.get<string>("jwt", "").trim();
+export const resolveCredentials = async (): Promise<SesamCredentials | null> => {
+  const activeProfile = getActiveProfileName();
+  const nodeUrl = resolveNodeUrl(activeProfile);
 
-  if (!nodeUrl || !jwt) {
+  if (!nodeUrl) {
     return null;
   }
 
-  return { nodeUrl, jwt };
+  // 1. SecretStorage (F03)
+  const secretJwt = await getToken(activeProfile);
+
+  if (secretJwt) {
+    return { nodeUrl, jwt: secretJwt };
+  }
+
+  // 2. Legacy settings fallback
+  const settingsJwt = vscode.workspace.getConfiguration("sesam").get<string>("jwt", "").trim();
+
+  if (settingsJwt) {
+    return { nodeUrl, jwt: settingsJwt };
+  }
+
+  return null;
 };

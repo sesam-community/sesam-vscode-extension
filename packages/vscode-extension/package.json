@@ -159,8 +159,28 @@
     ],
     "commands": [
       {
-        "command": "sesam.setCredentials",
-        "title": "Sesam: Set Credentials"
+        "command": "sesam.setToken",
+        "title": "Sesam: Store JWT Token"
+      },
+      {
+        "command": "sesam.deleteToken",
+        "title": "Sesam: Delete JWT Token"
+      },
+      {
+        "command": "sesam.addProfile",
+        "title": "Sesam: Add Profile"
+      },
+      {
+        "command": "sesam.deleteProfile",
+        "title": "Sesam: Delete Profile"
+      },
+      {
+        "command": "sesam.listProfiles",
+        "title": "Sesam: List Profiles"
+      },
+      {
+        "command": "sesam.switchProfile",
+        "title": "Sesam: Switch Profile"
       },
       {
         "command": "dtl.previewPipe",
@@ -346,6 +366,11 @@
           "type": "number",
           "default": 3,
           "description": "Folder depth to scan for pipe config files in the workspace."
+        },
+        "sesam.activeProfile": {
+          "type": "string",
+          "default": "default",
+          "description": "Name of the active Sesam profile. The JWT for this profile is resolved from secure storage (SecretStorage). Run 'Sesam: Add Profile' or 'Sesam: Store JWT Token' to configure profiles."
         },
         "sesam.nodeUrl": {
           "type": "string",
