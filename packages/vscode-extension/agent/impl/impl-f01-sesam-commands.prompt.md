@@ -26,7 +26,7 @@ a dedicated Output Channel, and VS Code Task definitions.
    | `sesam.upload` | Sesam: Upload pipes |
    | `sesam.download` | Sesam: Download pipes |
    | `sesam.run` | Sesam: Run pipe... |
-   | `sesam.validate` | Sesam: Validate |
+   | `sesam.validate` | Sesam: Validate | ⚠️ Implemented internally via `validateWorkspace()` in `@sesam/core` — does **not** call the backend API. The node has no validate endpoint; validation runs fully offline against local config files. |
    | `sesam.format` | Sesam: Format DTL files |
    | `sesam.status` | Sesam: Show status |
    | `sesam.log` | Sesam: Show pipe log... |
