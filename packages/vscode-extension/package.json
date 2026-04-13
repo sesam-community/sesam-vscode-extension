@@ -159,10 +159,6 @@
     ],
     "commands": [
       {
-        "command": "sesam.setCredentials",
-        "title": "Sesam: Set Credentials (Legacy)"
-      },
-      {
         "command": "sesam.setToken",
         "title": "Sesam: Store JWT Token"
       },

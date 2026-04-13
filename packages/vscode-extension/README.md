@@ -335,9 +335,9 @@ JWTs expire — re-run **Sesam: Store JWT Token** when yours is refreshed.
 
 #### Falling back to settings
 
-If no JWT is stored in SecretStorage for the active profile, the extension falls back to the legacy `sesam.jwt` workspace/user setting. This means existing setups continue to work without any changes — just migrate at your own pace by running **Sesam: Store JWT Token**.
+If no JWT is stored in SecretStorage for the active profile, the extension falls back to the `sesam.jwt` workspace/user setting. This means existing setups continue to work without any changes — just migrate at your own pace by running **Sesam: Store JWT Token**.
 
-> **Security note:** The `sesam.jwt` setting is still supported but it stores the token in plain text in VS Code settings files. Use **Sesam: Store JWT Token** or **Sesam: Add Profile** to move tokens to SecretStorage.
+> **Security note:** The `sesam.jwt` setting stores the token in plain text in VS Code settings files. Use **Sesam: Store JWT Token** or **Sesam: Add Profile** to move tokens to SecretStorage.
 
 ---
 
@@ -561,7 +561,7 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 | `dtl.graph.scanDepth` | `3` | Directory depth to scan for pipe/system files |
 | `sesam.activeProfile` | `"default"` | Name of the active Sesam profile. Credentials for this profile are resolved from SecretStorage. Run **Sesam: Add Profile** to configure. |
 | `sesam.nodeUrl` | `""` | Base URL of your Sesam node — used as a fallback when no profile nodeUrl is configured |
-| `sesam.jwt` | `""` | **Legacy.** JWT token stored in plain text in settings. Prefer **Sesam: Store JWT Token** to move this to SecretStorage. |
+| `sesam.jwt` | `""` | JWT token stored in plain text in settings. Superseded by SecretStorage — use **Sesam: Store JWT Token** instead. |
 
 ---
 
