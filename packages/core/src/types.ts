@@ -45,6 +45,8 @@ export interface UploadOptions {
   force?: boolean;
   /** Additional environment variables to PUT before uploading. */
   envVars?: Record<string, string>;
+  /** Skip the pre-upload local validation step (not recommended). */
+  skipValidate?: boolean;
 }
 
 export interface UploadResult {

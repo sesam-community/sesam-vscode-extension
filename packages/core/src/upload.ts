@@ -2,6 +2,7 @@
  * Upload
  *
  * Implements the `sesam upload` operation:
+ *   0. Validate local configs (same as `sesam validate`) — abort on errors.
  *   1. PUT environment variables (from test-env.json and/or caller-supplied map).
  *   2. ZIP workspace configs and PUT the archive to the node.
  *   3. Wait for all pipes to finish deploying.
@@ -12,6 +13,8 @@ import * as path from "node:path";
 
 import { NodeClient } from "./node-client.js";
 import { zipWorkspaceConfig } from "./config-zipper.js";
+import { validateWorkspace } from "./validate.js";
+import { NodeApiError } from "./errors.js";
 
 import type { NodeCredentials, UploadOptions, UploadResult } from "./types.js";
 
@@ -48,6 +51,17 @@ export async function uploadConfig(
   opts?: UploadOptions,
 ): Promise<UploadResult> {
   const client = new NodeClient(creds);
+
+  // 0. Validate local configs before touching the node (matches sesam-py behaviour)
+  if (!opts?.skipValidate) {
+    const validation = await validateWorkspace(workspaceDir);
+
+    if (!validation.valid) {
+      const summary = validation.errors.map((e) => `  ${e.file}: ${e.message}`).join("\n");
+
+      throw new NodeApiError(0, `Validation failed — fix errors before uploading:\n${summary}`);
+    }
+  }
 
   // 1. PUT caller-supplied env vars (if any)
   if (opts?.envVars && Object.keys(opts.envVars).length > 0) {
