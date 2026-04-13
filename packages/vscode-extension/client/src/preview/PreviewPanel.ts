@@ -26,8 +26,6 @@ import type { Entity } from "../node-client";
 type MessageFromWebview =
   | { type: "evaluate"; inputJson: string }
   | { type: "toggleMode" }
-  | { type: "toggleAutoRefresh"; enabled: boolean }
-  | { type: "toggleAutoEval"; enabled: boolean }
   | { type: "openSettings" }
   | { type: "copyOutput"; text: string }
   | { type: "copyInput"; text: string };
@@ -35,8 +33,6 @@ type MessageFromWebview =
 type PreviewMode = "offline" | "live";
 
 const MODE_KEY = "sesam.previewMode";
-const AUTO_REFRESH_KEY = "sesam.previewAutoRefresh";
-const AUTO_EVAL_KEY = "sesam.previewAutoEval";
 const DEBOUNCE_MS = 300;
 
 export class PreviewPanel {
@@ -48,8 +44,6 @@ export class PreviewPanel {
   private readonly _context: vscode.ExtensionContext;
   private _document: vscode.TextDocument;
   private _mode: PreviewMode;
-  private _autoRefresh: boolean;
-  private _autoEval: boolean;
   private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private _lastOutputJson: string | undefined;
   private _disposables: vscode.Disposable[] = [];
@@ -94,8 +88,6 @@ export class PreviewPanel {
     this._document = document;
     this._context = context;
     this._mode = context.workspaceState.get<PreviewMode>(MODE_KEY) ?? "offline";
-    this._autoRefresh = context.workspaceState.get<boolean>(AUTO_REFRESH_KEY) ?? false;
-    this._autoEval = context.workspaceState.get<boolean>(AUTO_EVAL_KEY) ?? true;
 
     this._panel.webview.html = this._buildHtml();
 
@@ -109,28 +101,22 @@ export class PreviewPanel {
       this._disposables,
     );
 
-    // Auto-refresh subscription
+    // Live-preview: re-evaluate on every document edit (debounced)
     this._disposables.push(
-      vscode.workspace.onDidSaveTextDocument((saved) => {
-        if (!this._autoRefresh) {
-          return;
-        }
-
-        if (saved.uri.toString() !== this._document.uri.toString()) {
+      vscode.workspace.onDidChangeTextDocument((event) => {
+        if (event.document.uri.toString() !== this._document.uri.toString()) {
           return;
         }
 
         clearTimeout(this._debounceTimer);
         this._debounceTimer = setTimeout(() => {
-          this._sendDocumentState();
+          this._panel.webview.postMessage({ type: "autoEvaluate" });
         }, DEBOUNCE_MS);
       }),
     );
 
     this._sendDocumentState();
     this._sendModeState();
-    this._panel.webview.postMessage({ type: "autoRefreshState", enabled: this._autoRefresh });
-    this._panel.webview.postMessage({ type: "autoEvalState", enabled: this._autoEval });
   }
 
   updateDocument(document: vscode.TextDocument): void {
@@ -189,20 +175,6 @@ export class PreviewPanel {
     if (message.type === "openSettings") {
       await vscode.commands.executeCommand("sesam.setCredentials");
       this._sendModeState();
-
-      return;
-    }
-
-    if (message.type === "toggleAutoRefresh") {
-      this._autoRefresh = message.enabled;
-      await this._context.workspaceState.update(AUTO_REFRESH_KEY, this._autoRefresh);
-
-      return;
-    }
-
-    if (message.type === "toggleAutoEval") {
-      this._autoEval = message.enabled;
-      await this._context.workspaceState.update(AUTO_EVAL_KEY, this._autoEval);
 
       return;
     }
@@ -515,15 +487,6 @@ export class PreviewPanel {
       border-color: #264f73;
     }
     .btn-live:hover { background: #1a4268; }
-    .auto-label {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      color: var(--vscode-descriptionForeground);
-      cursor: pointer;
-      user-select: none;
-    }
     .no-creds-banner {
       display: none;
       padding: 5px 12px;
@@ -680,14 +643,6 @@ export class PreviewPanel {
     <h1>Pipe preview</h1>
     <span class="file-name" id="file-name"></span>
     <div class="header-actions">
-      <label class="auto-label" title="Re-evaluate automatically when the pipe file is saved">
-        <input type="checkbox" id="auto-refresh-cb" onchange="toggleAutoRefresh(this.checked)" />
-        Re-evaluate on save
-      </label>
-      <label class="auto-label" title="Auto evaluation when navigating entities">
-        <input type="checkbox" id="auto-eval-cb" onchange="toggleAutoEval(this.checked)" checked />
-        Auto evaluation
-      </label>
       <button class="btn btn-secondary" id="mode-btn" onclick="toggleMode()">🔌 Offline</button>
       <button class="btn btn-primary" id="run-btn" onclick="runEval()">▶ Evaluate</button>
     </div>
@@ -747,7 +702,6 @@ export class PreviewPanel {
     let entityIndex = 0;
     let currentMode = 'offline';
     let lastOutputText = null;
-    let autoEval = true;
 
     // ── Entity navigation ────────────────────────────────────────────────────
 
@@ -776,9 +730,7 @@ export class PreviewPanel {
       document.getElementById('next-btn').disabled = entityIndex === embeddedEntities.length - 1;
       clearOutput();
 
-      if (autoEval) {
-        runEval();
-      }
+      runEval();
     }
 
     // ── Evaluation ───────────────────────────────────────────────────────────
@@ -819,17 +771,6 @@ export class PreviewPanel {
         btn.className = 'btn btn-secondary';
         banner.style.display = 'none';
       }
-    }
-
-    // ── Auto-refresh ─────────────────────────────────────────────────────────
-
-    function toggleAutoRefresh(checked) {
-      vscode.postMessage({ type: 'toggleAutoRefresh', enabled: checked });
-    }
-
-    function toggleAutoEval(checked) {
-      autoEval = checked;
-      vscode.postMessage({ type: 'toggleAutoEval', enabled: checked });
     }
 
     // ── Copy ─────────────────────────────────────────────────────────────────
@@ -879,7 +820,7 @@ export class PreviewPanel {
         const sourceLabel = document.getElementById('entity-source');
         nav.style.display = embeddedEntities.length > 0 ? 'flex' : 'none';
         sourceLabel.textContent = msg.entitySource ? '(' + msg.entitySource + ')' : '';
-        if (embeddedEntities.length > 0) { showEntity(); }
+        if (embeddedEntities.length > 0) { showEntity(); } else { runEval(); }
         if (msg.resetOutput) {
           const outputBox = document.getElementById('output-box');
           outputBox.style.color = 'var(--vscode-descriptionForeground)';
@@ -899,14 +840,8 @@ export class PreviewPanel {
         return;
       }
 
-      if (msg.type === 'autoRefreshState') {
-        document.getElementById('auto-refresh-cb').checked = msg.enabled;
-        return;
-      }
-
-      if (msg.type === 'autoEvalState') {
-        autoEval = msg.enabled;
-        document.getElementById('auto-eval-cb').checked = msg.enabled;
+      if (msg.type === 'autoEvaluate') {
+        if (currentMode === 'offline') { runEval(); }
         return;
       }
 
