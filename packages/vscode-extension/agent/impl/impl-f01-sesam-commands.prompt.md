@@ -9,7 +9,7 @@
 
 ## Summary
 
-Expose the most common sesam-py operations (upload, download, run, test, validate, format, status) directly
+Expose the most common sesam-py operations (upload, download, run, test, validate, format, status, log, restart) directly
 from VS Code without the user switching to a terminal. Covers Command Palette commands, a status bar widget,
 a dedicated Output Channel, and VS Code Task definitions.
 
@@ -29,6 +29,8 @@ a dedicated Output Channel, and VS Code Task definitions.
    | `sesam.validate` | Sesam: Validate |
    | `sesam.format` | Sesam: Format DTL files |
    | `sesam.status` | Sesam: Show status |
+   | `sesam.log` | Sesam: Show pipe log... |
+   | `sesam.restart` | Sesam: Restart node |
 
 2. Create `client/src/sesamCommands.ts`:
    - `runSesamCommand(args: string[]): Promise<void>` - invokes the command via F00 `SesamRunner`,
@@ -55,6 +57,8 @@ a dedicated Output Channel, and VS Code Task definitions.
    - `Sesam: download`
    - `Sesam: run <pipe>` (parameterized - prompts for pipe name)
    - `Sesam: test`
+   - `Sesam: log <pipe>` (parameterized - prompts for pipe name; streams execution log to Output Channel)
+   - `Sesam: restart` (restarts the target node; shows a confirmation dialog first)
 3. Make tasks available from `Terminal > Run Task...` and bindable to keyboard shortcuts.
 4. Register via `vscode.workspace.registerTaskProvider('sesam', provider)` in `extension.ts`.
 
@@ -76,7 +80,7 @@ a dedicated Output Channel, and VS Code Task definitions.
 |---|---|
 | `package.json` | Command registrations, settings, activation events |
 | `client/src/extension.ts` | Register commands + task provider on activation |
-| `client/src/sesamCommands.ts` (new) | Command implementations |
+| `client/src/sesamCommands.ts` (new) | Command implementations (includes `log` and `restart`) |
 | `client/src/sesamTaskProvider.ts` (new) | VS Code Task Provider |
 | `client/src/statusBar.ts` (new) | Status bar widget logic |
 

@@ -96,6 +96,21 @@ fetchDatasetEntities(
 ): Promise<Entity[]>
 // GET {nodeUrl}/api/datasets/{datasetId}/entities?limit={limit ?? 50}
 // Returns parsed entity array; caller uses _ts of last entity as next `since` cursor
+
+getDataset(
+  nodeUrl: string, jwt: string, datasetId: string
+): Promise<Entity[]>
+// Equivalent to sesam get-dataset: dumps all entities from a dataset
+// GET {nodeUrl}/api/datasets/{datasetId}/entities (paginated via _ts cursor)
+// Corresponds to sesam-py `get-dataset <dataset-id>` command
+
+putDataset(
+  nodeUrl: string, jwt: string, datasetId: string, entities: Entity[]
+): Promise<void>
+// Equivalent to sesam put-dataset: replaces all entities in a dataset
+// POST {nodeUrl}/api/receivers/{datasetId}/entities
+// Content-Type: application/json; body: JSON-serialised entity array
+// Corresponds to sesam-py `put-dataset <dataset-id>` command
 ```
 
 URL validation: reject non-HTTPS unless host is `localhost` or `127.0.0.1`.
