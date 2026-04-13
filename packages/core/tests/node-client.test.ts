@@ -274,7 +274,7 @@ describe("NodeClient.startPump()", () => {
     const [url, init] = stub.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("pipes/my-pipe/pump");
     expect(url).toContain("operation=start");
-    expect(init.method).toBe("PUT");
+    expect(init.method).toBe("POST");
   });
 });
 
