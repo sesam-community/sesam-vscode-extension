@@ -37,8 +37,8 @@ export interface SubscriptionConnection {
 export interface SubscriptionStatus {
   provisioning_status?: ProvisioningStatus;
   was_hibernated_due_to_idleness?: true;
-  /** Empty array when no connections are configured; object when a default connection is present. */
-  connections?: [] | SubscriptionConnection;
+  /** Array of connections; empty when none are configured. */
+  connections?: SubscriptionConnection[];
 }
 
 // ---------------------------------------------------------------------------
@@ -141,24 +141,35 @@ const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<Subscripti
 // ---------------------------------------------------------------------------
 
 const buildStatusHint = (status: SubscriptionStatus): string | null => {
+  // was_hibernated_due_to_idleness takes priority over provisioning_status:
+  // the node is auto-waking, so the message is informational not an error.
+  if (status.was_hibernated_due_to_idleness === true) {
+    return "Node is waking from hibernation — this may take a few minutes. Try again shortly.";
+  }
+
   const ps = status.provisioning_status;
 
   if (!ps || ps === "completed") {
+    // Completed but no default connection URL configured
+    const conns = status.connections;
+
+    if (Array.isArray(conns) && conns.length === 0) {
+      return "No default connection defined for this subscription. Configure one in the Sesam portal.";
+    }
+
     return null;
   }
 
   if (ps === "hibernated") {
-    const reason = status.was_hibernated_due_to_idleness ? " (hibernated due to idleness)" : "";
-
-    return `Node is hibernated${reason}. Wake it up in the Sesam portal before retrying.`;
+    return "Node is hibernated. Wake it up in the Sesam portal before retrying.";
   }
 
   if (ps === "pending" || ps === "provisioning") {
-    return `Node is still being provisioned (status: ${ps}). Try again in a moment.`;
+    return "Node is being provisioned — this may take a few minutes. Try again shortly.";
   }
 
   if (ps === "failed") {
-    return "Node provisioning has failed. Contact support@sesam.io.";
+    return "Node provisioning has failed. Check network settings in the Sesam portal.";
   }
 
   if (ps === "destroyed") {

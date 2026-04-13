@@ -90,3 +90,33 @@ a dedicated Output Channel, and VS Code Task definitions.
 
 - **F00** - `SesamRunner` must be initialised before any command can execute
 - **F03** - credential management should be wired in before `upload`/`download` are widely used
+
+---
+
+## Portal Node Status Hints
+
+When a node API call fails, `client/src/portal-client.ts` queries
+`GET https://portal.sesam.io/api/subscriptions/{sub-id}` (sub-id decoded from JWT `principals`)
+and appends a human-readable hint to the error message. Not shown for auth errors (401/403).
+
+The logic mirrors the Management Studio webapp (`useConnectSubscriptionFlow` +
+`calculateSubscriptionProvisioningStatus` in webconsole). Status evaluation order:
+
+| Priority | Condition | Hint shown to user |
+|---|---|---|
+| 1 | `was_hibernated_due_to_idleness === true` | "Node is waking from hibernation — this may take a few minutes. Try again shortly." |
+| 2 | `provisioning_status === "hibernated"` | "Node is hibernated. Wake it up in the Sesam portal before retrying." |
+| 3 | `provisioning_status === "pending"` or `"provisioning"` | "Node is being provisioned — this may take a few minutes. Try again shortly." |
+| 4 | `provisioning_status === "failed"` | "Node provisioning has failed. Check network settings in the Sesam portal." |
+| 5 | `provisioning_status === "destroyed"` | "Node has been destroyed. Check the Sesam portal." |
+| 6 | `provisioning_status === "completed"` and `connections === []` | "No default connection defined for this subscription. Configure one in the Sesam portal." |
+| — | `provisioning_status === "completed"` with connections | No hint (null) — node is healthy |
+| — | Portal fetch fails / sub-id not in JWT | No hint (null) — silent best-effort |
+
+**Key design notes:**
+- `was_hibernated_due_to_idleness` is checked **before** `provisioning_status` — same as Management Studio.
+  When hibernated due to idleness, the node auto-wakes (spinner in portal), so the message is
+  informational, not an instruction to act manually.
+- Auth errors skip the portal check entirely (hint would be misleading).
+- The portal response is always logged to the Sesam output channel for debugging.
+- For on-premise / non-provisioner-v2 nodes (no `principals` in JWT), hint is silently skipped.
