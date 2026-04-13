@@ -273,8 +273,12 @@ describe("NodeClient.startPump()", () => {
 
     const [url, init] = stub.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("pipes/my-pipe/pump");
-    expect(url).toContain("operation=start");
+    expect(url).not.toContain("operation=start"); // operation is now in the body
     expect(init.method).toBe("POST");
+    expect(init.body).toBe("operation=start");
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
+      "application/x-www-form-urlencoded",
+    );
   });
 });
 

@@ -159,7 +159,12 @@ export class NodeClient {
   /** Start the pump for a single pipe (equivalent to `sesam run <pipe-id>`). */
   async startPump(pipeId: string): Promise<void> {
     const encoded = encodeURIComponent(pipeId);
-    await this.request<unknown>("POST", `pipes/${encoded}/pump?operation=start`);
+    await this.request<unknown>(
+      "POST",
+      `pipes/${encoded}/pump`,
+      "operation=start",
+      "application/x-www-form-urlencoded",
+    );
   }
 
   /** Fetch entities produced by a pipe's output dataset. */
