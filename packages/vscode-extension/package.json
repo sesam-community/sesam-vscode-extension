@@ -398,6 +398,7 @@
     "package": "vsce package"
   },
   "dependencies": {
+    "@sesam/core": "workspace:*",
     "global": "^4.4.0",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
