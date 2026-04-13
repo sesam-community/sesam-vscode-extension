@@ -186,6 +186,40 @@ icons — similar to the Vitest extension's test sidebar.
 - Pass `provider.setState` as an `onResultsChanged` callback into `registerSesamTestController`
   so icons update in real time as each test completes during a run
 
+### Phase 3.6: Run Command, Toolbar Button & Test-Run Lock
+
+**Step 14d** — Register a `sesam.runPipeTests` command in `client/src/extension.ts`:
+- Calling the command triggers the same full `upload → run → verify` cycle as clicking
+  "Run All Tests" in the VS Code Test Explorer
+- Also accessible via the Command Palette (`Ctrl+Shift+P → Sesam: Run Pipe Tests`)
+- Exposed in `package.json` `commands` contribution with `title: "Sesam: Run Pipe Tests"`
+  and `icon: "$(beaker)"`
+
+**Step 14e** — Add a toolbar button next to **Sesam: Preview Pipe Output** in `package.json`:
+- `menus.editor/title` entry: `{ command: "sesam.runPipeTests", when: "resourceLangId == sesam-config", group: "navigation" }`
+- Placing it in the same `navigation` group puts it immediately adjacent to the existing
+  `sesam.previewPipeOutput` button
+
+**Step 14f** — Implement a test-run lock (busy guard) in `sesam-test-controller.ts`:
+- Keep a module-level `boolean` flag `isTestRunActive`; expose `isSesamTestRunning()` getter
+- Set to `true` at the start of a `TestRunRequest` handler; reset to `false` in `run.end()`
+  (including error/cancellation paths)
+- Set `vscode.commands.executeCommand('setContext', 'sesam.testRunning', isTestRunActive)` on
+  every state change so `when` clauses in `package.json` can disable other commands
+- All commands that trigger sesam-py actions (upload, download pipes/systems, sync, run) must
+  guard their handler with:
+  ```ts
+  if (isSesamTestRunning()) {
+    vscode.window.showWarningMessage('Sesam tests are running. Please wait for them to finish.');
+    return;
+  }
+  ```
+- While `sesam.testRunning` context key is `true`:
+  - Disable the `sesam.runPipeTests` command itself (prevent concurrent runs) via
+    `enablement: "!sesam.testRunning"` in the `commands` contribution
+  - Show a spinner in the Sesam Tests panel title via `vscode.window.withProgress` wrapping
+    the entire test run
+
 ### Phase 4: Failure Diff Webview
 
 On test failure, open a dedicated `WebviewPanel` showing the diff in the `- Expected / + Received`
@@ -255,13 +289,14 @@ style familiar from Jest/Vitest.
 
 | File | Change |
 |---|---|
-| `package.json` | add `"@sesam/core": "workspace:*"` to `dependencies`; register `sesam-tests` `ViewContainer` and `sesam-tests.testTree` `TreeView` |
-| `client/src/extension.ts` | call `registerSesamTestController(context)`; register `sesam-tests.testTree` TreeView |
+| `package.json` | add `"@sesam/core": "workspace:*"` to `dependencies`; register `sesam-tests` `ViewContainer`, `sesam-tests.testTree` `TreeView`, `sesam.runPipeTests` command, `editor/title` menu entry, and `enablement` guard on all sesam upload/download commands |
+| `client/src/extension.ts` | call `registerSesamTestController(context)`; register `sesam-tests.testTree` TreeView; register `sesam.runPipeTests` command |
 | `client/src/testing/credential-resolver.ts` | new — SecretStorage + `.syncconfig` |
 | `client/src/testing/sesam-test-controller.ts` | new — `TestController`, discovery, watcher, run handler |
 | `client/src/testing/test-tree-provider.ts` | new — custom `TreeDataProvider` with `test_passed/failed/not_run_yet.png` icons |
 | `client/src/testing/test-result-webview.ts` | new — `WebviewPanel` showing `- Expected` / `+ Received` colored diff |
 | `client/src/testing/test-codelens-provider.ts` | new — run + update CodeLens |
+| `client/src/testing/sesam-test-controller.ts` | add `isSesamTestRunning()` export and `sesam.testRunning` context key management |
 | `client/src/sesam-chat-participant.ts` | add `run-tests` intent for `/test`; rename `test` → `generate-test` |
 | `package.json` | add `/test` and rename `/generate-test` in `chatParticipants` contribution |
 
@@ -282,6 +317,9 @@ style familiar from Jest/Vitest.
 ## Verification
 
 1. Open a workspace with `expected/*.test.json` → Test Explorer shows one item per spec
+1a. `Ctrl+Shift+P → Sesam: Run Pipe Tests` → same full run cycle is triggered
+1b. Toolbar button (`$(beaker)`) appears in the editor title bar when a `sesam-config` file is open;
+    clicking it triggers `sesam.runPipeTests`
 2. Delete a `.test.json` file → item removed from Test Explorer in real time
 3. Run a single test → only that pipe is verified; others are skipped
 4. Run all tests → full `upload → run → verify` cycle completes
@@ -296,3 +334,7 @@ style familiar from Jest/Vitest.
     (`test_failed.png`) in real time as each result arrives — not only after the full run completes
 13. Click a failed test node in the Sesam Tests panel → `SesamTestResultWebview` opens (or is revealed)
     showing the pipe's diff with red `- Expected` rows and green `+ Received` rows
+14. While tests are running, invoking any upload/download/sync command shows a warning message and
+    does not execute; the `sesam.runPipeTests` command itself is disabled (greyed out in toolbar and
+    Command Palette) until the run completes
+15. Sesam Tests panel title shows a progress spinner for the duration of the test run
