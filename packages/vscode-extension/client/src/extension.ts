@@ -17,11 +17,23 @@ import {
 } from "vscode-languageclient/node";
 
 import { formatSesamJson } from "../../src/shared/config-formatter";
+import {
+  initCredentialManager,
+  deleteToken,
+  listStoredProfileNames,
+  storeToken,
+} from "./credential-manager";
 import { buildDagIndex, buildSystemIndex, extractFullPipeInfo } from "./graph/pipe-dag-builder";
 import { PipeDependentsProvider } from "./graph/PipeDependentsProvider";
 import { PipeLineageProvider } from "./graph/PipeLineageProvider";
 import { SystemPipesProvider } from "./graph/SystemPipesProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
+import {
+  initProfileManager,
+  runAddProfile,
+  runListProfiles,
+  runSwitchProfile,
+} from "./profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
 import { registerSesamChatParticipant } from "./sesam-chat-participant";
@@ -32,6 +44,10 @@ import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-build
 let client: LanguageClient;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // ── Credential & Profile Managers (F03) ──────────────────────────────────
+  initCredentialManager(context);
+  initProfileManager(context);
+
   // ── Language Server ───────────────────────────────────────────────────────
   const serverModule = context.asAbsolutePath(path.join("dist", "server", "server.js"));
 
@@ -281,6 +297,75 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await config.update("jwt", jwt.trim(), vscode.ConfigurationTarget.Global);
       vscode.window.showInformationMessage("Sesam credentials saved.");
     }),
+
+    // ── F03: Secure credential commands ──────────────────────────────────
+    vscode.commands.registerCommand("sesam.setToken", async () => {
+      const profileName = await vscode.window.showInputBox({
+        title: "Sesam: Store JWT — Step 1 of 2",
+        prompt: "Profile name to store the token under",
+        value: "default",
+        placeHolder: "default",
+        ignoreFocusOut: true,
+        validateInput: (v) => (v.trim() ? undefined : "Profile name cannot be empty"),
+      });
+
+      if (profileName === undefined) {
+        return;
+      }
+
+      const jwt = await vscode.window.showInputBox({
+        title: "Sesam: Store JWT — Step 2 of 2",
+        prompt: "Paste your JWT token (obtained from the Sesam portal)",
+        placeHolder: "eyJ…",
+        password: true,
+        ignoreFocusOut: true,
+        validateInput: (v) => (v.trim() ? undefined : "JWT cannot be empty"),
+      });
+
+      if (jwt === undefined) {
+        return;
+      }
+
+      await storeToken(profileName.trim(), jwt.trim());
+      vscode.window.showInformationMessage(
+        `Sesam: JWT stored for profile '${profileName.trim()}'.`,
+      );
+    }),
+
+    vscode.commands.registerCommand("sesam.deleteToken", async () => {
+      const names = listStoredProfileNames();
+
+      if (names.length === 0) {
+        vscode.window.showInformationMessage("Sesam: No stored profiles found.");
+        return;
+      }
+
+      const picked = await vscode.window.showQuickPick(names, {
+        title: "Sesam: Delete JWT — Select profile",
+        placeHolder: "Select a profile to delete its JWT",
+      });
+
+      if (!picked) {
+        return;
+      }
+
+      const confirmed = await vscode.window.showWarningMessage(
+        `Delete JWT for profile '${picked}'?`,
+        { modal: true },
+        "Delete",
+      );
+
+      if (confirmed !== "Delete") {
+        return;
+      }
+
+      await deleteToken(picked);
+      vscode.window.showInformationMessage(`Sesam: JWT deleted for profile '${picked}'.`);
+    }),
+
+    vscode.commands.registerCommand("sesam.addProfile", () => runAddProfile()),
+    vscode.commands.registerCommand("sesam.listProfiles", () => runListProfiles()),
+    vscode.commands.registerCommand("sesam.switchProfile", () => runSwitchProfile()),
 
     vscode.commands.registerCommand("dtl.openDocs", () => {
       vscode.env.openExternal(

@@ -116,7 +116,7 @@ export class PreviewPanel {
     );
 
     this._sendDocumentState();
-    this._sendModeState();
+    void this._sendModeState();
   }
 
   updateDocument(document: vscode.TextDocument): void {
@@ -151,7 +151,7 @@ export class PreviewPanel {
     if (message.type === "toggleMode") {
       this._mode = this._mode === "offline" ? "live" : "offline";
       await this._context.workspaceState.update(MODE_KEY, this._mode);
-      this._sendModeState();
+      await this._sendModeState();
 
       // When switching to live, try to populate entities from the node if none loaded locally
       if (this._mode === "live") {
@@ -173,8 +173,8 @@ export class PreviewPanel {
     }
 
     if (message.type === "openSettings") {
-      await vscode.commands.executeCommand("sesam.setCredentials");
-      this._sendModeState();
+      await vscode.commands.executeCommand("sesam.setToken");
+      await this._sendModeState();
 
       return;
     }
@@ -231,10 +231,10 @@ export class PreviewPanel {
   // ---------------------------------------------------------------------------
 
   private async _runLiveEvaluation(inputJson: string): Promise<void> {
-    const credentials = resolveCredentials();
+    const credentials = await resolveCredentials();
 
     if (!credentials) {
-      this._sendModeState();
+      await this._sendModeState();
 
       return;
     }
@@ -302,8 +302,8 @@ export class PreviewPanel {
   // Mode state
   // ---------------------------------------------------------------------------
 
-  private _sendModeState(): void {
-    const hasCredentials = resolveCredentials() !== null;
+  private async _sendModeState(): Promise<void> {
+    const hasCredentials = (await resolveCredentials()) !== null;
     this._panel.webview.postMessage({ type: "modeChanged", mode: this._mode, hasCredentials });
   }
 
@@ -351,7 +351,7 @@ export class PreviewPanel {
   }
 
   private async _fetchAndSendNodeEntities(fileName: string): Promise<void> {
-    const credentials = resolveCredentials();
+    const credentials = await resolveCredentials();
 
     if (!credentials) {
       return;
