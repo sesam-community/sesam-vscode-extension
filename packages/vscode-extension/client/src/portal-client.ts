@@ -84,6 +84,38 @@ export const extractSubscriptionId = (jwt: string): string | null => {
 // Portal fetch
 // ---------------------------------------------------------------------------
 
+/**
+ * Trigger node provisioning/wake-up by posting a page_view analytics event.
+ * Sesam-py does the same via `register_user_interaction()` — even if the node
+ * is hibernated or not yet provisioned, this POST causes the portal to start
+ * spinning it up.
+ * Fire-and-forget: failures are silently ignored.
+ */
+const triggerNodeWakeUp = (jwt: string, subId: string): void => {
+  const body = JSON.stringify({ subscription_id: subId, action: "page_view" });
+
+  const req = https.request(
+    "https://portal.sesam.io/api/analytics",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        "Content-Type": "application/json",
+        "Content-Length": String(Buffer.byteLength(body, "utf8")),
+      },
+    },
+    () => {
+      // response intentionally ignored
+    },
+  );
+
+  req.on("error", () => {
+    // best-effort — ignore failures
+  });
+  req.write(body, "utf8");
+  req.end();
+};
+
 const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<SubscriptionStatus | null> =>
   new Promise((resolve) => {
     const startMs = Date.now();
@@ -200,5 +232,19 @@ export const fetchNodeStatusHint = async (nodeUrl: string, jwt: string): Promise
 
   const status = await fetchSubscriptionStatus(jwt, subId);
 
-  return status ? buildStatusHint(status) : null;
+  if (!status) {
+    return null;
+  }
+
+  const needsWakeUp =
+    status.was_hibernated_due_to_idleness === true ||
+    status.provisioning_status === "hibernated" ||
+    status.provisioning_status === "pending" ||
+    status.provisioning_status === "provisioning";
+
+  if (needsWakeUp) {
+    triggerNodeWakeUp(jwt, subId);
+  }
+
+  return buildStatusHint(status);
 };
