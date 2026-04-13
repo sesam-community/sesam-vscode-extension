@@ -32,9 +32,9 @@
     "sesam-config": "_sesam_config"
   },
   "fileExtensions": {
-    "conf.pipe": "_sesam_config",
-    "conf.system": "_sesam_config",
-    "conf.json": "_sesam_config",
+    "conf.pipe": "_sesam_testdata_file",
+    "conf.system": "_sesam_testdata_file",
+    "conf.json": "_sesam_testdata_file",
     "test.json": "_sesam_test_spec",
     "json": "_sesam_testdata_file"
   },
