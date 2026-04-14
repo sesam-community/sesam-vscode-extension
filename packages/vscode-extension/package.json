@@ -185,7 +185,10 @@
       {
         "command": "sesam.runPipe",
         "title": "Sesam: Run Pipe",
-        "icon": "$(play)"
+        "icon": {
+          "light": "./fileicons/run-pipe.svg",
+          "dark": "./fileicons/run-pipe.svg"
+        }
       },
       {
         "command": "sesam.pipeRunningIndicator",
@@ -195,7 +198,10 @@
       {
         "command": "dtl.previewPipe",
         "title": "Sesam: Preview Pipe Output",
-        "icon": "$(open-preview)"
+        "icon": {
+          "light": "./fileicons/preview-pipe.svg",
+          "dark": "./fileicons/preview-pipe.svg"
+        }
       },
       {
         "command": "dtl.openDocs",
@@ -239,20 +245,17 @@
         {
           "command": "sesam.runPipe",
           "when": "(resourceLangId == json || resourceLangId == sesam-config) && !sesam.nodeProvisioning && !sesam.pipeRunning",
-          "group": "navigation@1",
-          "color": {
-            "id": "testing.runAction"
-          }
+          "group": "navigation@500"
         },
         {
           "command": "sesam.pipeRunningIndicator",
           "when": "(resourceLangId == json || resourceLangId == sesam-config) && sesam.pipeRunning",
-          "group": "navigation@1"
+          "group": "navigation@500"
         },
         {
           "command": "dtl.previewPipe",
           "when": "resourceLangId == json || resourceLangId == sesam-config",
-          "group": "navigation@2"
+          "group": "navigation@501"
         }
       ],
       "explorer/context": [

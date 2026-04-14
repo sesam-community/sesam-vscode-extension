@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- eye outline -->
+  <path fill="#569cd6" d="M8 3C4 3 1 8 1 8s3 5 7 5 7-5 7-5-3-5-7-5zm0 8.5A3.5 3.5 0 1 1 8 4.5a3.5 3.5 0 0 1 0 7z"/>
+  <!-- pupil -->
+  <circle fill="#569cd6" cx="8" cy="8" r="1.8"/>
+</svg>
