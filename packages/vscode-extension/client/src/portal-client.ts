@@ -211,6 +211,41 @@ const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<Subscripti
   });
 
 // ---------------------------------------------------------------------------
+// Node ping
+// ---------------------------------------------------------------------------
+
+/**
+ * Ping the Sesam node API. Returns true if the node responded with any HTTP
+ * status code (meaning it is reachable), false on timeout or connection error.
+ *
+ * A 4xx response still means the node is up — the TCP handshake succeeded.
+ */
+const pingNode = (nodeUrl: string, jwt: string): Promise<boolean> =>
+  new Promise((resolve) => {
+    const base = nodeUrl.replace(/\/+$/, "");
+    const pingUrl = `${base}/api/config`;
+
+    const req = https.request(
+      pingUrl,
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${jwt}`, Accept: "application/json" },
+      },
+      (res) => {
+        res.resume();
+        resolve(true);
+      },
+    );
+
+    req.on("error", () => resolve(false));
+    req.setTimeout(5_000, () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+
+// ---------------------------------------------------------------------------
 // Hint builder
 // ---------------------------------------------------------------------------
 
@@ -258,58 +293,88 @@ const buildStatusHint = (status: SubscriptionStatus): string | null => {
 // ---------------------------------------------------------------------------
 
 /**
- * Poll the portal every 5 s until `provisioning_status === "completed"` and
- * `was_hibernated_due_to_idleness` is no longer set (i.e. the node is ready).
+ * Poll in two phases until the Sesam node is fully reachable:
  *
- * Mirrors Management Studio's `usePollHibernatedConnectFlow` /
- * `usePollProvisioningConnectFlow` behaviour.
+ * **Phase 1 — portal**: Poll the portal every 30 s while `provisioning_status`
+ * is `provisioning`, `pending`, `hibernated`, or `was_hibernated_due_to_idleness`.
+ * No node URL requests are made in this phase.
+ *
+ * **Phase 2 — node**: When the portal returns `completed` (and not
+ * `was_hibernated_due_to_idleness`), switch to pinging the node URL every 10 s.
+ * Shows "Provisioning completed successfully! Please allow a few minutes for
+ * the subscription to connect." until the ping succeeds.
+ *
+ * `onReady()` is only called when the node is confirmed reachable — so the
+ * caller's `sesam.nodeProvisioning` guard stays active through both phases.
  *
  * Returns a `stop()` function — call it to cancel polling (e.g. on dispose).
  */
 export const startProvisioningPoller = (
   jwt: string,
   subId: string,
+  nodeUrl: string,
   onStatusChange: (hint: string) => void,
   onReady: () => void,
 ): { stop: () => void } => {
-  const POLL_INTERVAL_MS = 30_000;
+  const PORTAL_POLL_MS = 30_000;
+  const NODE_POLL_MS = 10_000;
   let stopped = false;
+  let phase: "portal" | "node" = "portal";
+  let handle: ReturnType<typeof setInterval>;
 
   const tick = async (): Promise<void> => {
     if (stopped) {
       return;
     }
 
-    const status = await fetchSubscriptionStatus(jwt, subId);
+    if (phase === "portal") {
+      const status = await fetchSubscriptionStatus(jwt, subId);
 
-    if (stopped) {
-      return;
-    }
+      if (stopped || !status) {
+        return;
+      }
 
-    if (!status) {
-      return;
-    }
+      const provisioningDone =
+        status.provisioning_status === "completed" &&
+        status.was_hibernated_due_to_idleness !== true;
 
-    const isReady =
-      status.provisioning_status === "completed" && status.was_hibernated_due_to_idleness !== true;
+      if (provisioningDone) {
+        // Portal says provisioning is done — switch to pinging the node directly.
+        // Keep sesam.nodeProvisioning = true until the node is actually reachable.
+        clearInterval(handle);
+        phase = "node";
+        onStatusChange(
+          "Provisioning completed successfully! Please allow a few minutes for the subscription to connect.",
+        );
+        handle = setInterval(() => {
+          void tick();
+        }, NODE_POLL_MS);
+      } else {
+        const hint = buildStatusHint(status);
 
-    if (isReady) {
-      stopped = true;
-      onReady();
+        if (hint) {
+          onStatusChange(hint);
+        }
+      }
+    } else {
+      // phase === "node": ping the node URL until it responds
+      const reachable = await pingNode(nodeUrl, jwt);
 
-      return;
-    }
+      if (stopped) {
+        return;
+      }
 
-    const hint = buildStatusHint(status);
-
-    if (hint) {
-      onStatusChange(hint);
+      if (reachable) {
+        stopped = true;
+        clearInterval(handle);
+        onReady();
+      }
     }
   };
 
-  const handle = setInterval(() => {
+  handle = setInterval(() => {
     void tick();
-  }, POLL_INTERVAL_MS);
+  }, PORTAL_POLL_MS);
 
   return {
     stop: () => {

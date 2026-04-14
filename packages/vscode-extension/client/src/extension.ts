@@ -89,6 +89,7 @@ const startPollerIfNeeded = (nodeUrl: string, jwt: string): void => {
   _provisioningPoller = startProvisioningPoller(
     jwt,
     subId,
+    nodeUrl,
     (hint) => {
       statusBarItem.text = `$(sync~spin) Sesam: ${hint}`;
     },
