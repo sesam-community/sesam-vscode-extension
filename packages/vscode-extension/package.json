@@ -311,6 +311,13 @@
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "sesam.runPipe",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r"
+      }
+    ],
     "views": {
       "explorer": [
         {
