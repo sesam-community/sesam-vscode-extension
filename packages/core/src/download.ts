@@ -49,12 +49,18 @@ export async function downloadConfig(
 
   await Promise.all([
     ...pipesWithConfig.map(async (p) => {
+      // The node wraps the user config in an envelope: { original, effective, audit, deployed, … }
+      // sesam-py writes only config["original"] — the stored user config without computed fields.
+      const userConfig =
+        (p.config?.["original"] as Record<string, unknown> | undefined) ?? p.config;
       const filePath = path.join(outDir, "pipes", `${p._id}.conf.pipe`);
-      await fs.writeFile(filePath, JSON.stringify(p.config, null, 2), "utf-8");
+      await fs.writeFile(filePath, JSON.stringify(userConfig, null, 2), "utf-8");
     }),
     ...systemsWithConfig.map(async (s) => {
+      const userConfig =
+        (s.config?.["original"] as Record<string, unknown> | undefined) ?? s.config;
       const filePath = path.join(outDir, "systems", `${s._id}.conf.system`);
-      await fs.writeFile(filePath, JSON.stringify(s.config, null, 2), "utf-8");
+      await fs.writeFile(filePath, JSON.stringify(userConfig, null, 2), "utf-8");
     }),
   ]);
 
