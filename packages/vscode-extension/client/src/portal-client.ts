@@ -16,6 +16,7 @@ import * as https from "node:https";
 import * as vscode from "vscode";
 
 import { getSesamChannel } from "./sesam-channel";
+import { trackRequest } from "./network-status";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -112,6 +113,7 @@ const triggerNodeWakeUp = (jwt: string, subId: string): Promise<void> =>
     const analyticsUrl = "https://portal.sesam.io/api/analytics";
     const body = JSON.stringify({ subscription_id: subId, action: "page_view" });
     const startMs = Date.now();
+    const done = trackRequest("POST", "portal/analytics");
 
     const req = https.request(
       analyticsUrl,
@@ -126,6 +128,7 @@ const triggerNodeWakeUp = (jwt: string, subId: string): Promise<void> =>
       (res) => {
         res.resume();
         res.on("end", () => {
+          done((res.statusCode ?? 0) < 400, res.statusCode);
           const ch = getSesamChannel();
           const ts = new Date();
           const tsStr = [
@@ -138,13 +141,20 @@ const triggerNodeWakeUp = (jwt: string, subId: string): Promise<void> =>
           );
           resolve();
         });
-        res.on("error", resolve);
+        res.on("error", () => {
+          done(false);
+          resolve();
+        });
       },
     );
 
-    req.on("error", resolve);
+    req.on("error", () => {
+      done(false);
+      resolve();
+    });
     req.setTimeout(10_000, () => {
       req.destroy();
+      done(false);
       resolve();
     });
     req.write(body, "utf8");
@@ -155,6 +165,7 @@ const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<Subscripti
   new Promise((resolve) => {
     const startMs = Date.now();
     const url = `https://portal.sesam.io/api/subscriptions/${encodeURIComponent(subId)}`;
+    const done = trackRequest("GET", "portal/subscriptions");
 
     const req = https.request(
       url,
@@ -173,6 +184,7 @@ const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<Subscripti
           const durationMs = Date.now() - startMs;
           const body = Buffer.concat(chunks).toString("utf8");
           const status = res.statusCode ?? 0;
+          done(status < 400, status === 0 ? undefined : status);
           const ch = getSesamChannel();
           const ts = new Date();
           const hh = ts.getHours().toString().padStart(2, "0");
@@ -197,13 +209,20 @@ const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<Subscripti
           }
         });
 
-        res.on("error", () => resolve(null));
+        res.on("error", () => {
+          done(false);
+          resolve(null);
+        });
       },
     );
 
-    req.on("error", () => resolve(null));
+    req.on("error", () => {
+      done(false);
+      resolve(null);
+    });
     req.setTimeout(10_000, () => {
       req.destroy();
+      done(false);
       resolve(null);
     });
 

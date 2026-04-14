@@ -16,6 +16,7 @@ import { resolveCredentials } from "../credential-resolver";
 import { fetchDatasetEntities, previewPipe } from "../node-client";
 import { fetchNodeStatusHint } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
+import { trackRequest } from "../network-status";
 
 import type { EvalEntity } from "../../../src/shared/dtl-evaluator";
 import type { Entity } from "../node-client";
@@ -299,14 +300,23 @@ export class PreviewPanel {
     this._panel.webview.postMessage({ type: "loading" });
 
     try {
-      const outputEntities = await previewPipe(
-        credentials.nodeUrl,
-        credentials.jwt,
-        pipeId,
-        pipeConfig,
-        [inputEntity],
-        logNodeRequest,
-      );
+      const doneTrack = trackRequest("POST", `preview/${pipeId}`);
+      let outputEntities: Awaited<ReturnType<typeof previewPipe>>;
+
+      try {
+        outputEntities = await previewPipe(
+          credentials.nodeUrl,
+          credentials.jwt,
+          pipeId,
+          pipeConfig,
+          [inputEntity],
+          logNodeRequest,
+        );
+        doneTrack(true);
+      } catch (previewErr) {
+        doneTrack(false);
+        throw previewErr;
+      }
 
       const output = outputEntities.length > 0 ? outputEntities : null;
       this._lastOutputJson = output !== null ? JSON.stringify(output, null, 2) : undefined;

@@ -50,6 +50,7 @@ import {
 } from "./portal-client";
 import { disposeSesamChannel } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
+import { createNetworkStatusBar, trackRequest } from "./network-status";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
 
@@ -109,6 +110,9 @@ const startPollerIfNeeded = (nodeUrl: string, jwt: string): void => {
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   // Wire the provisioning poller into PreviewPanel live eval failures
   PreviewPanel.onProvisioningNeeded = startPollerIfNeeded;
+
+  // ── Network Status Bar (F23) ──────────────────────────────────────────────
+  createNetworkStatusBar(context);
 
   // ── Credential & Profile Managers (F03) ──────────────────────────────────
   initCredentialManager(context);
@@ -349,10 +353,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         async () => {
           try {
             const runner = new SesamRunner();
-            const result = await runner.runPipe(
-              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
-              pipeId,
-            );
+            const done = trackRequest("POST", `run-pipe/${pipeId}`);
+            let runResult: Awaited<ReturnType<typeof runner.runPipe>>;
+
+            try {
+              runResult = await runner.runPipe(
+                { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
+                pipeId,
+              );
+              done(runResult.success);
+            } catch (runErr) {
+              done(false);
+              throw runErr;
+            }
+
+            const result = runResult;
 
             if (result.success) {
               vscode.window.showInformationMessage(`Sesam: Pipe '${pipeId}' started successfully.`);
