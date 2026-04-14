@@ -87,6 +87,17 @@ export const extractSubscriptionId = (jwt: string): string | null => {
 // ---------------------------------------------------------------------------
 
 /**
+ * Tracks sub-IDs for which we have already sent the wake-up analytics event.
+ * Cleared when the poller detects the node is ready (via `clearWakeUpSent`).
+ */
+const _wakeUpSent = new Set<string>();
+
+/** Called by the provisioning poller when the node becomes ready. */
+export const clearWakeUpSent = (subId: string): void => {
+  _wakeUpSent.delete(subId);
+};
+
+/**
  * Trigger node provisioning/wake-up by posting a page_view analytics event.
  * Sesam-py does the same via `register_user_interaction()` — even if the node
  * is hibernated or not yet provisioned, this POST causes the portal to start
@@ -338,7 +349,8 @@ export const fetchNodeStatusHint = async (nodeUrl: string, jwt: string): Promise
     status.provisioning_status === "pending" ||
     status.provisioning_status === "provisioning";
 
-  if (needsWakeUp) {
+  if (needsWakeUp && !_wakeUpSent.has(subId)) {
+    _wakeUpSent.add(subId);
     await triggerNodeWakeUp(jwt, subId);
   }
 

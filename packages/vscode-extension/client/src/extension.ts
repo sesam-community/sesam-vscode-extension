@@ -46,6 +46,7 @@ import {
   fetchNodeStatusHint,
   startProvisioningPoller,
   extractSubscriptionId,
+  clearWakeUpSent,
 } from "./portal-client";
 import { disposeSesamChannel } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
@@ -93,6 +94,7 @@ const startPollerIfNeeded = (nodeUrl: string, jwt: string): void => {
     },
     () => {
       _provisioningPoller = null;
+      clearWakeUpSent(subId);
       statusBarItem.dispose();
       void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
       PreviewPanel.currentPanel?.setNodeProvisioning(false);
