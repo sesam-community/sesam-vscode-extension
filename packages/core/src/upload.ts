@@ -14,7 +14,7 @@ import * as path from "node:path";
 import { NodeClient } from "./node-client.js";
 import { zipWorkspaceConfig } from "./config-zipper.js";
 import { validateWorkspace } from "./validate.js";
-import { NodeApiError } from "./errors.js";
+import { NodeApiError, ValidationFailedError } from "./errors.js";
 
 import type { NodeCredentials, UploadOptions, UploadResult } from "./types.js";
 
@@ -57,9 +57,7 @@ export async function uploadConfig(
     const validation = await validateWorkspace(workspaceDir);
 
     if (!validation.valid) {
-      const summary = validation.errors.map((e) => `  ${e.file}: ${e.message}`).join("\n");
-
-      throw new NodeApiError(0, `Validation failed — fix errors before uploading:\n${summary}`);
+      throw new ValidationFailedError(validation.errors);
     }
   }
 

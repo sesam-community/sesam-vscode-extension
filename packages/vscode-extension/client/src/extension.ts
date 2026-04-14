@@ -48,9 +48,10 @@ import {
   extractSubscriptionId,
   clearWakeUpSent,
 } from "./portal-client";
-import { disposeSesamChannel, logNodeRequest } from "./sesam-channel";
+import { disposeSesamChannel, getSesamChannel, logNodeRequest } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
+import { ValidationFailedError } from "@sesam/core";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
 
@@ -480,9 +481,55 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
           } catch (err) {
             done(false);
-            vscode.window.showErrorMessage(
-              `Sesam: Upload failed: ${err instanceof Error ? err.message : String(err)}`,
-            );
+
+            if (err instanceof ValidationFailedError) {
+              const ch = getSesamChannel();
+              ch.clear();
+
+              const total = err.errors.length;
+              const header = `Upload blocked — ${total} validation error${total === 1 ? "" : "s"} found`;
+              const rule = "─".repeat(header.length);
+              ch.appendLine(rule);
+              ch.appendLine(header);
+              ch.appendLine(rule);
+              ch.appendLine("");
+
+              // Group errors by file for readability
+              const byFile = new Map<string, typeof err.errors>();
+
+              for (const e of err.errors) {
+                const rel = workspaceDir ? e.file.replace(workspaceDir + "/", "") : e.file;
+                const existing = byFile.get(rel) ?? [];
+                existing.push(e);
+                byFile.set(rel, existing);
+              }
+
+              for (const [file, errs] of byFile) {
+                ch.appendLine(`  ${file}`);
+
+                for (const e of errs) {
+                  const loc =
+                    e.line != null
+                      ? ` (line ${e.line}${e.column != null ? `, col ${e.column}` : ""})`
+                      : "";
+                  ch.appendLine(`    ✗${loc}  ${e.message}`);
+                }
+
+                ch.appendLine("");
+              }
+
+              ch.appendLine(
+                `Fix the ${total} error${total === 1 ? "" : "s"} above, then upload again.`,
+              );
+              ch.show(true);
+              vscode.window.showErrorMessage(
+                `Sesam: Upload blocked — ${total} validation error${total === 1 ? "" : "s"}. See the Sesam output panel for details.`,
+              );
+            } else {
+              vscode.window.showErrorMessage(
+                `Sesam: Upload failed: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
           }
         },
       );

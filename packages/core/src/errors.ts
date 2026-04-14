@@ -40,3 +40,14 @@ export class NodeNetworkError extends Error {
 }
 
 export type NodeError = NodeAuthError | NodeApiError | NodeNetworkError;
+
+export class ValidationFailedError extends Error {
+  readonly kind = "validation" as const;
+
+  constructor(
+    readonly errors: Array<{ file: string; message: string; line?: number; column?: number }>,
+  ) {
+    super(`Validation failed with ${errors.length} error(s)`);
+    this.name = "ValidationFailedError";
+  }
+}
