@@ -204,6 +204,22 @@
         }
       },
       {
+        "command": "sesam.upload",
+        "title": "Sesam: Upload to Node",
+        "icon": {
+          "light": "./fileicons/upload.svg",
+          "dark": "./fileicons/upload.svg"
+        }
+      },
+      {
+        "command": "sesam.download",
+        "title": "Sesam: Download from Node",
+        "icon": {
+          "light": "./fileicons/download.svg",
+          "dark": "./fileicons/download.svg"
+        }
+      },
+      {
         "command": "dtl.openDocs",
         "title": "Sesam: Open Function Documentation"
       },
@@ -256,6 +272,16 @@
           "command": "dtl.previewPipe",
           "when": "resourceLangId == json || resourceLangId == sesam-config",
           "group": "navigation@2"
+        },
+        {
+          "command": "sesam.upload",
+          "when": "workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@3"
+        },
+        {
+          "command": "sesam.download",
+          "when": "workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@4"
         }
       ],
       "explorer/context": [
@@ -308,6 +334,14 @@
         {
           "command": "sesam.runPipe",
           "when": "editorLangId == sesam-config || editorLangId == json"
+        },
+        {
+          "command": "sesam.upload",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "sesam.download",
+          "when": "workspaceFolderCount > 0"
         }
       ],
       "view/title": [
@@ -332,6 +366,16 @@
         "command": "sesam.runPipe",
         "key": "ctrl+shift+r",
         "mac": "cmd+shift+r"
+      },
+      {
+        "command": "sesam.upload",
+        "key": "ctrl+shift+u",
+        "mac": "cmd+shift+u"
+      },
+      {
+        "command": "sesam.download",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d"
       }
     ],
     "views": {

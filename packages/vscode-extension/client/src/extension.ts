@@ -450,6 +450,116 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       PreviewPanel.createOrShow(context.extensionUri, editor.document, context);
     }),
 
+    // ── Upload / Download ─────────────────────────────────────────────────
+    vscode.commands.registerCommand("sesam.upload", async () => {
+      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+      if (!workspaceDir) {
+        vscode.window.showWarningMessage("Sesam: No workspace folder open.");
+        return;
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage(
+          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        );
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Sesam: Uploading…",
+          cancellable: false,
+        },
+        async () => {
+          const done = trackRequest("PUT", "upload/config");
+
+          try {
+            const runner = new SesamRunner();
+            const result = await runner.upload(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
+              workspaceDir,
+            );
+            done(result.success);
+
+            if (result.success) {
+              vscode.window.showInformationMessage(
+                `Sesam: Upload complete — ${result.pipesUploaded} pipes, ${result.systemsUploaded} systems.`,
+              );
+            } else {
+              vscode.window.showErrorMessage(
+                `Sesam: Upload failed: ${result.message ?? "unknown error"}`,
+              );
+            }
+          } catch (err) {
+            done(false);
+            vscode.window.showErrorMessage(
+              `Sesam: Upload failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        },
+      );
+    }),
+
+    vscode.commands.registerCommand("sesam.download", async () => {
+      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+      if (!workspaceDir) {
+        vscode.window.showWarningMessage("Sesam: No workspace folder open.");
+        return;
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage(
+          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        );
+        return;
+      }
+
+      const confirmed = await vscode.window.showWarningMessage(
+        "Sesam: Download will overwrite local pipe and system configs. Continue?",
+        { modal: true },
+        "Download",
+      );
+
+      if (confirmed !== "Download") {
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Sesam: Downloading…",
+          cancellable: false,
+        },
+        async () => {
+          const done = trackRequest("GET", "download/config");
+
+          try {
+            const runner = new SesamRunner();
+            const result = await runner.download(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
+              { outDir: workspaceDir },
+            );
+            done(true);
+            vscode.window.showInformationMessage(
+              `Sesam: Download complete — ${result.pipesWritten} pipes, ${result.systemsWritten} systems.`,
+            );
+          } catch (err) {
+            done(false);
+            vscode.window.showErrorMessage(
+              `Sesam: Download failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        },
+      );
+    }),
+
     // ── F03: Secure credential commands ──────────────────────────────────
     vscode.commands.registerCommand("sesam.setToken", async () => {
       const profileName = await vscode.window.showInputBox({
