@@ -338,6 +338,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.setStatusBarMessage("Sesam: DAG refreshed", 2000);
     }),
 
+    vscode.commands.registerCommand("sesam.pipeRunningIndicator", () => {
+      // No-op — this command exists only to show the spinning indicator
+      // in the editor title while a pipe run is in progress.
+    }),
+
     vscode.commands.registerCommand("sesam.runPipe", async () => {
       const editor =
         vscode.window.activeTextEditor ??
@@ -366,6 +371,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           cancellable: false,
         },
         async () => {
+          void vscode.commands.executeCommand("setContext", "sesam.pipeRunning", true);
+
           try {
             const runner = new SesamRunner();
             const done = trackRequest("POST", `run-pipe/${pipeId}`);
@@ -427,6 +434,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             if (hint) {
               startPollerIfNeeded(creds.nodeUrl, creds.jwt);
             }
+          } finally {
+            void vscode.commands.executeCommand("setContext", "sesam.pipeRunning", false);
           }
         },
       );
