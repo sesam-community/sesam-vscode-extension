@@ -48,7 +48,7 @@ import {
   extractSubscriptionId,
   clearWakeUpSent,
 } from "./portal-client";
-import { disposeSesamChannel } from "./sesam-channel";
+import { disposeSesamChannel, logNodeRequest } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
 
@@ -354,6 +354,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           try {
             const runner = new SesamRunner();
             const done = trackRequest("POST", `run-pipe/${pipeId}`);
+            const pumpUrl = `${creds.nodeUrl.replace(/\/+$/, "")}/api/pipes/${encodeURIComponent(pipeId)}/pump`;
+            const startMs = Date.now();
             let runResult: Awaited<ReturnType<typeof runner.runPipe>>;
 
             try {
@@ -361,8 +363,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
                 pipeId,
               );
+              logNodeRequest({
+                method: "POST",
+                url: pumpUrl,
+                statusCode: 200,
+                durationMs: Date.now() - startMs,
+              });
               done(runResult.success);
             } catch (runErr) {
+              const statusCode = (runErr as { statusCode?: number }).statusCode ?? 0;
+              logNodeRequest({
+                method: "POST",
+                url: pumpUrl,
+                statusCode,
+                durationMs: Date.now() - startMs,
+                error: String(runErr),
+              });
               done(false);
               throw runErr;
             }
