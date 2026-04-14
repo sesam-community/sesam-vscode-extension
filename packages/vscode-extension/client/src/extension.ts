@@ -376,31 +376,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           try {
             const runner = new SesamRunner();
             const done = trackRequest("POST", `run-pipe/${pipeId}`);
-            const pumpUrl = `${creds.nodeUrl.replace(/\/+$/, "").replace(/\/api$/i, "")}/api/pipes/${encodeURIComponent(pipeId)}/pump`;
-            const startMs = Date.now();
             let runResult: Awaited<ReturnType<typeof runner.runPipe>>;
 
             try {
               runResult = await runner.runPipe(
-                { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
+                { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
                 pipeId,
               );
-              logNodeRequest({
-                method: "POST",
-                url: pumpUrl,
-                statusCode: 200,
-                durationMs: Date.now() - startMs,
-              });
               done(runResult.success);
             } catch (runErr) {
-              const statusCode = (runErr as { statusCode?: number }).statusCode ?? 0;
-              logNodeRequest({
-                method: "POST",
-                url: pumpUrl,
-                statusCode,
-                durationMs: Date.now() - startMs,
-                error: String(runErr),
-              });
               done(false);
               throw runErr;
             }
@@ -480,7 +464,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           try {
             const runner = new SesamRunner();
             const result = await runner.upload(
-              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
               workspaceDir,
             );
             done(result.success);
@@ -542,9 +526,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
           try {
             const runner = new SesamRunner();
+            const reorderKeys =
+              vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
             const result = await runner.download(
-              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt },
-              { outDir: workspaceDir },
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+              {
+                outDir: workspaceDir,
+                formatter: (config) => formatSesamJson(config, 2, { reorderKeys }),
+              },
             );
             done(true);
             vscode.window.showInformationMessage(

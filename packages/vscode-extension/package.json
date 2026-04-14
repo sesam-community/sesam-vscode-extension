@@ -349,8 +349,24 @@
           "command": "sesam.clearErrors",
           "when": "view == sesamErrorsList",
           "group": "navigation"
+        },
+        {
+          "command": "sesam.upload",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@10"
+        },
+        {
+          "command": "sesam.download",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@11"
+        },
+        {
+          "command": "dtl.refreshDag",
+          "when": "view == sesamPipeLineage",
+          "group": "navigation@1"
         }
-      ]
+      ],
+      "viewsWelcome": []
     },
     "viewsContainers": {
       "panel": [

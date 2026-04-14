@@ -2,11 +2,23 @@
 // Credentials
 // ---------------------------------------------------------------------------
 
+export interface NodeRequestLogEntry {
+  method: string;
+  url: string;
+  statusCode: number;
+  durationMs: number;
+  error?: string;
+}
+
+export type NodeRequestLogger = (entry: NodeRequestLogEntry) => void;
+
 export interface NodeCredentials {
   nodeUrl: string;
   jwtToken: string;
   /** Whether to verify SSL certificates (default: true). */
   sslVerify?: boolean;
+  /** Optional logger called after every HTTP request. */
+  logger?: NodeRequestLogger;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +75,11 @@ export interface UploadResult {
 export interface DownloadOptions {
   /** Directory to write downloaded configs into.  `pipes/` and `systems/` are created as subdirs. */
   outDir: string;
+  /**
+   * Optional formatter applied to each config before writing to disk.
+   * When omitted, files are written with `JSON.stringify(config, null, 2)`.
+   */
+  formatter?: (config: unknown) => string;
 }
 
 export interface DownloadResult {

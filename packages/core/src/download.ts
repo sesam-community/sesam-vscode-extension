@@ -34,7 +34,9 @@ export async function downloadConfig(
   opts: DownloadOptions,
 ): Promise<DownloadResult> {
   const client = new NodeClient(creds);
-  const { outDir } = opts;
+  const { outDir, formatter } = opts;
+  const serialize = (config: unknown): string =>
+    formatter ? formatter(config) : JSON.stringify(config, null, 2);
 
   // Ensure output subdirectories exist
   await Promise.all([
@@ -54,13 +56,13 @@ export async function downloadConfig(
       const userConfig =
         (p.config?.["original"] as Record<string, unknown> | undefined) ?? p.config;
       const filePath = path.join(outDir, "pipes", `${p._id}.conf.json`);
-      await fs.writeFile(filePath, JSON.stringify(userConfig, null, 2), "utf-8");
+      await fs.writeFile(filePath, serialize(userConfig), "utf-8");
     }),
     ...systemsWithConfig.map(async (s) => {
       const userConfig =
         (s.config?.["original"] as Record<string, unknown> | undefined) ?? s.config;
       const filePath = path.join(outDir, "systems", `${s._id}.conf.json`);
-      await fs.writeFile(filePath, JSON.stringify(userConfig, null, 2), "utf-8");
+      await fs.writeFile(filePath, serialize(userConfig), "utf-8");
     }),
   ]);
 

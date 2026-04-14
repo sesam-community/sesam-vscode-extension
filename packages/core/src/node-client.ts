@@ -11,7 +11,14 @@
 
 import { NodeAuthError, NodeApiError, NodeNetworkError } from "./errors.js";
 
-import type { ApiPipe, ApiSystem, Entity, NodeCredentials, RunAllOptions } from "./types.js";
+import type {
+  ApiPipe,
+  ApiSystem,
+  Entity,
+  NodeCredentials,
+  NodeRequestLogger,
+  RunAllOptions,
+} from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -26,12 +33,14 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 export class NodeClient {
   private readonly apiBase: string;
   private readonly jwt: string;
+  private readonly logger: NodeRequestLogger | undefined;
 
   constructor(creds: NodeCredentials) {
     // Strip trailing slash and any trailing "/api" so nodeUrl can be stored
     // either as "https://host" or "https://host/api" without doubling the path.
     this.apiBase = `${creds.nodeUrl.replace(/\/+$/, "").replace(/\/api$/i, "")}/api`;
     this.jwt = creds.jwtToken;
+    this.logger = creds.logger;
   }
 
   // ── Low-level request ──────────────────────────────────────────────────
@@ -43,6 +52,7 @@ export class NodeClient {
     contentType?: string,
   ): Promise<T> {
     const url = `${this.apiBase}/${path.replace(/^\/+/, "")}`;
+    const startMs = Date.now();
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.jwt}`,
@@ -58,10 +68,24 @@ export class NodeClient {
     try {
       response = await fetch(url, { method, headers, body });
     } catch (err) {
+      this.logger?.({
+        method,
+        url,
+        statusCode: 0,
+        durationMs: Date.now() - startMs,
+        error: String(err),
+      });
       throw new NodeNetworkError(`Network error calling ${url}: ${String(err)}`);
     }
 
     if (response.status === 401 || response.status === 403) {
+      this.logger?.({
+        method,
+        url,
+        statusCode: response.status,
+        durationMs: Date.now() - startMs,
+        error: `Auth failed`,
+      });
       throw new NodeAuthError(
         response.status,
         `Authentication failed (HTTP ${response.status}) — check your JWT token.`,
@@ -77,11 +101,20 @@ export class NodeClient {
         // ignore read failures
       }
 
+      this.logger?.({
+        method,
+        url,
+        statusCode: response.status,
+        durationMs: Date.now() - startMs,
+        error: `HTTP ${response.status}`,
+      });
       throw new NodeApiError(
         response.status,
         `HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
       );
     }
+
+    this.logger?.({ method, url, statusCode: response.status, durationMs: Date.now() - startMs });
 
     // 204 No Content or empty body → return undefined cast to T
     const text = await response.text();
