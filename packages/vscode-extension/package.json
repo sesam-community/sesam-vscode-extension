@@ -245,17 +245,17 @@
         {
           "command": "sesam.runPipe",
           "when": "(resourceLangId == json || resourceLangId == sesam-config) && !sesam.nodeProvisioning && !sesam.pipeRunning",
-          "group": "navigation@500"
+          "group": "navigation@1"
         },
         {
           "command": "sesam.pipeRunningIndicator",
           "when": "(resourceLangId == json || resourceLangId == sesam-config) && sesam.pipeRunning",
-          "group": "navigation@500"
+          "group": "navigation@1"
         },
         {
           "command": "dtl.previewPipe",
           "when": "resourceLangId == json || resourceLangId == sesam-config",
-          "group": "navigation@501"
+          "group": "navigation@2"
         }
       ],
       "explorer/context": [
