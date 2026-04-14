@@ -487,11 +487,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           } catch (err) {
             done(false);
 
-            if (err instanceof ValidationFailedError) {
+            const isValidationError =
+              err instanceof ValidationFailedError ||
+              (typeof err === "object" &&
+                err !== null &&
+                (err as Record<string, unknown>)["kind"] === "validation" &&
+                Array.isArray((err as Record<string, unknown>)["errors"]));
+
+            if (isValidationError) {
+              const validationErr = err as ValidationFailedError;
               const ch = getSesamChannel();
               ch.clear();
 
-              const total = err.errors.length;
+              const total = validationErr.errors.length;
               const header = `Upload blocked — ${total} validation error${total === 1 ? "" : "s"} found`;
               const rule = "─".repeat(header.length);
               ch.appendLine(rule);
@@ -500,9 +508,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               ch.appendLine("");
 
               // Group errors by file for readability
-              const byFile = new Map<string, typeof err.errors>();
+              const byFile = new Map<string, typeof validationErr.errors>();
 
-              for (const e of err.errors) {
+              for (const e of validationErr.errors) {
                 const existing = byFile.get(e.file) ?? [];
                 existing.push(e);
                 byFile.set(e.file, existing);
@@ -529,12 +537,46 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               }
 
               ch.appendLine(
-                `Fix the ${total} error${total === 1 ? "" : "s"} above, then upload again.`,
+                `Fix the ${total} error${total === 1 ? "" : "s"} above, then upload again. Use "Fix with Copilot" in the notification to get AI assistance.`,
               );
-              ch.show(true);
-              vscode.window.showErrorMessage(
+              ch.show(false);
+
+              const action = await vscode.window.showErrorMessage(
                 `Sesam: Upload blocked — ${total} validation error${total === 1 ? "" : "s"}. See the Sesam output panel for details.`,
+                "Fix with Copilot",
               );
+
+              if (action === "Fix with Copilot") {
+                // Read the contents of each erroring file so the agent has full context
+                const uniqueFiles = [...new Set(validationErr.errors.map((e) => e.file))];
+                const fileSections = await Promise.all(
+                  uniqueFiles.map(async (absFile) => {
+                    const rel = workspaceDir ? absFile.replace(workspaceDir + "/", "") : absFile;
+                    const fileErrors = validationErr.errors
+                      .filter((e) => e.file === absFile)
+                      .map((e) => {
+                        const loc = e.line != null ? ` line ${e.line}` : "";
+                        return `  - ${e.message}${loc}`;
+                      })
+                      .join("\n");
+                    try {
+                      const raw = await vscode.workspace.fs.readFile(vscode.Uri.file(absFile));
+                      const content = Buffer.from(raw).toString("utf-8");
+                      return `### ${rel}\nErrors:\n${fileErrors}\n\nFile content:\n\`\`\`json\n${content}\n\`\`\``;
+                    } catch {
+                      return `### ${rel}\nErrors:\n${fileErrors}\n\n(Could not read file content)`;
+                    }
+                  }),
+                );
+
+                const query = [
+                  "@sesam My Sesam configs failed validation during upload. Here are the files with errors and their current content. Please fix each error directly in the code and explain what was wrong.",
+                  "",
+                  ...fileSections,
+                ].join("\n");
+
+                void vscode.commands.executeCommand("workbench.action.chat.open", { query });
+              }
             } else {
               vscode.window.showErrorMessage(
                 `Sesam: Upload failed: ${err instanceof Error ? err.message : String(err)}`,
