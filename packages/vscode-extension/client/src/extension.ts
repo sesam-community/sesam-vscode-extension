@@ -123,6 +123,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // ── Network Status Bar (F23) ──────────────────────────────────────────────
   createNetworkStatusBar(context);
 
+  // ── Sesam Output Channel ──────────────────────────────────────────────────
+  // Write an initial line so the channel appears in the Output dropdown immediately.
+  context.subscriptions.push({ dispose: disposeSesamChannel });
+  getSesamChannel().appendLine("Sesam extension activated.");
+
   // ── Credential & Profile Managers (F03) ──────────────────────────────────
   initCredentialManager(context);
   initProfileManager(context);
