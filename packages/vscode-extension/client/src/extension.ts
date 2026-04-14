@@ -64,6 +64,14 @@ let client: LanguageClient;
 let _provisioningPoller: { stop: () => void } | null = null;
 
 /**
+ * Last text editor that held a sesam-config or JSON pipe/system file.
+ * Updated whenever focus moves to a qualifying editor so commands like
+ * `sesam.runPipe` still work when focus is in the terminal, output panel,
+ * or the pipe preview webview.
+ */
+let _lastSesamEditor: vscode.TextEditor | undefined;
+
+/**
  * Start polling the portal for the given credentials if the node is not ready.
  * Sets the `sesam.nodeProvisioning` context key so menus can disable themselves.
  * Calls `onReady` (and notifies PreviewPanel) when the node becomes available.
@@ -218,6 +226,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Sync active config to all DAG views
   const syncActivePipe = (editor: vscode.TextEditor | undefined): void => {
+    if (editor && getActivePipeId(editor) !== undefined) {
+      _lastSesamEditor = editor;
+    }
+
     const id = getActivePipeId(editor);
     lineageProvider.setCurrentPipe(id);
     dependentsProvider.setCurrentPipe(id);
@@ -327,7 +339,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
 
     vscode.commands.registerCommand("sesam.runPipe", async () => {
-      const editor = vscode.window.activeTextEditor;
+      const editor =
+        vscode.window.activeTextEditor ??
+        _lastSesamEditor ??
+        vscode.window.visibleTextEditors.find((e) => getActivePipeId(e) !== undefined);
       const pipeId = getActivePipeId(editor);
 
       if (!pipeId) {
