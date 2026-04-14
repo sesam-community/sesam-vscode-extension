@@ -34,6 +34,7 @@
 | F20 | Extension Language Model Tools API | Phase 1 | `implemented` | [impl-f20-lm-tools-api.prompt.md](impl-f20-lm-tools-api.prompt.md) |
 | F21 | Config Property Completions | Phase 1 | `implemented` | [impl-f21-config-prop-completions.prompt.md](impl-f21-config-prop-completions.prompt.md) |
 | F22 | Sesam Panel (Errors / Warnings View) | Phase 1 | `implemented` | — |
+| F23 | Centralized Network Status Bar | Phase 1 | `planned` | [impl-f23-network-status.prompt.md](impl-f23-network-status.prompt.md) |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
 | F04 | Node-Connected Live Preview | Phase 3 | `implemented` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
@@ -71,6 +72,7 @@
 | F20: Extension Language Model Tools API | `implemented` |
 | F21: Config Property Completions (all phases) | `implemented` |
 | F22: Sesam Panel (Errors / Warnings View) | `implemented` |
+| F23: Centralized Network Status Bar | `planned` |
 
 ### Phase 2: Testing & Diff Loop
 
