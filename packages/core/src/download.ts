@@ -53,13 +53,13 @@ export async function downloadConfig(
       // sesam-py writes only config["original"] — the stored user config without computed fields.
       const userConfig =
         (p.config?.["original"] as Record<string, unknown> | undefined) ?? p.config;
-      const filePath = path.join(outDir, "pipes", `${p._id}.conf.pipe`);
+      const filePath = path.join(outDir, "pipes", `${p._id}.conf.json`);
       await fs.writeFile(filePath, JSON.stringify(userConfig, null, 2), "utf-8");
     }),
     ...systemsWithConfig.map(async (s) => {
       const userConfig =
         (s.config?.["original"] as Record<string, unknown> | undefined) ?? s.config;
-      const filePath = path.join(outDir, "systems", `${s._id}.conf.system`);
+      const filePath = path.join(outDir, "systems", `${s._id}.conf.json`);
       await fs.writeFile(filePath, JSON.stringify(userConfig, null, 2), "utf-8");
     }),
   ]);
