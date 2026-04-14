@@ -503,21 +503,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               const byFile = new Map<string, typeof err.errors>();
 
               for (const e of err.errors) {
-                const rel = workspaceDir ? e.file.replace(workspaceDir + "/", "") : e.file;
-                const existing = byFile.get(rel) ?? [];
+                const existing = byFile.get(e.file) ?? [];
                 existing.push(e);
-                byFile.set(rel, existing);
+                byFile.set(e.file, existing);
               }
 
-              for (const [file, errs] of byFile) {
-                ch.appendLine(`  ${file}`);
+              for (const [absFile, errs] of byFile) {
+                const rel = workspaceDir ? absFile.replace(workspaceDir + "/", "") : absFile;
+                ch.appendLine(`  ${rel}`);
 
                 for (const e of errs) {
-                  const loc =
+                  const fileUri = vscode.Uri.file(absFile);
+                  const lineNum = e.line ?? 1;
+                  const colNum = e.column ?? 1;
+                  const link = `${fileUri.toString()}:${lineNum}:${colNum}`;
+                  const locLabel =
                     e.line != null
-                      ? ` (line ${e.line}${e.column != null ? `, col ${e.column}` : ""})`
+                      ? ` line ${e.line}${e.column != null ? `:${e.column}` : ""}`
                       : "";
-                  ch.appendLine(`    ✗${loc}  ${e.message}`);
+                  ch.appendLine(`    ✗${locLabel}  ${e.message}`);
+                  ch.appendLine(`      ${link}`);
                 }
 
                 ch.appendLine("");
@@ -578,13 +583,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
           try {
             const runner = new SesamRunner();
-            const reorderKeys =
-              vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
             const result = await runner.download(
               { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
               {
                 outDir: workspaceDir,
-                formatter: (config) => formatSesamJson(config, 2, { reorderKeys }),
+                formatter: (config) => formatSesamJson(config, 2, { reorderKeys: true }),
               },
             );
             done(true);

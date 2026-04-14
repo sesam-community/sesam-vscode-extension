@@ -17,6 +17,19 @@ export const disposeSesamChannel = (): void => {
   _channel = undefined;
 };
 
+// ANSI escape helpers (rendered by VS Code output channels)
+export const ansi = {
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+  red: "\x1b[31m",
+  yellow: "\x1b[33m",
+  cyan: "\x1b[36m",
+  white: "\x1b[37m",
+  brightRed: "\x1b[91m",
+  brightYellow: "\x1b[93m",
+} as const;
+
 const timestamp = (): string => {
   const d = new Date();
   const hh = d.getHours().toString().padStart(2, "0");
