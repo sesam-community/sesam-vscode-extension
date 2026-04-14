@@ -354,7 +354,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           try {
             const runner = new SesamRunner();
             const done = trackRequest("POST", `run-pipe/${pipeId}`);
-            const pumpUrl = `${creds.nodeUrl.replace(/\/+$/, "")}/api/pipes/${encodeURIComponent(pipeId)}/pump`;
+            const pumpUrl = `${creds.nodeUrl.replace(/\/+$/, "").replace(/\/api$/i, "")}/api/pipes/${encodeURIComponent(pipeId)}/pump`;
             const startMs = Date.now();
             let runResult: Awaited<ReturnType<typeof runner.runPipe>>;
 

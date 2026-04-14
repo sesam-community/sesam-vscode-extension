@@ -28,8 +28,9 @@ export class NodeClient {
   private readonly jwt: string;
 
   constructor(creds: NodeCredentials) {
-    // Strip trailing slash from nodeUrl so paths join cleanly.
-    this.apiBase = `${creds.nodeUrl.replace(/\/+$/, "")}/api`;
+    // Strip trailing slash and any trailing "/api" so nodeUrl can be stored
+    // either as "https://host" or "https://host/api" without doubling the path.
+    this.apiBase = `${creds.nodeUrl.replace(/\/+$/, "").replace(/\/api$/i, "")}/api`;
     this.jwt = creds.jwtToken;
   }
 
