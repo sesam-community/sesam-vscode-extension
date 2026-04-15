@@ -121,7 +121,18 @@ const _refreshStatusBar = (): void => {
   }
 
   const active = getActiveProfileName();
-  _statusBarItem.text = `$(key) Sesam: [${active}]`;
+  const nodeUrl = resolveNodeUrl(active);
+  let hostname = "";
+
+  try {
+    if (nodeUrl) {
+      hostname = new URL(nodeUrl).hostname;
+    }
+  } catch {
+    // malformed nodeUrl — fall back to profile name only
+  }
+
+  _statusBarItem.text = hostname ? `$(key) ${active} · ${hostname}` : `$(key) Sesam: [${active}]`;
   _statusBarItem.show();
 };
 
