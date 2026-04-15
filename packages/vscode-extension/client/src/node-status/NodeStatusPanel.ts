@@ -46,21 +46,24 @@ export class NodeStatusPanel {
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
   private _refreshTimer: ReturnType<typeof setInterval> | undefined;
+  /** When set, the panel focuses on a single pipe (pre-fills search box). */
+  private _filterPipeId: string | undefined;
 
   // ── Static factory ────────────────────────────────────────────────────────
 
-  static createOrShow(): void {
+  static createOrShow(filterPipeId?: string): void {
     const column = vscode.ViewColumn.Beside;
 
     if (NodeStatusPanel.currentPanel) {
       NodeStatusPanel.currentPanel._panel.reveal(column);
+      NodeStatusPanel.currentPanel._filterPipeId = filterPipeId;
       void NodeStatusPanel.currentPanel._loadAndSend();
       return;
     }
 
     const panel = vscode.window.createWebviewPanel(
       NodeStatusPanel.viewType,
-      "Sesam Node Status",
+      filterPipeId ? `Sesam: ${filterPipeId}` : "Sesam Node Status",
       column,
       {
         enableScripts: true,
@@ -68,13 +71,14 @@ export class NodeStatusPanel {
       },
     );
 
-    NodeStatusPanel.currentPanel = new NodeStatusPanel(panel);
+    NodeStatusPanel.currentPanel = new NodeStatusPanel(panel, filterPipeId);
   }
 
   // ── Constructor ───────────────────────────────────────────────────────────
 
-  private constructor(panel: vscode.WebviewPanel) {
+  private constructor(panel: vscode.WebviewPanel, filterPipeId?: string) {
     this._panel = panel;
+    this._filterPipeId = filterPipeId;
     this._panel.webview.html = this._buildHtml();
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -178,6 +182,7 @@ export class NodeStatusPanel {
         nodeUrl: creds.nodeUrl,
         subId,
         portalUrl,
+        filterPipeId: this._filterPipeId ?? null,
         refreshedAt: new Date().toLocaleTimeString(),
       });
     } catch (err) {
@@ -500,7 +505,7 @@ export class NodeStatusPanel {
 
 <!-- Filter bar -->
 <div class="filter-bar">
-  <input type="search" id="searchBox" placeholder="Filter by pipe ID…" oninput="applyFilters()" />
+  <input type="search" id="searchBox" placeholder='Filter by pipe ID… (use "exact" for exact match)' oninput="applyFilters()" />
   <div class="filter-pills">
     <button id="pill-all"      class="secondary active" onclick="setStatePill('all')">All</button>
     <button id="pill-running"  class="secondary"        onclick="setStatePill('running')">Running</button>
@@ -585,6 +590,12 @@ export class NodeStatusPanel {
       document.getElementById('nodeUrl').textContent = msg.nodeUrl;
       document.getElementById('refreshedAt').textContent = 'Updated ' + msg.refreshedAt;
       document.getElementById('refreshBtn').disabled = false;
+      if (msg.filterPipeId) {
+        const box = document.getElementById('searchBox');
+        if (!box.value) box.value = '"' + msg.filterPipeId + '"';
+        document.getElementById('pill-all').classList.remove('active');
+        stateFilter = 'all';
+      }
       renderSummary();
       renderTable();
     }
@@ -641,9 +652,14 @@ export class NodeStatusPanel {
   }
 
   function getFiltered() {
-    const query = document.getElementById('searchBox').value.toLowerCase();
+    const raw = document.getElementById('searchBox').value;
+    const exactMatch = raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"');
+    const query = exactMatch ? raw.slice(1, -1).toLowerCase() : raw.toLowerCase();
     return allStatuses.filter(s => {
-      if (query && !s.id.toLowerCase().includes(query)) return false;
+      if (query) {
+        const id = s.id.toLowerCase();
+        if (exactMatch ? id !== query : !id.includes(query)) return false;
+      }
       if (stateFilter === 'all') return true;
       if (stateFilter === 'failed') return s.failureCount > 0;
       if (stateFilter === 'running') return s.state === 'running';

@@ -904,7 +904,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
 
     // ── Status commands ───────────────────────────────────────────────────
-    vscode.commands.registerCommand("sesam.pipeStatus", async () => {
+    vscode.commands.registerCommand("sesam.pipeStatus", () => {
       const editor =
         vscode.window.activeTextEditor ??
         _lastSesamEditor ??
@@ -916,65 +916,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      const creds = await resolveCredentials();
-
-      if (!creds) {
-        vscode.window.showErrorMessage(
-          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
-        );
-        return;
-      }
-
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: `Sesam: Fetching status for '${pipeId}'…`,
-          cancellable: false,
-        },
-        async () => {
-          const done = trackRequest("GET", `status/${pipeId}`);
-
-          try {
-            const runner = new SesamRunner();
-            const statuses = await runner.status({
-              nodeUrl: creds.nodeUrl,
-              jwtToken: creds.jwt,
-              logger: logNodeRequest,
-            });
-            done(true);
-
-            const ps = statuses.find((s) => s.id === pipeId);
-
-            if (!ps) {
-              vscode.window.showWarningMessage(`Sesam: Pipe '${pipeId}' not found on node.`);
-              return;
-            }
-
-            const stateIcon =
-              ps.state === "running"
-                ? "$(sync~spin)"
-                : ps.failureCount > 0
-                  ? "$(error)"
-                  : "$(check)";
-            const lastRun = ps.lastRun ? new Date(ps.lastRun).toLocaleString() : "never";
-            const detail = [
-              `State: ${ps.state}`,
-              `Success: ${ps.successCount}  Failures: ${ps.failureCount}  Queued: ${ps.queued}`,
-              `Last run: ${lastRun}`,
-            ].join("\n");
-
-            vscode.window.showInformationMessage(
-              `${stateIcon} Sesam pipe '${pipeId}': ${ps.state}`,
-              { detail, modal: false },
-            );
-          } catch (err) {
-            done(false);
-            vscode.window.showErrorMessage(
-              `Sesam: Failed to fetch status: ${err instanceof Error ? err.message : String(err)}`,
-            );
-          }
-        },
-      );
+      NodeStatusPanel.createOrShow(pipeId);
     }),
 
     vscode.commands.registerCommand("sesam.nodeStatus", () => {
