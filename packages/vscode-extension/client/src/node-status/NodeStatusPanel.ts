@@ -669,10 +669,11 @@ export class NodeStatusPanel {
       const lastRun = s.lastRun ? fmtDate(s.lastRun) : '<span style="opacity:.45">—</span>';
       const queuedVal = s.queued > 0 ? '<span class="q-count">' + s.queued + '</span>' : '<span style="opacity:.35">0</span>';
 
+      const safeId = escHtml(s.id);
       return '<tr>' +
         '<td>' +
-          '<span class="pipe-id" title="Open local config file" onclick="openLocal(' + JSON.stringify(s.id) + ')">' + escHtml(s.id) + '</span>' +
-          '<span class="pipe-studio-link" title="Open in Management Studio" onclick="openInStudio(' + JSON.stringify(s.id) + ')">' +
+          '<span class="pipe-id" data-action="open-local" data-pipe-id="' + safeId + '" title="Open local config file">' + safeId + '</span>' +
+          '<span class="pipe-studio-link" data-action="open-studio" data-pipe-id="' + safeId + '" title="Open in Management Studio">' +
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="12" height="12" fill="currentColor">' +
               '<path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM5.78 8.75a9.64 9.64 0 0 0 1.363 4.177c.255.426.542.832.857 1.215.245-.296.551-.705.857-1.215A9.64 9.64 0 0 0 10.22 8.75Zm4.44-1.5a9.64 9.64 0 0 0-1.363-4.177c-.306-.51-.612-.919-.857-1.215a9.927 9.927 0 0 0-.857 1.215A9.64 9.64 0 0 0 5.78 7.25Zm-5.944 1.5H1.543a6.507 6.507 0 0 0 4.666 5.5A11.13 11.13 0 0 1 4.276 9.75Zm-2.733-1.5h2.733A11.13 11.13 0 0 1 6.209 2.75 6.507 6.507 0 0 0 1.543 8.25Zm10.214 1.5a11.13 11.13 0 0 1-1.933 5.5 6.506 6.506 0 0 0 4.666-5.5Zm1.733-1.5a6.506 6.506 0 0 0-4.666-5.5 11.13 11.13 0 0 1 1.933 5.5Z"/>' +
             '</svg>' +
@@ -687,13 +688,15 @@ export class NodeStatusPanel {
     }).join('');
   }
 
-  function openLocal(pipeId) {
-    vscode.postMessage({ type: 'openLocalFile', pipeId });
-  }
-
-  function openInStudio(pipeId) {
-    vscode.postMessage({ type: 'openInManagementStudio', pipeId, nodeUrl: currentNodeUrl });
-  }
+  // Single delegated listener — avoids all inline-onclick quoting issues
+  document.getElementById('tbody').addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const pipeId = el.dataset.pipeId;
+    const action = el.dataset.action;
+    if (action === 'open-local')  vscode.postMessage({ type: 'openLocalFile', pipeId });
+    if (action === 'open-studio') vscode.postMessage({ type: 'openInManagementStudio', pipeId, nodeUrl: currentNodeUrl });
+  });
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function badgeClass(s) {
