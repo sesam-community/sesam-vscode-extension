@@ -45,7 +45,6 @@ export class NodeStatusPanel {
 
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
-  private _refreshTimer: ReturnType<typeof setInterval> | undefined;
   /** When set, the panel focuses on a single pipe (pre-fills search box). */
   private _filterPipeId: string | undefined;
 
@@ -90,11 +89,6 @@ export class NodeStatusPanel {
       null,
       this._disposables,
     );
-
-    // Auto-refresh every 30 s
-    this._refreshTimer = setInterval(() => {
-      void this._loadAndSend();
-    }, 30_000);
   }
 
   // ── Message handler ───────────────────────────────────────────────────────
@@ -210,7 +204,6 @@ export class NodeStatusPanel {
 
   dispose(): void {
     NodeStatusPanel.currentPanel = undefined;
-    clearInterval(this._refreshTimer);
     this._panel.dispose();
     this._disposables.forEach((d) => d.dispose());
     this._disposables = [];
@@ -646,7 +639,7 @@ export class NodeStatusPanel {
     stateFilter = state;
     document.querySelectorAll('.filter-pills button').forEach(b => b.classList.remove('active'));
     document.getElementById('pill-' + state).classList.add('active');
-    sendRefresh();
+    renderTable();
   }
 
   function applyFilters() { renderTable(); }
