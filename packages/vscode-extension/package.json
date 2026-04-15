@@ -281,7 +281,7 @@
       },
       {
         "command": "sesam.nodeStatus",
-        "title": "Sesam: Show Node Status",
+        "title": "Sesam: Open Node Status Panel",
         "icon": "$(server)"
       }
     ],

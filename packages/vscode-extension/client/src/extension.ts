@@ -51,6 +51,7 @@ import {
 import { disposeSesamChannel, getSesamChannel, logNodeRequest } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
+import { NodeStatusPanel } from "./node-status/NodeStatusPanel";
 import { ValidationFailedError } from "@sesam/core";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
@@ -976,70 +977,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       );
     }),
 
-    vscode.commands.registerCommand("sesam.nodeStatus", async () => {
-      const creds = await resolveCredentials();
-
-      if (!creds) {
-        vscode.window.showErrorMessage(
-          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
-        );
-        return;
-      }
-
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Sesam: Fetching node status…",
-          cancellable: false,
-        },
-        async () => {
-          const done = trackRequest("GET", "status/all");
-
-          try {
-            const runner = new SesamRunner();
-            const statuses = await runner.status({
-              nodeUrl: creds.nodeUrl,
-              jwtToken: creds.jwt,
-              logger: logNodeRequest,
-            });
-            done(true);
-
-            const items = statuses.map((ps) => {
-              const icon =
-                ps.state === "running"
-                  ? "$(sync~spin)"
-                  : ps.failureCount > 0
-                    ? "$(error)"
-                    : ps.state === "ok" || ps.state === "idle"
-                      ? "$(check)"
-                      : "$(circle-outline)";
-
-              const lastRun = ps.lastRun ? new Date(ps.lastRun).toLocaleString() : "never";
-              return {
-                label: `${icon} ${ps.id}`,
-                description: ps.state,
-                detail: `✓ ${ps.successCount}  ✗ ${ps.failureCount}  last: ${lastRun}`,
-              };
-            });
-
-            const running = statuses.filter((s) => s.state === "running").length;
-            const failed = statuses.filter((s) => s.failureCount > 0).length;
-            const summary = `${statuses.length} pipes — ${running} running, ${failed} with failures`;
-
-            await vscode.window.showQuickPick(items, {
-              title: `Sesam Node Status: ${summary}`,
-              placeHolder: "Pipe status overview (read-only)",
-              matchOnDescription: true,
-              matchOnDetail: true,
-            });
-          } catch (err) {
-            done(false);
-            vscode.window.showErrorMessage(
-              `Sesam: Failed to fetch node status: ${err instanceof Error ? err.message : String(err)}`,
-            );
-          }
-        },
-      );
+    vscode.commands.registerCommand("sesam.nodeStatus", () => {
+      NodeStatusPanel.createOrShow();
     }),
 
     vscode.commands.registerCommand("sesam.fixWithCopilot", async () => {
