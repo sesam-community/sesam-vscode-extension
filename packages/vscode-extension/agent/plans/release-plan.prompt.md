@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **F02**: Config File Intelligence — schema-aware validation and completions for all top-level
   config properties across pipe, system, and global configs
+- **F24**: Live Updates via Socket.IO — `NodeStatusPanel` connects to the Sesam node over
+  Socket.IO (`socket.io-client`) for real-time `pipes_updated` / `pipes_added` / `pipes_deleted`
+  push events; replaces 30 s polling; falls back to poll on connection failure; live/polling/offline
+  badge in the Node Status WebView
 
 ---
 
