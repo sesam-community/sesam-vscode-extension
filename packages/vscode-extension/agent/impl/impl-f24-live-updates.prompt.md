@@ -270,14 +270,38 @@ Panel disposed
 The `_refreshTimer` `setInterval` is **removed entirely**. There is no polling fallback. The only
 ways data refreshes are:
 1. Socket.IO push event (when live updates are on and supported).
-2. Manual Refresh button click in the webview (`{ type: "refresh" }` → `_loadAndSend()`).
+2. Manual Refresh button click in the webview (`{ type: "refresh" }` → `_loadAndSend()`) — only visible when live updates are off.
+
+#### Refresh button visibility
+
+The Refresh button is **hidden while live updates are active** and only shown when the connection
+state is `"disabled"` or `"not-supported"`. Controlled by the `connection-state` message:
+
+```js
+window.addEventListener('message', (event) => {
+  const msg = event.data;
+  if (msg.type === 'connection-state') {
+    const showRefresh = msg.state === 'disabled' || msg.state === 'not-supported';
+    document.getElementById('refreshBtn').style.display = showRefresh ? '' : 'none';
+  }
+});
+```
+
+On initial load (before any `connection-state` message arrives) the button is **hidden by default**
+via inline style `style="display:none"` — it appears only once the state is confirmed.
+
+| `connection-state` | Refresh button |
+|---|---|
+| `"live"` | Hidden |
+| `"disabled"` | Visible |
+| `"not-supported"` | Visible |
 
 #### Filter pills — client-side only
 
 Filter pills currently call `sendRefresh()` which fires a new REST request. With live updates:
 - **Remove** the `sendRefresh()` call from `setStatePill()`.
 - Pills update `stateFilter` and call `renderTable()` directly — no network request.
-- The manual Refresh button remains for users to pull a fresh snapshot when live updates are off.
+- The Refresh button is only shown when live updates are disabled/not-supported (see above).
 
 #### Merging incremental updates
 
