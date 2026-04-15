@@ -672,7 +672,7 @@ See [`agent/impl/impl-distribution.prompt.md`](agent/impl/impl-distribution.prom
 
 ## Roadmap
 
-The extension is being expanded in 5 phases. See [`agent/impl/README.md`](agent/impl/README.md) for the implementation tracker, or [`agent/sesam-extension-plan.prompt.md`](agent/sesam-extension-plan.prompt.md) for the full product plan.
+The extension is being expanded in 5 phases. See [`agent/impl/README.md`](agent/impl/README.md) for the implementation tracker, [`agent/sesam-extension-plan.prompt.md`](agent/sesam-extension-plan.prompt.md) for the full product plan, or [`agent/plans/release-plan.prompt.md`](agent/plans/release-plan.prompt.md) for the versioned changelog and release roadmap.
 
 | Phase | Focus | Key deliverables |
 |---|---|---|
