@@ -318,10 +318,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   syncActivePipe(vscode.window.activeTextEditor);
 
   // Keep sesam-config files in the left column (ViewColumn.One) so they don't
-  // open over the Preview panel in the right split.
+  // open over the Preview panel or the Node Status panel in the right split.
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (!editor || editor.viewColumn === vscode.ViewColumn.One || !PreviewPanel.currentPanel) {
+      if (
+        !editor ||
+        editor.viewColumn === vscode.ViewColumn.One ||
+        (!PreviewPanel.currentPanel && !NodeStatusPanel.currentPanel)
+      ) {
         return;
       }
 
