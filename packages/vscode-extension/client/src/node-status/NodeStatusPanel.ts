@@ -12,6 +12,8 @@
  *   - Click a pipe row → run sesam.runPipe for that pipe
  */
 
+import * as path from "node:path";
+
 import * as vscode from "vscode";
 
 import { resolveCredentials } from "../credential-resolver";
@@ -26,7 +28,8 @@ import { trackRequest } from "../network-status";
 
 type MessageFromWebview =
   | { type: "refresh" }
-  | { type: "runPipe"; pipeId: string }
+  | { type: "openLocalFile"; pipeId: string }
+  | { type: "openInManagementStudio"; pipeId: string; nodeUrl: string }
   | { type: "ready" };
 
 // ---------------------------------------------------------------------------
@@ -95,8 +98,37 @@ export class NodeStatusPanel {
       return;
     }
 
-    if (message.type === "runPipe") {
-      await vscode.commands.executeCommand("sesam.runPipe");
+    if (message.type === "openLocalFile") {
+      // Scan all pipe/system config files and find one whose basename matches the id.
+      // Using a broad pattern + basename filter is more robust than per-extension globs
+      // because the workspace may use .conf.json, .conf.pipe, .json, etc.
+      const all = await vscode.workspace.findFiles("**/{pipes,systems}/**", "**/node_modules/**");
+
+      const CONFIG_EXTS = [".conf.json", ".conf.pipe", ".conf.system", ".json"];
+      const match = all.find((uri) => {
+        const base = path.basename(uri.fsPath);
+        return CONFIG_EXTS.some((ext) => base === `${message.pipeId}${ext}`);
+      });
+
+      if (!match) {
+        vscode.window.showWarningMessage(
+          `Sesam: No local file found for '${message.pipeId}'. Have you downloaded configs?`,
+        );
+        return;
+      }
+
+      await vscode.commands.executeCommand("vscode.open", match, {
+        viewColumn: vscode.ViewColumn.One,
+        preserveFocus: false,
+        preview: false,
+      });
+      return;
+    }
+
+    if (message.type === "openInManagementStudio") {
+      const base = message.nodeUrl.replace(/\/+$/, "").replace(/\/api$/i, "");
+      const url = `${base}/gui/pipes/${encodeURIComponent(message.pipeId)}`;
+      await vscode.env.openExternal(vscode.Uri.parse(url));
       return;
     }
   }
@@ -344,6 +376,22 @@ export class NodeStatusPanel {
 
     .pipe-id:hover { text-decoration: underline; }
 
+    .pipe-studio-link {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 6px;
+      opacity: 0;
+      color: var(--vscode-textLink-foreground);
+      cursor: pointer;
+      vertical-align: middle;
+      transition: opacity 0.1s;
+    }
+
+    .pipe-studio-link svg { display: block; }
+
+    tr:hover .pipe-studio-link { opacity: 0.55; }
+    .pipe-studio-link:hover   { opacity: 1 !important; }
+
     /* ── state badge ── */
     .badge {
       display: inline-block;
@@ -488,6 +536,7 @@ export class NodeStatusPanel {
   let sortKey    = 'id';
   let sortAsc    = true;
   let stateFilter = 'all';
+  let currentNodeUrl = '';
 
   // ── VS Code messaging ──────────────────────────────────────────────────
   function sendRefresh() {
@@ -513,6 +562,7 @@ export class NodeStatusPanel {
 
     if (msg.type === 'data') {
       allStatuses = msg.statuses;
+      currentNodeUrl = msg.nodeUrl;
       document.getElementById('nodeUrl').textContent = msg.nodeUrl;
       document.getElementById('refreshedAt').textContent = 'Updated ' + msg.refreshedAt;
       document.getElementById('refreshBtn').disabled = false;
@@ -620,7 +670,14 @@ export class NodeStatusPanel {
       const queuedVal = s.queued > 0 ? '<span class="q-count">' + s.queued + '</span>' : '<span style="opacity:.35">0</span>';
 
       return '<tr>' +
-        '<td><span class="pipe-id" title="Click to run this pipe" onclick="runPipe(' + JSON.stringify(s.id) + ')">' + escHtml(s.id) + '</span></td>' +
+        '<td>' +
+          '<span class="pipe-id" title="Open local config file" onclick="openLocal(' + JSON.stringify(s.id) + ')">' + escHtml(s.id) + '</span>' +
+          '<span class="pipe-studio-link" title="Open in Management Studio" onclick="openInStudio(' + JSON.stringify(s.id) + ')">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="12" height="12" fill="currentColor">' +
+              '<path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM5.78 8.75a9.64 9.64 0 0 0 1.363 4.177c.255.426.542.832.857 1.215.245-.296.551-.705.857-1.215A9.64 9.64 0 0 0 10.22 8.75Zm4.44-1.5a9.64 9.64 0 0 0-1.363-4.177c-.306-.51-.612-.919-.857-1.215a9.927 9.927 0 0 0-.857 1.215A9.64 9.64 0 0 0 5.78 7.25Zm-5.944 1.5H1.543a6.507 6.507 0 0 0 4.666 5.5A11.13 11.13 0 0 1 4.276 9.75Zm-2.733-1.5h2.733A11.13 11.13 0 0 1 6.209 2.75 6.507 6.507 0 0 0 1.543 8.25Zm10.214 1.5a11.13 11.13 0 0 1-1.933 5.5 6.506 6.506 0 0 0 4.666-5.5Zm1.733-1.5a6.506 6.506 0 0 0-4.666-5.5 11.13 11.13 0 0 1 1.933 5.5Z"/>' +
+            '</svg>' +
+          '</span>' +
+        '</td>' +
         '<td><span class="badge ' + badge + '">' + escHtml(s.state) + '</span></td>' +
         '<td class="count-cell"><span class="ok-count">' + s.successCount + '</span></td>' +
         '<td class="count-cell"><span class="' + (s.failureCount > 0 ? 'err-count' : '') + '">' + s.failureCount + '</span></td>' +
@@ -630,8 +687,12 @@ export class NodeStatusPanel {
     }).join('');
   }
 
-  function runPipe(pipeId) {
-    vscode.postMessage({ type: 'runPipe', pipeId });
+  function openLocal(pipeId) {
+    vscode.postMessage({ type: 'openLocalFile', pipeId });
+  }
+
+  function openInStudio(pipeId) {
+    vscode.postMessage({ type: 'openInManagementStudio', pipeId, nodeUrl: currentNodeUrl });
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────
