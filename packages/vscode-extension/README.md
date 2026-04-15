@@ -20,6 +20,7 @@
 - [Pipe Preview](#pipe-preview)
 - [Node Integration — Upload & Download](#node-integration--upload--download)
 - [Node Integration — Run Pipe](#node-integration--run-pipe)
+- [Node Status](#node-status)
 - [New Sesam Config File](#new-sesam-config-file)
 - [Credential Management](#credential-management)
 - [Copilot Agent Integration](#copilot-agent-integration)
@@ -316,6 +317,14 @@ Upload and download all pipe/system configs directly from VS Code — no termina
 2. If validation fails, the **Sesam output channel** opens with a grouped error report including clickable `file:///` links to each problem. A **Fix with Copilot** button in the notification opens `@sesam /fix` in the chat panel, which reads the broken files and applies corrections to disk automatically.
 3. On success, a notification shows the pipe and system counts uploaded.
 
+#### Upload single file
+
+Upload only the config file open in the active editor — without replacing other configs on the node.
+
+- Toolbar button in the editor title bar (when a Sesam config is open).
+- Command: **Sesam: Upload File**.
+- Validates the single file offline before uploading.
+
 #### Download (`Ctrl+Shift+D`)
 
 1. Confirms before overwriting local files (modal dialog).
@@ -331,6 +340,14 @@ Buttons for both commands appear in:
 - **File Explorer header** (`workbench.explorer.fileView`) — always available, even with no file open
 
 All requests are logged to the **Sesam output channel**.
+
+#### Download single file
+
+Download only the config for the pipe/system open in the active editor.
+
+- Toolbar button in the editor title bar (when a Sesam config is open).
+- Command: **Sesam: Download File**.
+- Shows a confirmation dialog before overwriting the local file.
 
 ---
 
@@ -348,6 +365,42 @@ Run the currently open pipe on the connected Sesam node.
 
 ---
 
+### Node Status
+
+A live WebView panel showing the **runtime status of all pipes** on the connected Sesam node.
+
+#### Node Status panel (`sesam.nodeStatus`)
+
+Open from the **editor title bar** or the **Explorer toolbar** (always available).
+
+| Column | Description |
+|---|---|
+| Pipe | Clickable pipe ID — opens the local config file; globe icon opens the pipe in Management Studio |
+| State | Colour-coded badge: running · ok · failed · disabled |
+| OK runs | Cumulative success count |
+| Failures | Cumulative failure count (red when > 0) |
+| Queued | Entities waiting in the queue |
+| Last run | Human-readable timestamp |
+
+**Controls:**
+- **Filter pills** — All · Running · Failed · OK · Disabled — each fetches fresh data from the node.
+- **Search box** — type to filter by pipe ID (substring). Wrap in double-quotes for an exact match: `"my-pipe"` shows only that pipe.
+- **Column headers** — click to sort ascending/descending.
+- **Auto-refresh** — panel refreshes automatically every 30 seconds.
+- **Summary bar** — shows total pipe count with running / failure / disabled breakdowns.
+
+**Pipe ID links:**
+- Click the pipe name → opens the local config file in the leftmost editor column.
+- Click the 🌐 icon → opens the pipe's edit page in Management Studio.
+
+#### Pipe Status (`sesam.pipeStatus`)
+
+Available from the **editor title bar** when a Sesam config file is open. Opens the same Node Status WebView but pre-filtered to show only the active pipe (using exact-match search). Fetches only the single pipe from the node — no full status scan.
+
+Clicking the button for a different pipe while the panel is already open updates the search filter to the new pipe.
+
+---
+
 ### Credential Management
 
 The extension stores your Sesam JWT tokens securely in VS Code **SecretStorage** (OS keychain on Linux/macOS/Windows) — tokens are never written to disk or committed to source control.
@@ -357,7 +410,7 @@ You can configure multiple named **profiles** (e.g. `dev`, `staging`, `prod`) an
 #### Quick start
 
 1. Run **Sesam: Add Profile** from the Command Palette.
-2. Enter a profile name (e.g. `dev`), your node URL, and your JWT (paste from the Sesam portal).
+2. Enter a profile name (e.g. `dev`), the portal URL (defaults to `https://portal.sesam.io`), your node URL, and your JWT.
 3. The active profile name is shown in the status bar: `$(key) Sesam: [dev]`. Click it to switch profiles.
 
 #### How to obtain a JWT
@@ -372,12 +425,12 @@ JWTs expire — re-run **Sesam: Store JWT Token** when yours is refreshed.
 
 | Command | Description |
 |---|---|
-| `Sesam: Add Profile` | 3-step wizard — name, node URL, JWT. Creates or replaces a full profile. |
+| `Sesam: Add Profile` | 4-step wizard — name, portal URL (default: `https://portal.sesam.io`), node URL, JWT. Creates or replaces a full profile. |
 | `Sesam: Delete Profile` | Remove a profile entirely (JWT from SecretStorage + node URL from workspace state). |
 | `Sesam: Store JWT Token` | Quick command to store (or update) just the JWT for a named profile. |
 | `Sesam: Delete JWT Token` | Remove only the stored JWT for a profile, keeping the node URL. |
 | `Sesam: Switch Profile` | Switch the active profile from a QuickPick list. Same as clicking the status bar item. |
-| `Sesam: List Profiles` | Print all configured profiles (name, node URL, token status) to the Sesam output channel. |
+| `Sesam: List Profiles` | Print all configured profiles (name, node URL, portal URL, token status) to the Sesam output channel. |
 
 #### Falling back to settings
 
@@ -548,8 +601,12 @@ my-sesam-project/
 |---|---|---|
 | `DTL: Preview Pipe` | — | Open the preview panel for the active file |
 | `Sesam: Run Pipe` | `Ctrl+Shift+R` | Run the active pipe on the connected node |
+| `Sesam: Pipe Status` | — | Open the Node Status panel filtered to the active pipe |
+| `Sesam: Node Status` | — | Open the Node Status panel showing all pipes |
 | `Sesam: Upload` | `Ctrl+Shift+U` | Validate and upload all local configs to the node |
 | `Sesam: Download` | `Ctrl+Shift+D` | Download all configs from the node (overwrites local files) |
+| `Sesam: Upload File` | — | Upload only the active config file to the node |
+| `Sesam: Download File` | — | Download only the active pipe/system config from the node |
 | `Sesam: Refresh Pipe DAG` | — | Rescan workspace and refresh Lineage / Dependents / System Pipes sidebars |
 | `DTL: Open Documentation` | — | Open the Sesam DTL docs in a browser |
 | `DTL: New Sesam Config File` | — | Create a new pipe or system config file from a template |

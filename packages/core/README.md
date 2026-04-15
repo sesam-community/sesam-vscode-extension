@@ -18,10 +18,13 @@ interface NodeCredentials {
 ```ts
 import {
   uploadConfig,
+  uploadSingleConfig,
   downloadConfig,
+  downloadSingleConfig,
   runPipe,
   runAllPipes,
   getStatus,
+  getPipeStatus,
   validateWorkspace,
 } from "@sesam/core";
 
@@ -29,9 +32,17 @@ import {
 const result = await uploadConfig(creds, "/path/to/workspace");
 // → { success: true, pipesUploaded: 12, systemsUploaded: 3 }
 
+// Upload a single config file (pipe or system) without replacing others
+const result = await uploadSingleConfig(creds, "/path/to/workspace/pipes/my-pipe.conf.json");
+// → { success: true, id: "my-pipe", configType: "pipe" }
+
 // Download all configs from the node
 const result = await downloadConfig(creds, { outDir: "/path/to/workspace" });
 // → { pipesWritten: 12, systemsWritten: 3 }
+
+// Download a single pipe or system config from the node
+const result = await downloadSingleConfig(creds, { pipeId: "my-pipe", outDir: "/path/to/workspace" });
+// → { written: "/path/to/workspace/pipes/my-pipe.conf.json" }
 
 // Run all pipes
 await runAllPipes(creds);
@@ -42,6 +53,10 @@ await runPipe(creds, "my-pipe-id");
 // Get status of all pipes
 const statuses = await getStatus(creds);
 // → [{ id, state, successCount, failureCount, queued, lastRun, nextRun }, ...]
+
+// Get status of a single pipe (single HTTP request — faster than getStatus)
+const status = await getPipeStatus(creds, "my-pipe-id");
+// → { id, state, successCount, failureCount, queued, lastRun, nextRun }
 
 // Validate local configs (offline — no node needed)
 const result = await validateWorkspace("/path/to/workspace");
