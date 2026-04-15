@@ -10,20 +10,25 @@
 
 import {
   downloadConfig,
+  downloadSingleConfig,
   getStatus,
   runAllPipes,
   runPipe,
   uploadConfig,
+  uploadSingleConfig,
   validateWorkspace,
 } from "@sesam/core";
 
 import type {
   DownloadOptions,
   DownloadResult,
+  DownloadSingleOptions,
   NodeCredentials,
   PipeStatus,
   RunAllOptions,
   RunResult,
+  SingleDownloadResult,
+  SingleUploadResult,
   UploadOptions,
   UploadResult,
   ValidationResult,
@@ -84,5 +89,28 @@ export class SesamRunner {
    */
   async validate(workspaceDir: string): Promise<ValidationResult> {
     return validateWorkspace(workspaceDir);
+  }
+
+  /**
+   * Upload a single config file to the node without replacing other configs.
+   */
+  async uploadFile(
+    creds: NodeCredentials,
+    filePath: string,
+    opts?: { skipValidate?: boolean },
+  ): Promise<SingleUploadResult> {
+    return uploadSingleConfig(creds, filePath, opts);
+  }
+
+  /**
+   * Download a single pipe or system config from the node to disk.
+   */
+  async downloadFile(
+    creds: NodeCredentials,
+    configId: string,
+    configType: "pipe" | "system",
+    opts: DownloadSingleOptions,
+  ): Promise<SingleDownloadResult> {
+    return downloadSingleConfig(creds, configId, configType, opts);
   }
 }

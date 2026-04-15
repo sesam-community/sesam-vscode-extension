@@ -16,7 +16,7 @@ import { zipWorkspaceConfig } from "./config-zipper.js";
 import { validateWorkspace } from "./validate.js";
 import { NodeApiError, ValidationFailedError } from "./errors.js";
 
-import type { NodeCredentials, UploadOptions, UploadResult } from "./types.js";
+import type { NodeCredentials, SingleUploadResult, UploadOptions, UploadResult } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,4 +94,58 @@ export async function uploadConfig(
   await client.waitForDeploy();
 
   return { success: true, pipesUploaded, systemsUploaded };
+}
+
+// ---------------------------------------------------------------------------
+// Single-config upload
+// ---------------------------------------------------------------------------
+
+/**
+ * Upload a single pipe or system config file to the node.
+ *
+ * Reads the file at `filePath`, determines its type from the `type` field,
+ * and PUTs it via the per-entity config endpoint.  Does **not** affect other
+ * pipes or systems on the node.
+ *
+ * @param creds     Node URL + JWT credentials.
+ * @param filePath  Absolute path to the `.conf.json` / `.conf.pipe` / `.conf.system` file.
+ * @param opts      Optional flags (skip offline validation).
+ */
+export async function uploadSingleConfig(
+  creds: NodeCredentials,
+  filePath: string,
+  opts?: { skipValidate?: boolean },
+): Promise<SingleUploadResult> {
+  const raw = await fs.readFile(filePath, "utf-8");
+  const config = JSON.parse(raw) as Record<string, unknown>;
+  const configId = typeof config["_id"] === "string" ? config["_id"] : null;
+
+  if (!configId) {
+    throw new NodeApiError(0, `Config file has no "_id" field: ${filePath}`);
+  }
+
+  const typeStr = typeof config["type"] === "string" ? config["type"] : "";
+  const configType: "pipe" | "system" =
+    typeStr.startsWith("system:") || typeStr === "system" ? "system" : "pipe";
+
+  if (!opts?.skipValidate) {
+    // Derive workspace root: the file lives in <root>/pipes/ or <root>/systems/
+    const workspaceDir = path.dirname(path.dirname(filePath));
+    const validation = await validateWorkspace(workspaceDir);
+    const relevant = validation.errors.filter((e) => e.file === filePath);
+
+    if (relevant.length > 0) {
+      throw new ValidationFailedError(relevant);
+    }
+  }
+
+  const client = new NodeClient(creds);
+
+  if (configType === "pipe") {
+    await client.putPipeConfig(configId, config);
+  } else {
+    await client.putSystemConfig(configId, config);
+  }
+
+  return { success: true, configId, configType };
 }

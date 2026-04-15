@@ -1,6 +1,6 @@
 # F01: sesam-py Command Integration
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 1 - MVP
 > **Depends on**: F00 (SesamRunner available)
 > **Tracking**: [README.md](README.md)
@@ -9,87 +9,105 @@
 
 ## Summary
 
-Expose the most common sesam-py operations (upload, download, run, test, validate, format, status, log, restart) directly
-from VS Code without the user switching to a terminal. Covers Command Palette commands, a status bar widget,
-a dedicated Output Channel, and VS Code Task definitions.
+Expose the most common sesam-py operations directly from VS Code without the user switching to a
+terminal. Covers Command Palette commands, editor title-bar buttons, a dedicated Output Channel,
+and VS Code Task definitions.
 
 ---
 
-## Implementation Phases
+## Implemented Commands
 
-### Phase A: Command Palette + Output Channel
+| Command ID | Title | Scope |
+|---|---|---|
+| `sesam.upload` | Sesam: Upload to Node | Whole workspace |
+| `sesam.download` | Sesam: Download from Node | Whole workspace |
+| `sesam.runPipe` | Sesam: Run Pipe | Current file |
+| `sesam.uploadFile` | Sesam: Upload This Config to Node | Current file |
+| `sesam.downloadFile` | Sesam: Download This Config from Node | Current file |
+| `sesam.pipeStatus` | Sesam: Show Pipe Status | Current file |
+| `sesam.nodeStatus` | Sesam: Show Node Status | Whole node |
 
-1. Register the following commands in `package.json` under `contributes.commands`:
+### Editor title-bar button order (left → right)
 
-   | Command ID | Title |
-   |---|---|
-   | `sesam.upload` | Sesam: Upload pipes |
-   | `sesam.download` | Sesam: Download pipes |
-   | `sesam.run` | Sesam: Run pipe... |
-   | `sesam.validate` | Sesam: Validate | ⚠️ Implemented internally via `validateWorkspace()` in `@sesam/core` — does **not** call the backend API. The node has no validate endpoint; validation runs fully offline against local config files. |
-   | `sesam.format` | Sesam: Format DTL files |
-   | `sesam.status` | Sesam: Show status |
-   | `sesam.log` | Sesam: Show pipe log... |
-   | `sesam.restart` | Sesam: Restart node |
+1. `sesam.runPipe` / `sesam.pipeRunningIndicator` — start the pump (or spinner when running)
+2. `sesam.pipeStatus` — fetch and display runtime status for the current pipe
+3. `dtl.previewPipe` — open the offline preview panel
+4. `sesam.uploadFile` — upload **only** the current config file to the node
+5. `sesam.downloadFile` — download **only** the current config file from the node
+6. `sesam.upload` — upload full workspace to the node
+7. `sesam.download` — download full workspace from the node
+8. `sesam.nodeStatus` — show a Quick Pick with runtime status of all node pipes
+9. `sesam.fixWithCopilot` — open Copilot chat with file errors
 
-2. Create `client/src/sesamCommands.ts`:
-   - `runSesamCommand(args: string[]): Promise<void>` - invokes the command via F00 `SesamRunner`,
-     streams stdout/stderr to a named Output Channel `"Sesam"`.
-   - Each command listed above maps to a function that calls `runSesamCommand` with the right args.
-3. Register activation event `onCommand:sesam.*` (or `onStartupFinished`) in `package.json`.
-4. Add `when` clause `sesam.runnerReady` so commands are greyed out if the runner check fails (F00).
+### `sesam.nodeStatus` — Node Status Quick Pick
 
-### Phase B: Status Bar Widget
+- Fetches all pipe statuses via `SesamRunner.status()`.
+- Shows a filterable Quick Pick list with:
+  - Icon: `$(sync~spin)` running · `$(error)` failures · `$(check)` OK · `$(circle-outline)` other
+  - Description: state string
+  - Detail: success/failure counts and last-run timestamp
+- Summary header: `N pipes — X running, Y with failures`.
+- Available in: editor title bar (`navigation@8`), Explorer panel `view/title`, Command Palette.
 
-1. Create a persistent status bar item (priority 100, left-aligned) showing:
-   - Idle: `$(sesam-logo) Sesam` - clickable -> opens Output Channel.
-   - Running: `$(sync~spin) Sesam: uploading...`
-   - Success: `$(check) Sesam: done` (clears after 5 s).
-   - Error: `$(error) Sesam: failed` (persists until next run, clickable -> Output Channel).
-2. Track running commands with a ref-counter so concurrent runs are reflected correctly.
-3. Expose `sesam.showOutput` command (status bar click handler).
+### `sesam.pipeStatus` — Per-Pipe Status Notification
 
-### Phase C: VS Code Task Provider
+- Reads `_id` from the active document.
+- Fetches all statuses and finds the matching entry.
+- Shows an information message: `$(icon) Sesam pipe '<id>': <state>`.
 
-1. Implement `vscode.TaskProvider` in `client/src/sesamTaskProvider.ts`.
-2. Auto-detect workspace root for `.syncconfig`; expose tasks:
-   - `Sesam: upload`
-   - `Sesam: download`
-   - `Sesam: run <pipe>` (parameterized - prompts for pipe name)
-   - `Sesam: test`
-   - `Sesam: log <pipe>` (parameterized - prompts for pipe name; streams execution log to Output Channel)
-   - `Sesam: restart` (restarts the target node; shows a confirmation dialog first)
-3. Make tasks available from `Terminal > Run Task...` and bindable to keyboard shortcuts.
-4. Register via `vscode.workspace.registerTaskProvider('sesam', provider)` in `extension.ts`.
+### `sesam.uploadFile` / `sesam.downloadFile` — Single-config transfer
+
+The single-file operations use per-entity REST endpoints (`PUT /api/pipes/{id}/config`,
+`GET /api/pipes/{id}`) from `@sesam/core`, so they do **not** overwrite other configs on the node.
+
+#### Upload flow
+1. Read and parse the active config file.
+2. Run offline validation on the workspace (filter to this file's errors).
+3. `PUT /api/pipes/{id}/config` or `PUT /api/systems/{id}/config`.
+4. Show success / validation error notification.
+
+#### Download flow
+1. Read `_id` from the active document.
+2. Show confirmation dialog (will overwrite local file).
+3. `GET /api/pipes/{id}` or `GET /api/systems/{id}`.
+4. Write the `original` config to `pipes/<id>.conf.json` or `systems/<id>.conf.json`.
+5. Show success notification with the relative file path.
 
 ---
 
-## Configuration Points (package.json contributions)
+## Core additions (`@sesam/core`)
 
-```jsonc
-"dtl.sesampy.defaultNode": "",           // fallback if .syncconfig absent
-"dtl.sesampy.confirmBeforeUpload": true, // safety gate
-"dtl.sesampy.singleMode": false          // pass --single-mode to upload/download
-```
+| Addition | Purpose |
+|---|---|
+| `NodeClient.getPipe(id)` | `GET /api/pipes/{id}` |
+| `NodeClient.getSystem(id)` | `GET /api/systems/{id}` |
+| `NodeClient.putPipeConfig(id, config)` | `PUT /api/pipes/{id}/config` |
+| `NodeClient.putSystemConfig(id, config)` | `PUT /api/systems/{id}/config` |
+| `uploadSingleConfig(creds, filePath, opts?)` | Single-file upload (exported from index) |
+| `downloadSingleConfig(creds, id, type, opts)` | Single-config download (exported from index) |
+| `SingleUploadResult`, `SingleDownloadResult`, `DownloadSingleOptions` | New types |
 
 ---
 
-## Files to Modify / Add
+## Files Modified
 
 | File | Change |
 |---|---|
-| `package.json` | Command registrations, settings, activation events |
-| `client/src/extension.ts` | Register commands + task provider on activation |
-| `client/src/sesamCommands.ts` (new) | Command implementations (includes `log` and `restart`) |
-| `client/src/sesamTaskProvider.ts` (new) | VS Code Task Provider |
-| `client/src/statusBar.ts` (new) | Status bar widget logic |
+| `package.json` | Added 4 new commands + menu entries |
+| `client/src/extension.ts` | Registered `sesam.uploadFile`, `sesam.downloadFile`, `sesam.pipeStatus`, `sesam.nodeStatus` |
+| `client/src/sesam-runner.ts` | Added `uploadFile()`, `downloadFile()` methods |
+| `packages/core/src/node-client.ts` | Added `getPipe`, `getSystem`, `putPipeConfig`, `putSystemConfig` |
+| `packages/core/src/upload.ts` | Added `uploadSingleConfig()` |
+| `packages/core/src/download.ts` | Added `downloadSingleConfig()` |
+| `packages/core/src/types.ts` | Added single-config types |
+| `packages/core/src/index.ts` | Exported new functions |
 
 ---
 
 ## Dependencies
 
 - **F00** - `SesamRunner` must be initialised before any command can execute
-- **F03** - credential management should be wired in before `upload`/`download` are widely used
+- **F03** - credential management must be wired in before upload/download commands are used
 
 ---
 

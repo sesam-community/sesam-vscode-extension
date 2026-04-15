@@ -268,4 +268,46 @@ export class NodeClient {
   async getSystems(): Promise<ApiSystem[]> {
     return this.request<ApiSystem[]>("GET", "systems");
   }
+
+  /** Fetch a single system by ID. */
+  async getSystem(systemId: string): Promise<ApiSystem> {
+    const encoded = encodeURIComponent(systemId);
+    return this.request<ApiSystem>("GET", `systems/${encoded}`);
+  }
+
+  // ── Single-config PUT ─────────────────────────────────────────────────
+
+  /** Fetch a single pipe by ID (includes runtime state and config). */
+  async getPipe(pipeId: string): Promise<ApiPipe> {
+    const encoded = encodeURIComponent(pipeId);
+    return this.request<ApiPipe>("GET", `pipes/${encoded}`);
+  }
+
+  /**
+   * Update a single pipe's config on the node.
+   * Unlike `putConfig` (full ZIP), this only modifies the one named pipe.
+   */
+  async putPipeConfig(pipeId: string, config: unknown): Promise<void> {
+    const encoded = encodeURIComponent(pipeId);
+    await this.request<unknown>(
+      "PUT",
+      `pipes/${encoded}/config`,
+      JSON.stringify(config),
+      "application/json",
+    );
+  }
+
+  /**
+   * Update a single system's config on the node.
+   * Unlike `putConfig` (full ZIP), this only modifies the one named system.
+   */
+  async putSystemConfig(systemId: string, config: unknown): Promise<void> {
+    const encoded = encodeURIComponent(systemId);
+    await this.request<unknown>(
+      "PUT",
+      `systems/${encoded}/config`,
+      JSON.stringify(config),
+      "application/json",
+    );
+  }
 }
