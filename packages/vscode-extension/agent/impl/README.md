@@ -20,7 +20,7 @@
 | # | Feature | Rollout Phase | Status | Sub-plan |
 |---|---|---|---|---|
 | F00 | Bundle sesam-py (TS rewrite + npm bundle) | Phase 1 | `implemented` | [impl-f00-bundle-sesam-py.prompt.md](impl-f00-bundle-sesam-py.prompt.md) |
-| F01 | sesam-py Command Integration | Phase 1 | `planned` | [impl-f01-sesam-commands.prompt.md](impl-f01-sesam-commands.prompt.md) |
+| F01 | sesam-py Command Integration | Phase 1 | `implemented` | [impl-f01-sesam-commands.prompt.md](impl-f01-sesam-commands.prompt.md) |
 | F02 | Config File Intelligence | Phase 1 | `planned` | [impl-f02-config-file-intelligence.prompt.md](impl-f02-config-file-intelligence.prompt.md) |
 | F03 | Secure Credential Management | Phase 1 | `implemented` | [impl-f03-credential-management.prompt.md](impl-f03-credential-management.prompt.md) |
 | F12 | Sesam Config File Extensions & Formatter | Phase 1 | `implemented` | [impl-f12-conf-json-formatter.prompt.md](impl-f12-conf-json-formatter.prompt.md) |
@@ -34,7 +34,7 @@
 | F20 | Extension Language Model Tools API | Phase 1 | `implemented` | [impl-f20-lm-tools-api.prompt.md](impl-f20-lm-tools-api.prompt.md) |
 | F21 | Config Property Completions | Phase 1 | `implemented` | [impl-f21-config-prop-completions.prompt.md](impl-f21-config-prop-completions.prompt.md) |
 | F22 | Sesam Panel (Errors / Warnings View) | Phase 1 | `implemented` | — |
-| F23 | Centralized Network Status Bar | Phase 1 | `planned` | [impl-f23-network-status.prompt.md](impl-f23-network-status.prompt.md) |
+| F23 | Centralized Network Status Bar | Phase 1 | `implemented` | [impl-f23-network-status.prompt.md](impl-f23-network-status.prompt.md) |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
 | F04 | Node-Connected Live Preview | Phase 3 | `implemented` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
@@ -59,7 +59,7 @@
 | Feature | Status |
 |---|---|
 | F00: Bundle sesam-py | `implemented` |
-| F01: sesam-py Command Integration | `planned` |
+| F01: sesam-py Command Integration | `implemented` |
 | F02: Config File Intelligence | `planned` |
 | F03: Secure Credential Management | `implemented` |
 | F12: conf.json Support & Full-File Sesam Formatter | `implemented` |
@@ -72,7 +72,7 @@
 | F20: Extension Language Model Tools API | `implemented` |
 | F21: Config Property Completions (all phases) | `implemented` |
 | F22: Sesam Panel (Errors / Warnings View) | `implemented` |
-| F23: Centralized Network Status Bar | `planned` |
+| F23: Centralized Network Status Bar | `implemented` |
 
 ### Phase 2: Testing & Diff Loop
 

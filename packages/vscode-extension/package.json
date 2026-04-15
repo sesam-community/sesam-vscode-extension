@@ -58,6 +58,10 @@
           {
             "name": "cli",
             "description": "Get guidance on sesam-py CLI commands"
+          },
+          {
+            "name": "fix",
+            "description": "Fix validation errors in Sesam config files and apply changes to disk"
           }
         ]
       }
@@ -254,6 +258,11 @@
       {
         "command": "dtl.renamePipe",
         "title": "Sesam: Rename Config File"
+      },
+      {
+        "command": "sesam.fixWithCopilot",
+        "title": "Sesam: Fix with Copilot",
+        "icon": "$(sparkle)"
       }
     ],
     "menus": {
@@ -282,6 +291,11 @@
           "command": "sesam.download",
           "when": "workspaceFolderCount > 0 && !sesam.nodeProvisioning",
           "group": "navigation@4"
+        },
+        {
+          "command": "sesam.fixWithCopilot",
+          "when": "resourceLangId == json || resourceLangId == sesam-config",
+          "group": "navigation@5"
         }
       ],
       "explorer/context": [
