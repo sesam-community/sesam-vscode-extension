@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] — Planned: Phase 4 — AI & Visual Polish
 
+This release is about understanding your pipes at a glance and accelerating connector work.
+The interactive pipe graph lets you explore the full data-flow canvas without leaving the editor,
+while the connector dev tools close the feedback loop when building custom microservice sources.
+
 ### Added
 
 - **F07/F15**: Interactive Pipe Graph — canvas-based webview showing the full pipe DAG with
@@ -32,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0] — Planned: Phase 3 Completion — Node Diagnostics
 
+With the node already connected since v0.1.0, this release surfaces what the node actually sees.
+Entity output and runtime errors appear as inline editor decorations so you never have to
+cross-reference the Management Studio logs manually again.
+
 ### Added
 
 - **F10**: Inline Output & Diagnostics from Node — live entity output and node-reported errors
@@ -40,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [0.2.0] — Planned: Phase 2 — Testing & Diff Loop
+
+This release closes the edit–verify loop. You can run your Sesam pipe tests from the VS Code
+Test Explorer and immediately see which assertions fail, then diff your local configs against
+what is live on the node before deciding what to push.
 
 ### Added
 
@@ -52,8 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] — 2026-04-15
 
-Initial release. Covers all Phase 1 MVP features and selected Phase 3/4 features that were
-ready ahead of schedule.
+The foundation release. The goal was simple: open VS Code, open a pipe, and never touch a
+terminal again. All sesam-py operations are available from the Command Palette, credentials
+are kept secure in the OS keyring, and the editor understands DTL deeply enough to catch
+mistakes as you type. As a bonus, node-connected live preview, the `@sesam` Copilot agent,
+and the full pipe graph sidebar shipped ahead of schedule alongside the core MVP.
 
 ### Added
 
