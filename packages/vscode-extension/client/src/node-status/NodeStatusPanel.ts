@@ -18,9 +18,12 @@ import * as vscode from "vscode";
 
 import { resolveCredentials } from "../credential-resolver";
 import { fetchNodeStatusHint } from "../portal-client";
+import { extractSubscriptionId } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
 import { SesamRunner } from "../sesam-runner";
 import { trackRequest } from "../network-status";
+import { getActiveProfileName, resolvePortalUrl } from "../profile-manager";
+import { DEFAULT_PORTAL_URL } from "../constants";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,7 +32,7 @@ import { trackRequest } from "../network-status";
 type MessageFromWebview =
   | { type: "refresh" }
   | { type: "openLocalFile"; pipeId: string }
-  | { type: "openInManagementStudio"; pipeId: string; nodeUrl: string }
+  | { type: "openInManagementStudio"; pipeId: string; portalUrl: string; subId: string }
   | { type: "ready" };
 
 // ---------------------------------------------------------------------------
@@ -126,8 +129,15 @@ export class NodeStatusPanel {
     }
 
     if (message.type === "openInManagementStudio") {
-      const base = message.nodeUrl.replace(/\/+$/, "").replace(/\/api$/i, "");
-      const url = `${base}/gui/pipes/${encodeURIComponent(message.pipeId)}`;
+      if (!message.subId) {
+        vscode.window.showWarningMessage(
+          "Sesam: Cannot determine subscription ID from the JWT — cannot open Management Studio link.",
+        );
+        return;
+      }
+
+      const base = message.portalUrl.replace(/\/+$/, "");
+      const url = `${base}/subscription/${encodeURIComponent(message.subId)}/pipes/pipe/${encodeURIComponent(message.pipeId)}/edit`;
       await vscode.env.openExternal(vscode.Uri.parse(url));
       return;
     }
@@ -159,10 +169,15 @@ export class NodeStatusPanel {
       });
       done(true);
 
+      const subId = extractSubscriptionId(creds.jwt) ?? "";
+      const portalUrl = resolvePortalUrl(getActiveProfileName());
+
       this._panel.webview.postMessage({
         type: "data",
         statuses,
         nodeUrl: creds.nodeUrl,
+        subId,
+        portalUrl,
         refreshedAt: new Date().toLocaleTimeString(),
       });
     } catch (err) {
@@ -537,6 +552,8 @@ export class NodeStatusPanel {
   let sortAsc    = true;
   let stateFilter = 'all';
   let currentNodeUrl = '';
+  let currentSubId   = '';
+  let currentPortalUrl = ${JSON.stringify(DEFAULT_PORTAL_URL)};
 
   // ── VS Code messaging ──────────────────────────────────────────────────
   function sendRefresh() {
@@ -562,7 +579,9 @@ export class NodeStatusPanel {
 
     if (msg.type === 'data') {
       allStatuses = msg.statuses;
-      currentNodeUrl = msg.nodeUrl;
+      currentNodeUrl   = msg.nodeUrl;
+      currentSubId     = msg.subId   || '';
+      currentPortalUrl = msg.portalUrl || ${JSON.stringify(DEFAULT_PORTAL_URL)};
       document.getElementById('nodeUrl').textContent = msg.nodeUrl;
       document.getElementById('refreshedAt').textContent = 'Updated ' + msg.refreshedAt;
       document.getElementById('refreshBtn').disabled = false;
@@ -695,7 +714,7 @@ export class NodeStatusPanel {
     const pipeId = el.dataset.pipeId;
     const action = el.dataset.action;
     if (action === 'open-local')  vscode.postMessage({ type: 'openLocalFile', pipeId });
-    if (action === 'open-studio') vscode.postMessage({ type: 'openInManagementStudio', pipeId, nodeUrl: currentNodeUrl });
+    if (action === 'open-studio') vscode.postMessage({ type: 'openInManagementStudio', pipeId, portalUrl: currentPortalUrl, subId: currentSubId });
   });
 
   // ── Helpers ────────────────────────────────────────────────────────────

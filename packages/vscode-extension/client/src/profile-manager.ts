@@ -15,10 +15,13 @@
 import * as vscode from "vscode";
 
 import { deleteToken, listStoredProfileNames, storeToken } from "./credential-manager";
+import { DEFAULT_PORTAL_URL } from "./constants";
 import { getSesamChannel } from "./sesam-channel";
 
 export interface ProfileMeta {
   name: string;
+  /** Base URL of the Sesam Management Portal (default: https://portal.sesam.io). */
+  portalUrl?: string;
   nodeUrl: string;
 }
 
@@ -102,6 +105,12 @@ export const resolveNodeUrl = (profileName: string): string => {
   return vscode.workspace.getConfiguration("sesam").get<string>("nodeUrl", "").trim();
 };
 
+/** Returns the Management Portal base URL for the given profile (defaults to portal.sesam.io). */
+export const resolvePortalUrl = (profileName: string): string => {
+  const meta = getStoredProfiles().find((p) => p.name === profileName);
+  return meta?.portalUrl?.trim() || DEFAULT_PORTAL_URL;
+};
+
 // ---------------------------------------------------------------------------
 // Status bar
 // ---------------------------------------------------------------------------
@@ -158,7 +167,7 @@ export const runSwitchProfile = async (): Promise<void> => {
 
 export const runAddProfile = async (): Promise<void> => {
   const name = await vscode.window.showInputBox({
-    title: "Add Sesam Profile — Step 1 of 3",
+    title: "Add Sesam Profile — Step 1 of 4",
     prompt: "Profile name (e.g. dev, staging, prod)",
     placeHolder: "default",
     value: "default",
@@ -170,8 +179,22 @@ export const runAddProfile = async (): Promise<void> => {
     return;
   }
 
+  const portalUrl = await vscode.window.showInputBox({
+    title: "Add Sesam Profile — Step 2 of 4",
+    prompt: "Management Studio URL (press Enter to use the default)",
+    placeHolder: DEFAULT_PORTAL_URL,
+    value: DEFAULT_PORTAL_URL,
+    ignoreFocusOut: true,
+    validateInput: (v) =>
+      v.trim().startsWith("http") ? undefined : "Must be a valid URL starting with http(s)://",
+  });
+
+  if (portalUrl === undefined) {
+    return;
+  }
+
   const nodeUrl = await vscode.window.showInputBox({
-    title: "Add Sesam Profile — Step 2 of 3",
+    title: "Add Sesam Profile — Step 3 of 4",
     prompt: "Sesam node URL",
     placeHolder: "https://datahub-xxxxxxxx.sesam.cloud",
     ignoreFocusOut: true,
@@ -183,7 +206,7 @@ export const runAddProfile = async (): Promise<void> => {
   }
 
   const jwt = await vscode.window.showInputBox({
-    title: "Add Sesam Profile — Step 3 of 3",
+    title: "Add Sesam Profile — Step 4 of 4",
     prompt: "Paste your JWT token (obtained from the Sesam portal)",
     placeHolder: "eyJ…",
     password: true,
@@ -195,7 +218,12 @@ export const runAddProfile = async (): Promise<void> => {
     return;
   }
 
-  await upsertProfile({ name: name.trim(), nodeUrl: nodeUrl.trim() });
+  const trimmedPortalUrl = portalUrl.trim();
+  await upsertProfile({
+    name: name.trim(),
+    portalUrl: trimmedPortalUrl === DEFAULT_PORTAL_URL ? undefined : trimmedPortalUrl,
+    nodeUrl: nodeUrl.trim(),
+  });
   await storeToken(name.trim(), jwt.trim());
   await setActiveProfileName(name.trim());
   _refreshStatusBar();
@@ -269,8 +297,9 @@ export const runListProfiles = (): void => {
       const hasToken = storedNames.includes(name);
       const active = name === activeProfile ? " [active]" : "";
 
+      const portalUrl = meta?.portalUrl ?? DEFAULT_PORTAL_URL;
       channel.appendLine(
-        `  ${name}${active}: ${nodeUrl}  JWT: ${hasToken ? "stored" : "not stored"}`,
+        `  ${name}${active}: ${nodeUrl}  portal: ${portalUrl}  JWT: ${hasToken ? "stored" : "not stored"}`,
       );
     }
   }
