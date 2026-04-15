@@ -591,9 +591,9 @@ export class NodeStatusPanel {
       document.getElementById('refreshedAt').textContent = 'Updated ' + msg.refreshedAt;
       document.getElementById('refreshBtn').disabled = false;
       if (msg.filterPipeId) {
-        const box = document.getElementById('searchBox');
-        if (!box.value) box.value = '"' + msg.filterPipeId + '"';
-        document.getElementById('pill-all').classList.remove('active');
+        document.getElementById('searchBox').value = '"' + msg.filterPipeId + '"';
+        document.querySelectorAll('.filter-pills button').forEach(b => b.classList.remove('active'));
+        document.getElementById('pill-all').classList.add('active');
         stateFilter = 'all';
       }
       renderSummary();
