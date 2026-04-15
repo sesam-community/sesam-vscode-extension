@@ -17,6 +17,7 @@ import * as vscode from "vscode";
 
 import { getSesamChannel } from "./sesam-channel";
 import { trackRequest } from "./network-status";
+import { DEFAULT_PORTAL_URL } from "./constants";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,7 +111,7 @@ export const clearWakeUpSent = (subId: string): void => {
  */
 const triggerNodeWakeUp = (jwt: string, subId: string): Promise<void> =>
   new Promise((resolve) => {
-    const analyticsUrl = "https://portal.sesam.io/api/analytics";
+    const analyticsUrl = `${DEFAULT_PORTAL_URL}/api/analytics`;
     const body = JSON.stringify({ subscription_id: subId, action: "page_view" });
     const startMs = Date.now();
     const done = trackRequest("POST", "portal/analytics");
@@ -164,7 +165,7 @@ const triggerNodeWakeUp = (jwt: string, subId: string): Promise<void> =>
 const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<SubscriptionStatus | null> =>
   new Promise((resolve) => {
     const startMs = Date.now();
-    const url = `https://portal.sesam.io/api/subscriptions/${encodeURIComponent(subId)}`;
+    const url = `${DEFAULT_PORTAL_URL}/api/subscriptions/${encodeURIComponent(subId)}`;
     const done = trackRequest("GET", "portal/subscriptions");
 
     const req = https.request(

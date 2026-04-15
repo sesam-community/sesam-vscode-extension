@@ -137,6 +137,30 @@ export interface ValidationResult {
 }
 
 // ---------------------------------------------------------------------------
+// Single-config upload / download
+// ---------------------------------------------------------------------------
+
+export interface SingleUploadResult {
+  success: boolean;
+  configId: string;
+  configType: "pipe" | "system";
+  message?: string;
+}
+
+export interface DownloadSingleOptions {
+  /** Directory to write the downloaded config into (`pipes/` or `systems/` is appended). */
+  outDir: string;
+  /** Optional formatter applied to the config before writing to disk. */
+  formatter?: (config: unknown) => string;
+}
+
+export interface SingleDownloadResult {
+  configId: string;
+  configType: "pipe" | "system";
+  filePath: string;
+}
+
+// ---------------------------------------------------------------------------
 // Test management (F05)
 // ---------------------------------------------------------------------------
 

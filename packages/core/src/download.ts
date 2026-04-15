@@ -12,7 +12,13 @@ import * as path from "node:path";
 
 import { NodeClient } from "./node-client.js";
 
-import type { NodeCredentials, DownloadOptions, DownloadResult } from "./types.js";
+import type {
+  DownloadOptions,
+  DownloadSingleOptions,
+  NodeCredentials,
+  SingleDownloadResult,
+  DownloadResult,
+} from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -70,4 +76,50 @@ export async function downloadConfig(
     pipesWritten: pipesWithConfig.length,
     systemsWritten: systemsWithConfig.length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Single-config download
+// ---------------------------------------------------------------------------
+
+/**
+ * Download a single pipe or system config from the node and write it to disk.
+ *
+ * The file is written to `opts.outDir/pipes/<id>.conf.json` (for pipes) or
+ * `opts.outDir/systems/<id>.conf.json` (for systems).
+ *
+ * @param creds       Node URL + JWT credentials.
+ * @param configId    The `_id` of the pipe or system to download.
+ * @param configType  Whether `configId` refers to a `"pipe"` or `"system"`.
+ * @param opts        Download options — must include `outDir`.
+ */
+export async function downloadSingleConfig(
+  creds: NodeCredentials,
+  configId: string,
+  configType: "pipe" | "system",
+  opts: DownloadSingleOptions,
+): Promise<SingleDownloadResult> {
+  const client = new NodeClient(creds);
+  const serialize = (config: unknown): string =>
+    opts.formatter ? opts.formatter(config) : JSON.stringify(config, null, 2);
+
+  if (configType === "pipe") {
+    const pipe = await client.getPipe(configId);
+    const userConfig =
+      (pipe.config?.["original"] as Record<string, unknown> | undefined) ?? pipe.config;
+    const dir = path.join(opts.outDir, "pipes");
+    await fs.mkdir(dir, { recursive: true });
+    const filePath = path.join(dir, `${configId}.conf.json`);
+    await fs.writeFile(filePath, serialize(userConfig), "utf-8");
+    return { configId, configType: "pipe", filePath };
+  }
+
+  const system = await client.getSystem(configId);
+  const userConfig =
+    (system.config?.["original"] as Record<string, unknown> | undefined) ?? system.config;
+  const dir = path.join(opts.outDir, "systems");
+  await fs.mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, `${configId}.conf.json`);
+  await fs.writeFile(filePath, serialize(userConfig), "utf-8");
+  return { configId, configType: "system", filePath };
 }
