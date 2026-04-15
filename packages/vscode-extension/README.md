@@ -2,7 +2,7 @@
 
 ## Table of Contents
 
-## Features
+### Features
 
 - [Syntax Highlighting](#syntax-highlighting)
 - [Auto-Completion](#auto-completion)
