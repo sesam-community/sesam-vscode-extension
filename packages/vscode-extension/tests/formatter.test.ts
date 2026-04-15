@@ -206,14 +206,14 @@ describe("reorderConfigKeys", () => {
     expect(keys[2]).toBe("source");
   });
 
-  it("orders pipe keys: _id, type, source, transform, sink, pump", () => {
+  it("orders pipe keys: _id, type, source, sink, transform, pump", () => {
     const obj = { pump: {}, sink: {}, transform: {}, source: {}, type: "pipe", _id: "x" };
     const keys = Object.keys(reorderConfigKeys(obj));
     expect(keys.indexOf("_id")).toBeLessThan(keys.indexOf("type"));
     expect(keys.indexOf("type")).toBeLessThan(keys.indexOf("source"));
-    expect(keys.indexOf("source")).toBeLessThan(keys.indexOf("transform"));
-    expect(keys.indexOf("transform")).toBeLessThan(keys.indexOf("sink"));
-    expect(keys.indexOf("sink")).toBeLessThan(keys.indexOf("pump"));
+    expect(keys.indexOf("source")).toBeLessThan(keys.indexOf("sink"));
+    expect(keys.indexOf("sink")).toBeLessThan(keys.indexOf("transform"));
+    expect(keys.indexOf("transform")).toBeLessThan(keys.indexOf("pump"));
   });
 
   it("orders system keys: _id, type, name, description", () => {
@@ -234,10 +234,10 @@ describe("reorderConfigKeys", () => {
     expect(keys.indexOf("alpha")).toBeLessThan(keys.indexOf("zebra"));
   });
 
-  it("returns obj unchanged for unknown type", () => {
+  it("sorts unknown-type objects alphabetically with internal keys last", () => {
     const obj = { z: 1, a: 2 };
     const result = reorderConfigKeys(obj);
-    expect(Object.keys(result)).toEqual(["z", "a"]);
+    expect(Object.keys(result)).toEqual(["a", "z"]);
   });
 
   it("does not recursively reorder nested objects", () => {

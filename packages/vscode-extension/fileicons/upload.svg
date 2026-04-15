@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- arrow up -->
+  <path fill="#dcdcaa" d="M8 2l5 5H9v5H7V7H3z"/>
+  <!-- base line -->
+  <rect fill="#dcdcaa" x="2" y="13" width="12" height="1.5" rx="0.75"/>
+</svg>

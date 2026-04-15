@@ -168,7 +168,7 @@ ${DTL_REFERENCE}
 // Intent detection
 // ---------------------------------------------------------------------------
 
-type Intent = "generate" | "explain" | "test" | "run-tests" | "cli" | "default";
+type Intent = "generate" | "explain" | "test" | "run-tests" | "cli" | "fix" | "default";
 
 const detectIntent = (prompt: string, command: string | undefined): Intent => {
   if (command === "generate") {
@@ -191,6 +191,10 @@ const detectIntent = (prompt: string, command: string | undefined): Intent => {
 
   if (command === "cli") {
     return "cli";
+  }
+
+  if (command === "fix") {
+    return "fix";
   }
 
   const lower = prompt.toLowerCase();
@@ -471,8 +475,94 @@ const handleCliGuidance = async (
   return {};
 };
 
+const FIX_SYSTEM_PROMPT = `
+You are an expert in Sesam pipe and system config files (JSON).
+The user will provide one or more config files with validation errors.
+For each file, output ONLY a fenced JSON code block with the filename as the info string, containing the complete corrected file. No prose before the blocks.
+The output will be auto-formatted, so do not worry about indentation or key order.
+Format:
+\`\`\`json filename=<relative-path>
+{ corrected content }
+\`\`\`
+`.trim();
+
+const handleFix = async (
+  request: vscode.ChatRequest,
+  stream: vscode.ChatResponseStream,
+  token: vscode.CancellationToken,
+): Promise<vscode.ChatResult> => {
+  stream.progress("Analysing and fixing validation errors…");
+
+  const messages = [
+    vscode.LanguageModelChatMessage.User(FIX_SYSTEM_PROMPT),
+    vscode.LanguageModelChatMessage.User(request.prompt),
+  ];
+
+  const response = await request.model.sendRequest(messages, {}, token);
+  let full = "";
+
+  for await (const chunk of response.text) {
+    if (token.isCancellationRequested) {
+      break;
+    }
+
+    full += chunk;
+    stream.markdown(chunk);
+  }
+
+  // Extract and apply each fenced block: ```json filename=<path>\n<content>\n```
+  const blockRe = /```(?:json)?\s+filename=([^\n]+)\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  const applied: string[] = [];
+
+  while ((match = blockRe.exec(full)) !== null) {
+    const relPath = match[1].trim();
+    const content = match[2].trim();
+    const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+
+    if (!wsFolder) {
+      continue;
+    }
+
+    const fileUri = vscode.Uri.joinPath(wsFolder, relPath);
+
+    await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content + "\n", "utf-8"));
+
+    // Format via the LSP formatter (same path as on-save formatting)
+    try {
+      const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
+        "vscode.executeFormatDocumentProvider",
+        fileUri,
+        { tabSize: 2, insertSpaces: true },
+      );
+
+      if (edits && edits.length > 0) {
+        const wsEdit = new vscode.WorkspaceEdit();
+        wsEdit.set(fileUri, edits);
+        await vscode.workspace.applyEdit(wsEdit);
+        const doc = await vscode.workspace.openTextDocument(fileUri);
+        await doc.save();
+      }
+    } catch {
+      // LSP formatter unavailable — file already written correctly
+    }
+
+    stream.reference(fileUri);
+    applied.push(relPath);
+  }
+
+  if (applied.length > 0) {
+    stream.markdown(
+      `\n\n---\n✓ Applied fixes to ${applied.length} file${applied.length === 1 ? "" : "s"}: ${applied.map((p) => `\`${p}\``).join(", ")}`,
+    );
+  }
+
+  return {};
+};
+
 const handleDefaultQA = async (
   request: vscode.ChatRequest,
+  context: vscode.ChatContext,
   stream: vscode.ChatResponseStream,
   token: vscode.CancellationToken,
 ): Promise<vscode.ChatResult> => {
@@ -486,8 +576,29 @@ const handleDefaultQA = async (
     userMessage = `${request.prompt}\n\nConfig context:\n\`\`\`json\n${contextContent}\n\`\`\``;
   }
 
+  // Build message history from prior turns so the model has full context
+  const historyMessages: vscode.LanguageModelChatMessage[] = [];
+
+  for (const turn of context.history) {
+    if (turn instanceof vscode.ChatRequestTurn) {
+      historyMessages.push(vscode.LanguageModelChatMessage.User(turn.prompt));
+    } else if (turn instanceof vscode.ChatResponseTurn) {
+      const text = turn.response
+        .filter(
+          (p): p is vscode.ChatResponseMarkdownPart => p instanceof vscode.ChatResponseMarkdownPart,
+        )
+        .map((p) => p.value.value)
+        .join("");
+
+      if (text) {
+        historyMessages.push(vscode.LanguageModelChatMessage.Assistant(text));
+      }
+    }
+  }
+
   const messages = [
     vscode.LanguageModelChatMessage.User(DEFAULT_SYSTEM_PROMPT),
+    ...historyMessages,
     vscode.LanguageModelChatMessage.User(userMessage),
   ];
 
@@ -516,7 +627,7 @@ const makeHandler =
   (client: LanguageClient) =>
   async (
     request: vscode.ChatRequest,
-    _context: vscode.ChatContext,
+    context: vscode.ChatContext,
     stream: vscode.ChatResponseStream,
     token: vscode.CancellationToken,
   ): Promise<vscode.ChatResult> => {
@@ -539,8 +650,10 @@ const makeHandler =
         return {};
       case "cli":
         return handleCliGuidance(request, stream, token);
+      case "fix":
+        return handleFix(request, stream, token);
       default:
-        return handleDefaultQA(request, stream, token);
+        return handleDefaultQA(request, context, stream, token);
     }
   };
 

@@ -41,13 +41,164 @@ import {
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
 import { registerSesamChatParticipant } from "./sesam-chat-participant";
-import { disposeSesamChannel } from "./sesam-channel";
+import { resolveCredentials } from "./credential-resolver";
+import {
+  fetchNodeStatusHint,
+  startProvisioningPoller,
+  extractSubscriptionId,
+  clearWakeUpSent,
+} from "./portal-client";
+import { disposeSesamChannel, getSesamChannel, logNodeRequest } from "./sesam-channel";
+import { SesamRunner } from "./sesam-runner";
+import { createNetworkStatusBar, trackRequest } from "./network-status";
+import { ValidationFailedError } from "@sesam/core";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
 
 let client: LanguageClient;
 
+// ---------------------------------------------------------------------------
+// Node provisioning state
+// ---------------------------------------------------------------------------
+
+/** Active provisioning poller — at most one at a time. */
+let _provisioningPoller: { stop: () => void } | null = null;
+
+/**
+ * Last text editor that held a sesam-config or JSON pipe/system file.
+ * Updated whenever focus moves to a qualifying editor so commands like
+ * `sesam.runPipe` still work when focus is in the terminal, output panel,
+ * or the pipe preview webview.
+ */
+let _lastSesamEditor: vscode.TextEditor | undefined;
+
+/**
+ * Start polling the portal for the given credentials if the node is not ready.
+ * Sets the `sesam.nodeProvisioning` context key so menus can disable themselves.
+ * Calls `onReady` (and notifies PreviewPanel) when the node becomes available.
+ */
+const startPollerIfNeeded = (nodeUrl: string, jwt: string): void => {
+  const subId = extractSubscriptionId(jwt);
+
+  if (!subId) {
+    return;
+  }
+
+  if (_provisioningPoller) {
+    return; // already polling
+  }
+
+  void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", true);
+  PreviewPanel.currentPanel?.setNodeProvisioning(true);
+
+  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+  statusBarItem.text = "$(sync~spin) Sesam: node provisioning…";
+  statusBarItem.tooltip = "Waiting for Sesam node to become available";
+  statusBarItem.show();
+
+  _provisioningPoller = startProvisioningPoller(
+    jwt,
+    subId,
+    nodeUrl,
+    (hint) => {
+      statusBarItem.text = `$(sync~spin) Sesam: ${hint}`;
+    },
+    () => {
+      _provisioningPoller = null;
+      clearWakeUpSent(subId);
+      statusBarItem.dispose();
+      void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
+      PreviewPanel.currentPanel?.setNodeProvisioning(false);
+      void vscode.window.showInformationMessage(
+        "Sesam: Node is ready. You can now run pipes and use live preview.",
+      );
+    },
+  );
+};
+
+/**
+ * If the node is hibernated/provisioning, start the wake-up + polling flow and
+ * wait until the node is ready before resolving.  Returns `true` when the node
+ * is (or became) ready, `false` if the user cancelled.
+ */
+const ensureNodeReady = async (nodeUrl: string, jwt: string): Promise<boolean> => {
+  const hint = await fetchNodeStatusHint(nodeUrl, jwt);
+
+  if (!hint) {
+    return true; // node already reachable
+  }
+
+  // Node is hibernated / provisioning — inform the user and wait.
+  const answer = await vscode.window.showWarningMessage(
+    `Sesam: Node is not ready — ${hint}. Wake it up and wait?`,
+    { modal: true },
+    "Wake up & wait",
+  );
+
+  if (answer !== "Wake up & wait") {
+    return false;
+  }
+
+  return new Promise<boolean>((resolve) => {
+    const subId = extractSubscriptionId(jwt);
+
+    if (!subId) {
+      resolve(false);
+      return;
+    }
+
+    if (_provisioningPoller) {
+      // Already polling from another trigger — just wait for it to call onReady.
+      // We piggyback by polling _provisioningPoller until it clears.
+      const check = setInterval(() => {
+        if (!_provisioningPoller) {
+          clearInterval(check);
+          resolve(true);
+        }
+      }, 3_000);
+
+      return;
+    }
+
+    void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", true);
+    PreviewPanel.currentPanel?.setNodeProvisioning(true);
+
+    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+    statusBarItem.text = "$(sync~spin) Sesam: node provisioning…";
+    statusBarItem.tooltip = "Waiting for Sesam node to become available";
+    statusBarItem.show();
+
+    _provisioningPoller = startProvisioningPoller(
+      jwt,
+      subId,
+      nodeUrl,
+      (statusHint) => {
+        statusBarItem.text = `$(sync~spin) Sesam: ${statusHint}`;
+      },
+      () => {
+        _provisioningPoller = null;
+        clearWakeUpSent(subId);
+        statusBarItem.dispose();
+        void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
+        PreviewPanel.currentPanel?.setNodeProvisioning(false);
+        resolve(true);
+      },
+    );
+  });
+};
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // Wire the provisioning poller into PreviewPanel live eval failures
+  PreviewPanel.onProvisioningNeeded = startPollerIfNeeded;
+
+  // ── Network Status Bar (F23) ──────────────────────────────────────────────
+  createNetworkStatusBar(context);
+
+  // ── Sesam Output Channel ──────────────────────────────────────────────────
+  // Write an initial line so the channel appears in the Output dropdown immediately.
+  context.subscriptions.push({ dispose: disposeSesamChannel });
+  getSesamChannel().appendLine("Sesam extension activated.");
+
   // ── Credential & Profile Managers (F03) ──────────────────────────────────
   initCredentialManager(context);
   initProfileManager(context);
@@ -152,6 +303,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Sync active config to all DAG views
   const syncActivePipe = (editor: vscode.TextEditor | undefined): void => {
+    if (editor && getActivePipeId(editor) !== undefined) {
+      _lastSesamEditor = editor;
+    }
+
     const id = getActivePipeId(editor);
     lineageProvider.setCurrentPipe(id);
     dependentsProvider.setCurrentPipe(id);
@@ -260,6 +415,93 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.setStatusBarMessage("Sesam: DAG refreshed", 2000);
     }),
 
+    vscode.commands.registerCommand("sesam.pipeRunningIndicator", () => {
+      // No-op — this command exists only to show the spinning indicator
+      // in the editor title while a pipe run is in progress.
+    }),
+
+    vscode.commands.registerCommand("sesam.runPipe", async () => {
+      const editor =
+        vscode.window.activeTextEditor ??
+        _lastSesamEditor ??
+        vscode.window.visibleTextEditors.find((e) => getActivePipeId(e) !== undefined);
+      const pipeId = getActivePipeId(editor);
+
+      if (!pipeId) {
+        vscode.window.showWarningMessage("Sesam: No _id found in the active document.");
+        return;
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage(
+          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        );
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Sesam: Running pipe '${pipeId}'…`,
+          cancellable: false,
+        },
+        async () => {
+          void vscode.commands.executeCommand("setContext", "sesam.pipeRunning", true);
+
+          try {
+            const runner = new SesamRunner();
+            const done = trackRequest("POST", `run-pipe/${pipeId}`);
+            let runResult: Awaited<ReturnType<typeof runner.runPipe>>;
+
+            try {
+              runResult = await runner.runPipe(
+                { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+                pipeId,
+              );
+              done(runResult.success);
+            } catch (runErr) {
+              done(false);
+              throw runErr;
+            }
+
+            const result = runResult;
+
+            if (result.success) {
+              vscode.window.showInformationMessage(`Sesam: Pipe '${pipeId}' started successfully.`);
+            } else {
+              const hint = await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
+              const detail = result.message ?? "unknown error";
+              vscode.window.showErrorMessage(
+                `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
+              );
+
+              if (hint) {
+                startPollerIfNeeded(creds.nodeUrl, creds.jwt);
+              }
+            }
+          } catch (err) {
+            const isAuth =
+              typeof err === "object" &&
+              err !== null &&
+              (err as Record<string, unknown>)["kind"] === "auth";
+            const detail = err instanceof Error ? err.message : String(err);
+            const hint = isAuth ? null : await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
+            vscode.window.showErrorMessage(
+              `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
+            );
+
+            if (hint) {
+              startPollerIfNeeded(creds.nodeUrl, creds.jwt);
+            }
+          } finally {
+            void vscode.commands.executeCommand("setContext", "sesam.pipeRunning", false);
+          }
+        },
+      );
+    }),
+
     vscode.commands.registerCommand("dtl.previewPipe", () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
@@ -267,6 +509,249 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       PreviewPanel.createOrShow(context.extensionUri, editor.document, context);
+    }),
+
+    // ── Upload / Download ─────────────────────────────────────────────────
+    vscode.commands.registerCommand("sesam.upload", async () => {
+      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+      if (!workspaceDir) {
+        vscode.window.showWarningMessage("Sesam: No workspace folder open.");
+        return;
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage(
+          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        );
+        return;
+      }
+
+      const uploadReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+      if (!uploadReady) {
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Sesam: Uploading…",
+          cancellable: false,
+        },
+        async () => {
+          const done = trackRequest("PUT", "upload/config");
+
+          try {
+            const runner = new SesamRunner();
+            const result = await runner.upload(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+              workspaceDir,
+            );
+            done(result.success);
+
+            if (result.success) {
+              vscode.window.showInformationMessage(
+                `Sesam: Upload complete — ${result.pipesUploaded} pipes, ${result.systemsUploaded} systems.`,
+              );
+            } else {
+              vscode.window.showErrorMessage(
+                `Sesam: Upload failed: ${result.message ?? "unknown error"}`,
+              );
+            }
+          } catch (err) {
+            done(false);
+
+            const isValidationError =
+              err instanceof ValidationFailedError ||
+              (typeof err === "object" &&
+                err !== null &&
+                (err as Record<string, unknown>)["kind"] === "validation" &&
+                Array.isArray((err as Record<string, unknown>)["errors"]));
+
+            if (isValidationError) {
+              const validationErr = err as ValidationFailedError;
+              const ch = getSesamChannel();
+              ch.clear();
+
+              const total = validationErr.errors.length;
+              const header = `Upload blocked — ${total} validation error${total === 1 ? "" : "s"} found`;
+              const rule = "─".repeat(header.length);
+              ch.appendLine(rule);
+              ch.appendLine(header);
+              ch.appendLine(rule);
+              ch.appendLine("");
+
+              // Group errors by file for readability
+              const byFile = new Map<string, typeof validationErr.errors>();
+
+              for (const e of validationErr.errors) {
+                const existing = byFile.get(e.file) ?? [];
+                existing.push(e);
+                byFile.set(e.file, existing);
+              }
+
+              for (const [absFile, errs] of byFile) {
+                const rel = workspaceDir ? absFile.replace(workspaceDir + "/", "") : absFile;
+                ch.appendLine(`  ${rel}`);
+
+                for (const e of errs) {
+                  const fileUri = vscode.Uri.file(absFile);
+                  const lineNum = e.line ?? 1;
+                  const colNum = e.column ?? 1;
+                  const link = `${fileUri.toString()}:${lineNum}:${colNum}`;
+                  const locLabel =
+                    e.line != null
+                      ? ` line ${e.line}${e.column != null ? `:${e.column}` : ""}`
+                      : "";
+                  ch.appendLine(`    ✗${locLabel}  ${e.message}`);
+                  ch.appendLine(`      ${link}`);
+                }
+
+                ch.appendLine("");
+              }
+
+              ch.appendLine(
+                `Fix the ${total} error${total === 1 ? "" : "s"} above, then upload again. Use "Fix with Copilot" in the notification to get AI assistance.`,
+              );
+              ch.show(false);
+
+              const action = await vscode.window.showErrorMessage(
+                `Sesam: Upload blocked — ${total} validation error${total === 1 ? "" : "s"}. See the Sesam output panel for details.`,
+                "Fix with Copilot",
+              );
+
+              if (action === "Fix with Copilot") {
+                // Read the contents of each erroring file so the agent has full context
+                const uniqueFiles = [...new Set(validationErr.errors.map((e) => e.file))];
+                const fileSections = await Promise.all(
+                  uniqueFiles.map(async (absFile) => {
+                    const rel = workspaceDir ? absFile.replace(workspaceDir + "/", "") : absFile;
+                    const fileErrors = validationErr.errors
+                      .filter((e) => e.file === absFile)
+                      .map((e) => {
+                        const loc = e.line != null ? ` line ${e.line}` : "";
+                        return `  - ${e.message}${loc}`;
+                      })
+                      .join("\n");
+                    try {
+                      const raw = await vscode.workspace.fs.readFile(vscode.Uri.file(absFile));
+                      const content = Buffer.from(raw).toString("utf-8");
+                      return `### ${rel}\nErrors:\n${fileErrors}\n\nFile content:\n\`\`\`json\n${content}\n\`\`\``;
+                    } catch {
+                      return `### ${rel}\nErrors:\n${fileErrors}\n\n(Could not read file content)`;
+                    }
+                  }),
+                );
+
+                const query = [
+                  "@sesam /fix My Sesam configs failed validation during upload. Here are the files with errors and their current content:",
+                  "",
+                  ...fileSections,
+                ].join("\n");
+
+                void vscode.commands.executeCommand("workbench.action.chat.open", { query });
+              }
+            } else {
+              vscode.window.showErrorMessage(
+                `Sesam: Upload failed: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          }
+        },
+      );
+    }),
+
+    vscode.commands.registerCommand("sesam.download", async () => {
+      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+      if (!workspaceDir) {
+        vscode.window.showWarningMessage("Sesam: No workspace folder open.");
+        return;
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage(
+          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        );
+        return;
+      }
+
+      const downloadReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+      if (!downloadReady) {
+        return;
+      }
+
+      const confirmed = await vscode.window.showWarningMessage(
+        "Sesam: Download will overwrite local pipe and system configs. Continue?",
+        { modal: true },
+        "Download",
+      );
+
+      if (confirmed !== "Download") {
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Sesam: Downloading…",
+          cancellable: false,
+        },
+        async () => {
+          const done = trackRequest("GET", "download/config");
+
+          try {
+            const runner = new SesamRunner();
+            const result = await runner.download(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+              {
+                outDir: workspaceDir,
+                formatter: (config) => formatSesamJson(config, 2, { reorderKeys: true }),
+              },
+            );
+            done(true);
+            vscode.window.showInformationMessage(
+              `Sesam: Download complete — ${result.pipesWritten} pipes, ${result.systemsWritten} systems.`,
+            );
+          } catch (err) {
+            done(false);
+            vscode.window.showErrorMessage(
+              `Sesam: Download failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        },
+      );
+    }),
+
+    vscode.commands.registerCommand("sesam.fixWithCopilot", async () => {
+      const editor = vscode.window.activeTextEditor;
+
+      if (!editor) {
+        vscode.window.showWarningMessage("Sesam: Open a Sesam config file to fix.");
+        return;
+      }
+
+      const absFile = editor.document.uri.fsPath;
+      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const rel = workspaceDir ? absFile.replace(workspaceDir + "/", "") : absFile;
+      const content = editor.document.getText();
+
+      const query = [
+        "@sesam /fix Please fix any validation errors in this Sesam config file:",
+        "",
+        `### ${rel}`,
+        `\`\`\`json`,
+        content,
+        `\`\`\``,
+      ].join("\n");
+
+      void vscode.commands.executeCommand("workbench.action.chat.open", { query });
     }),
 
     // ── F03: Secure credential commands ──────────────────────────────────

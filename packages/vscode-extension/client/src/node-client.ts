@@ -23,7 +23,7 @@ import * as https from "node:https";
 export type Entity = Record<string, unknown>;
 
 export interface NodeRequestLogEntry {
-  method: "GET" | "POST";
+  method: string;
   url: string;
   statusCode: number;
   durationMs: number;

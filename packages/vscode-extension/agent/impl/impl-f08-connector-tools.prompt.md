@@ -20,6 +20,7 @@ Reduces context-switching to the terminal for connector iteration.
 |---|---|
 | `sesam connector_init <type>` | Scaffold connector directory from template |
 | `sesam expand` | Expand Jinja templates in current directory |
+| `sesam convert` | Convert embedded sources in input pipes to `http_endpoint` systems and extract data into files |
 | `connector_cli` package | Python package used inside connector containers |
 
 ---
@@ -56,6 +57,15 @@ Reduces context-switching to the terminal for connector iteration.
 4. Display the received token (masked), expiry, and scopes in an Output Channel.
 5. Offer a "Copy token to clipboard" action.
 6. Additionally, offer `sesam.testApiKey` and `sesam.testTripletex` for the other auth types.
+
+### Phase E: Embedded Source Converter
+
+1. Register command `sesam.convertEmbeddedSources`.
+2. Show a confirmation dialog: this operation modifies local config files irreversibly.
+3. Invoke `sesam convert` via F01/F00 mechanism; stream output to the Sesam Output Channel.
+4. After completion, reveal any modified files via `vscode.window.showTextDocument` for the user to review.
+
+---
 
 ### Phase D: Connector Container Dev Loop
 

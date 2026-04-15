@@ -40,58 +40,63 @@ export const sortObjectKeysRecursively = (obj: unknown): unknown => {
 // Canonical key ordering
 // ---------------------------------------------------------------------------
 
-const PIPE_KEY_ORDER: readonly string[] = [
+// Convention-based sort order matching sesam-py's jsonformat.py _SORT_ORDER.
+// Convention keys appear first (in this exact order), then unknown keys
+// alphabetically, then internal _* keys (except _id) and $audit last.
+const SORT_ORDER: readonly string[] = [
   "_id",
   "type",
+  "name",
+  "description",
+  // pipes
   "source",
-  "transform",
   "sink",
+  "transform",
   "pump",
-  "name",
-  "description",
-  "comment",
   "metadata",
+  // sinks, sources
+  "system",
+  // hops
+  "datasets",
+  "where",
+  "return",
+  "recurse",
+  "max_depth",
+  "exclude_root",
+  "track-dependencies",
+  "trace",
+  // dtl transform
+  "default",
 ];
 
-const SYSTEM_KEY_ORDER: readonly string[] = [
-  "_id",
-  "type",
-  "name",
-  "description",
-  "comment",
-  "metadata",
-];
+const SORT_ORDER_INDEX = new Map(SORT_ORDER.map((key, idx) => [key, idx]));
 
-type ConfigKind = "pipe" | "system" | "unknown";
+const isInternalKey = (key: string): boolean =>
+  key !== "_id" && (key.startsWith("_") || key === "$audit" || key === "$principals-from-user");
 
-const detectKind = (obj: Record<string, unknown>): ConfigKind => {
-  const t = obj["type"];
-
-  if (t === "pipe") {
-    return "pipe";
+const keyWeight = (key: string): string => {
+  if (isInternalKey(key)) {
+    return `2${key}`; // last
   }
 
-  if (typeof t === "string" && t.startsWith("system:")) {
-    return "system";
+  const idx = SORT_ORDER_INDEX.get(key);
+
+  if (idx !== undefined) {
+    return `0${String(idx).padStart(4, "0")}`; // first, in order
   }
 
-  return "unknown";
+  return `1${key}`; // middle, alphabetical
 };
 
 export const reorderConfigKeys = (obj: Record<string, unknown>): Record<string, unknown> => {
-  const kind = detectKind(obj);
-  const order = kind === "pipe" ? PIPE_KEY_ORDER : kind === "system" ? SYSTEM_KEY_ORDER : null;
-
-  if (order === null) {
-    return obj;
-  }
-
-  const allKeys = Object.keys(obj);
-  const canonical = order.filter((k) => allKeys.includes(k));
-  const rest = allKeys.filter((k) => !order.includes(k)).sort();
+  const sorted = Object.keys(obj).sort((a, b) => {
+    const wa = keyWeight(a);
+    const wb = keyWeight(b);
+    return wa < wb ? -1 : wa > wb ? 1 : 0;
+  });
   const reordered: Record<string, unknown> = {};
 
-  for (const k of [...canonical, ...rest]) {
+  for (const k of sorted) {
     reordered[k] = obj[k];
   }
 
@@ -107,7 +112,14 @@ const applyReorder = (value: unknown): unknown => {
     return value.map(applyReorder);
   }
 
-  return reorderConfigKeys(value as Record<string, unknown>);
+  const reordered = reorderConfigKeys(value as Record<string, unknown>);
+  const result: Record<string, unknown> = {};
+
+  for (const k of Object.keys(reordered)) {
+    result[k] = applyReorder(reordered[k]);
+  }
+
+  return result;
 };
 
 export interface FormatOptions {

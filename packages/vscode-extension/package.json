@@ -58,6 +58,10 @@
           {
             "name": "cli",
             "description": "Get guidance on sesam-py CLI commands"
+          },
+          {
+            "name": "fix",
+            "description": "Fix validation errors in Sesam config files and apply changes to disk"
           }
         ]
       }
@@ -183,9 +187,41 @@
         "title": "Sesam: Switch Profile"
       },
       {
+        "command": "sesam.runPipe",
+        "title": "Sesam: Run Pipe",
+        "icon": {
+          "light": "./fileicons/run-pipe.svg",
+          "dark": "./fileicons/run-pipe.svg"
+        }
+      },
+      {
+        "command": "sesam.pipeRunningIndicator",
+        "title": "Sesam: Pipe Running…",
+        "icon": "$(sync~spin)"
+      },
+      {
         "command": "dtl.previewPipe",
         "title": "Sesam: Preview Pipe Output",
-        "icon": "$(play)"
+        "icon": {
+          "light": "./fileicons/preview-pipe.svg",
+          "dark": "./fileicons/preview-pipe.svg"
+        }
+      },
+      {
+        "command": "sesam.upload",
+        "title": "Sesam: Upload to Node",
+        "icon": {
+          "light": "./fileicons/upload.svg",
+          "dark": "./fileicons/upload.svg"
+        }
+      },
+      {
+        "command": "sesam.download",
+        "title": "Sesam: Download from Node",
+        "icon": {
+          "light": "./fileicons/download.svg",
+          "dark": "./fileicons/download.svg"
+        }
       },
       {
         "command": "dtl.openDocs",
@@ -222,14 +258,44 @@
       {
         "command": "dtl.renamePipe",
         "title": "Sesam: Rename Config File"
+      },
+      {
+        "command": "sesam.fixWithCopilot",
+        "title": "Sesam: Fix with Copilot",
+        "icon": "$(sparkle)"
       }
     ],
     "menus": {
       "editor/title": [
         {
+          "command": "sesam.runPipe",
+          "when": "(resourceLangId == json || resourceLangId == sesam-config) && !sesam.nodeProvisioning && !sesam.pipeRunning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "sesam.pipeRunningIndicator",
+          "when": "(resourceLangId == json || resourceLangId == sesam-config) && sesam.pipeRunning",
+          "group": "navigation@1"
+        },
+        {
           "command": "dtl.previewPipe",
           "when": "resourceLangId == json || resourceLangId == sesam-config",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "command": "sesam.upload",
+          "when": "workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@3"
+        },
+        {
+          "command": "sesam.download",
+          "when": "workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@4"
+        },
+        {
+          "command": "sesam.fixWithCopilot",
+          "when": "resourceLangId == json || resourceLangId == sesam-config",
+          "group": "navigation@5"
         }
       ],
       "explorer/context": [
@@ -278,6 +344,18 @@
         {
           "command": "dtl.renamePipe",
           "when": "editorLangId == sesam-config"
+        },
+        {
+          "command": "sesam.runPipe",
+          "when": "editorLangId == sesam-config || editorLangId == json"
+        },
+        {
+          "command": "sesam.upload",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "sesam.download",
+          "when": "workspaceFolderCount > 0"
         }
       ],
       "view/title": [
@@ -285,8 +363,24 @@
           "command": "sesam.clearErrors",
           "when": "view == sesamErrorsList",
           "group": "navigation"
+        },
+        {
+          "command": "sesam.upload",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@10"
+        },
+        {
+          "command": "sesam.download",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@11"
+        },
+        {
+          "command": "dtl.refreshDag",
+          "when": "view == sesamPipeLineage",
+          "group": "navigation@1"
         }
-      ]
+      ],
+      "viewsWelcome": []
     },
     "viewsContainers": {
       "panel": [
@@ -297,6 +391,23 @@
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "sesam.runPipe",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r"
+      },
+      {
+        "command": "sesam.upload",
+        "key": "ctrl+shift+u",
+        "mac": "cmd+shift+u"
+      },
+      {
+        "command": "sesam.download",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d"
+      }
+    ],
     "views": {
       "explorer": [
         {
@@ -382,6 +493,11 @@
           "default": "",
           "scope": "application",
           "markdownDescription": "JWT token for the Sesam node API. **Store this in user settings only — do NOT commit to `.vscode/settings.json`.**"
+        },
+        "sesam.portal.verboseLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log the full portal API response body in the Sesam output channel. Useful for debugging subscription/provisioning status issues."
         }
       }
     }
@@ -398,6 +514,7 @@
     "package": "vsce package"
   },
   "dependencies": {
+    "@sesam/core": "workspace:*",
     "global": "^4.4.0",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",

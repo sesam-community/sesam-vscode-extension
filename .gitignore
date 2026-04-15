@@ -6,3 +6,10 @@ dist/
 packages/vscode-extension/client/src/**/*.js
 packages/vscode-extension/server/src/**/*.js
 packages/vscode-extension/src/**/*.js
+# Sesam credential files — never commit
+.syncconfig
+.authconfig
+# Downloaded sesam workspace configs — for local testing only
+packages/cli/pipes/
+packages/cli/systems/
+packages/cli/node-metadata.conf.json

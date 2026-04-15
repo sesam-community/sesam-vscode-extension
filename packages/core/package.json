@@ -8,10 +8,15 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.config.ts",
     "lint": "eslint src --ext .ts"
   },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
   "devDependencies": {
+    "@types/jszip": "^3.4.1",
+    "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
     "vitest": "^4.1.0"
   }

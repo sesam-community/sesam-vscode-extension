@@ -2,24 +2,27 @@
 
 ## Table of Contents
 
-- [Features](#features)
-  - [Syntax Highlighting](#syntax-highlighting)
-  - [Auto-Completion](#auto-completion)
-  - [Hover Documentation](#hover-documentation)
-  - [Diagnostics (Linting)](#diagnostics-linting)
-  - [Formatter](#formatter)
-  - [Code Snippets](#code-snippets)
-  - [Go to Rule Definition](#go-to-rule-definition)
-  - [Cross-file Navigation](#cross-file-navigation)
-  - [Dataset Alias Support](#dataset-alias-support)
-  - [Pipe Lineage](#pipe-lineage)
-  - [Pipe Dependents](#pipe-dependents)
-  - [System Pipes](#system-pipes)
-  - [Sesam Panel](#sesam-panel)
-  - [Pipe Preview](#pipe-preview)
-  - [New Sesam Config File](#new-sesam-config-file)
-  - [Credential Management](#credential-management)
-  - [Copilot Agent Integration](#copilot-agent-integration)
+## Features
+
+- [Syntax Highlighting](#syntax-highlighting)
+- [Auto-Completion](#auto-completion)
+- [Hover Documentation](#hover-documentation)
+- [Diagnostics (Linting)](#diagnostics-linting)
+- [Formatter](#formatter)
+- [Code Snippets](#code-snippets)
+- [Go to Rule Definition](#go-to-rule-definition)
+- [Cross-file Navigation](#cross-file-navigation)
+- [Dataset Alias Support](#dataset-alias-support)
+- [Pipe Lineage](#pipe-lineage)
+- [Pipe Dependents](#pipe-dependents)
+- [System Pipes](#system-pipes)
+- [Sesam Panel](#sesam-panel)
+- [Pipe Preview](#pipe-preview)
+- [Node Integration — Upload & Download](#node-integration--upload--download)
+- [Node Integration — Run Pipe](#node-integration--run-pipe)
+- [New Sesam Config File](#new-sesam-config-file)
+- [Credential Management](#credential-management)
+- [Copilot Agent Integration](#copilot-agent-integration)
 - [Getting Started](#getting-started)
 - [DTL Primer](#dtl-primer)
 - [Extension Settings](#extension-settings)
@@ -126,7 +129,7 @@ All diagnostics are shown as **squiggly underlines** in the editor, as **file ba
 Format any Sesam config file with **Shift+Alt+F** (or **Format Document** / `Sesam: Format Document`). The formatter:
 
 - Preserves insertion key order by default.
-- **Canonical key reordering** on save: root-level keys are reordered to `_id` → `type` → `source` → `transform` → `sink` → `pump` → … for pipes, and `_id` → `type` → … for systems. Unknown keys are placed last, alphabetically. Controlled by `dtl.format.reorderKeys` (default `true`).
+- **Canonical key reordering** on save: keys are sorted to match the sesam-py convention — `_id → type → name → description → source → sink → transform → pump → metadata → …` (convention keys), then unknown keys alphabetically, then internal `_*` keys last. Applied recursively to all nested objects. Controlled by `dtl.format.reorderKeys` (default `true`).
 - Renders DTL rule arrays compactly (one rule per line) so diff output stays readable.
 - Pretty-prints top-level config objects with standard indentation.
 - Triggers automatically on save for `*.conf.pipe`, `*.conf.system`, and `*.conf.json` files.
@@ -303,6 +306,48 @@ The file is written to the target folder and opened immediately.
 
 ---
 
+### Node Integration — Upload & Download
+
+Upload and download all pipe/system configs directly from VS Code — no terminal required.
+
+#### Upload (`Ctrl+Shift+U`)
+
+1. Validates all local configs **offline first** — upload is blocked if any file has errors.
+2. If validation fails, the **Sesam output channel** opens with a grouped error report including clickable `file:///` links to each problem. A **Fix with Copilot** button in the notification opens `@sesam /fix` in the chat panel, which reads the broken files and applies corrections to disk automatically.
+3. On success, a notification shows the pipe and system counts uploaded.
+
+#### Download (`Ctrl+Shift+D`)
+
+1. Confirms before overwriting local files (modal dialog).
+2. Downloads all pipe and system configs from the node.
+3. Formats and **key-orders** every file to match the sesam-py convention:
+   - `_id → type → name → description → source → sink → transform → pump → metadata → …` (convention keys first)
+   - Unknown keys sorted alphabetically after
+   - Internal `_*` keys (except `_id`) and `$audit` moved last
+   - Applied **recursively** — nested objects like `source` and `transform` are also reordered
+
+Buttons for both commands appear in:
+- **Editor title bar** (when a Sesam config is open)
+- **File Explorer header** (`workbench.explorer.fileView`) — always available, even with no file open
+
+All requests are logged to the **Sesam output channel**.
+
+---
+
+### Node Integration — Run Pipe
+
+Run the currently open pipe on the connected Sesam node.
+
+| Action | How to invoke |
+|---|---|
+| **Run pipe** | `Ctrl+Shift+R` · Editor title bar play button |
+
+- Works even when focus is in the terminal, output panel, or the preview webview — the extension remembers the last active Sesam config editor.
+- The play button is replaced by a spinner while the run is in progress; all other node commands are disabled.
+- On failure, a hint is shown about the node status; if the node is provisioning, the provisioning poller starts automatically.
+
+---
+
 ### Credential Management
 
 The extension stores your Sesam JWT tokens securely in VS Code **SecretStorage** (OS keychain on Linux/macOS/Windows) — tokens are never written to disk or committed to source control.
@@ -354,7 +399,16 @@ fix, and generate DTL pipes with full awareness of Sesam-specific rules.
 - VS Code 1.90 or later
 - The Sesam extension active in your workspace
 
-#### Available Tools
+#### `@sesam` Chat Participant Commands
+
+| Command | Description |
+|---|---|
+| `@sesam /generate <description>` | Generate a new pipe config from a natural-language description |
+| `@sesam /explain` | Explain the active DTL transform or pipe config |
+| `@sesam /test` | Generate test input and expected output entities for the active pipe |
+| `@sesam /fix <errors + file content>` | Fix validation errors and write corrected files to disk automatically |
+| `@sesam /cli <question>` | Get guidance on sesam-py CLI commands |
+| `@sesam <anything>` | General Q&A about Sesam, DTL, and sesam-py (with full conversation history) |
 
 | Tool | Reference name | What it does |
 |---|---|---|
@@ -490,22 +544,30 @@ my-sesam-project/
 
 ### Commands
 
-| Command | Description |
-|---|---|
-| `DTL: Preview Pipe` | Open the preview panel for the active file |
-| `Sesam: Refresh Pipe DAG` | Rescan workspace and refresh Lineage / Dependents / System Pipes sidebars |
-| `DTL: Open Documentation` | Open the Sesam DTL docs in a browser |
-| `DTL: New Sesam Config File` | Create a new pipe or system config file from a template |
-| `Sesam: Format Document` | Format the active Sesam config file |
-| `Sesam: Clear Errors` | Clear all entries from the Sesam panel |
-| `Sesam: Add Profile` | Add a named Sesam profile (node URL + JWT) |
-| `Sesam: Delete Profile` | Remove a profile (JWT + node URL) entirely |
-| `Sesam: Store JWT Token` | Store or update the JWT for a named profile |
-| `Sesam: Delete JWT Token` | Remove only the JWT for a profile, keeping the node URL |
-| `Sesam: Switch Profile` | Switch the active profile (also available via the status bar) |
-| `Sesam: List Profiles` | Print all configured profiles to the Sesam output channel |
-| `#sesamLintDocument` | (Copilot agent) Lint a single Sesam config file |
-| `#sesamLintWorkspace` | (Copilot agent) Audit all Sesam configs in the workspace |
+| Command | Shortcut | Description |
+|---|---|---|
+| `DTL: Preview Pipe` | — | Open the preview panel for the active file |
+| `Sesam: Run Pipe` | `Ctrl+Shift+R` | Run the active pipe on the connected node |
+| `Sesam: Upload` | `Ctrl+Shift+U` | Validate and upload all local configs to the node |
+| `Sesam: Download` | `Ctrl+Shift+D` | Download all configs from the node (overwrites local files) |
+| `Sesam: Refresh Pipe DAG` | — | Rescan workspace and refresh Lineage / Dependents / System Pipes sidebars |
+| `DTL: Open Documentation` | — | Open the Sesam DTL docs in a browser |
+| `DTL: New Sesam Config File` | — | Create a new pipe or system config file from a template |
+| `Sesam: Format Document` | — | Format the active Sesam config file |
+| `Sesam: Clear Errors` | — | Clear all entries from the Sesam panel |
+| `Sesam: Add Profile` | — | Add a named Sesam profile (node URL + JWT) |
+| `Sesam: Delete Profile` | — | Remove a profile (JWT + node URL) entirely |
+| `Sesam: Store JWT Token` | — | Store or update the JWT for a named profile |
+| `Sesam: Delete JWT Token` | — | Remove only the JWT for a profile, keeping the node URL |
+| `Sesam: Switch Profile` | — | Switch the active profile (also available via the status bar) |
+| `Sesam: List Profiles` | — | Print all configured profiles to the Sesam output channel |
+| `@sesam /generate` | — | (Copilot) Generate a new Sesam pipe config |
+| `@sesam /explain` | — | (Copilot) Explain the active DTL transform or pipe config |
+| `@sesam /test` | — | (Copilot) Generate test input/expected entities for the active pipe |
+| `@sesam /fix` | — | (Copilot) Fix validation errors and apply corrected files to disk |
+| `@sesam /cli` | — | (Copilot) Get guidance on sesam-py CLI commands |
+| `#sesamLintDocument` | — | (Copilot agent) Lint a single Sesam config file |
+| `#sesamLintWorkspace` | — | (Copilot agent) Audit all Sesam configs in the workspace |
 
 ---
 
