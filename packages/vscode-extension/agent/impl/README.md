@@ -52,6 +52,7 @@
 |---|---|---|
 | Monorepo structure | `@sesam/core`, `@sesam/cli`, and vscode-extension in a single pnpm monorepo (`sesam-ts`) | [impl-f00-monorepo-structure.prompt.md](impl-f00-monorepo-structure.prompt.md) |
 | Extension distribution | VSIX published to GitHub Releases (private repo) — no Microsoft Marketplace | [impl-distribution.prompt.md](impl-distribution.prompt.md) |
+| Release plan | Versioned changelog and roadmap following Keep a Changelog 1.1.0 + SemVer | [release-plan.prompt.md](../plans/release-plan.prompt.md) |
 
 ### Phase 1: MVP - The Daily Command Loop
 > Goal: zero-install experience; eliminate terminal context-switch.
