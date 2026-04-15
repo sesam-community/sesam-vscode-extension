@@ -20,5 +20,5 @@ export { zipWorkspaceConfig } from "./config-zipper.js";
 export { uploadConfig, uploadSingleConfig } from "./upload.js";
 export { downloadConfig, downloadSingleConfig } from "./download.js";
 export { runPipe, runAllPipes } from "./run-pipes.js";
-export { getStatus } from "./status.js";
+export { getStatus, getPipeStatus } from "./status.js";
 export { validateWorkspace } from "./validate.js";

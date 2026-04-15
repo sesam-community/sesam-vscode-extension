@@ -11,6 +11,7 @@
 import {
   downloadConfig,
   downloadSingleConfig,
+  getPipeStatus,
   getStatus,
   runAllPipes,
   runPipe,
@@ -82,6 +83,13 @@ export class SesamRunner {
    */
   async status(creds: NodeCredentials): Promise<PipeStatus[]> {
     return getStatus(creds);
+  }
+
+  /**
+   * Fetch the runtime status of a single pipe.
+   */
+  async pipeStatus(creds: NodeCredentials, pipeId: string): Promise<PipeStatus> {
+    return getPipeStatus(creds, pipeId);
   }
 
   /**

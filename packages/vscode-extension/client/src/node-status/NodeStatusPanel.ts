@@ -162,15 +162,25 @@ export class NodeStatusPanel {
       return;
     }
 
-    const done = trackRequest("GET", "node-status");
+    const done = trackRequest(
+      "GET",
+      this._filterPipeId ? `pipe-status/${this._filterPipeId}` : "node-status",
+    );
 
     try {
       const runner = new SesamRunner();
-      const statuses = await runner.status({
-        nodeUrl: creds.nodeUrl,
-        jwtToken: creds.jwt,
-        logger: logNodeRequest,
-      });
+      const statuses = this._filterPipeId
+        ? [
+            await runner.pipeStatus(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+              this._filterPipeId,
+            ),
+          ]
+        : await runner.status({
+            nodeUrl: creds.nodeUrl,
+            jwtToken: creds.jwt,
+            logger: logNodeRequest,
+          });
       done(true);
 
       const subId = extractSubscriptionId(creds.jwt) ?? "";
