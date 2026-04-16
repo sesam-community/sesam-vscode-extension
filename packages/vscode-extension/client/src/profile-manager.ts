@@ -491,9 +491,8 @@ export const runAddProfile = async (): Promise<void> => {
     production: productionPick.label === "Yes",
   });
   await storeToken(profileName, jwt.trim());
-  await setActiveProfileName(profileName);
   void _refreshStatusBar();
-  vscode.window.showInformationMessage(`Sesam: profile '${profileName}' saved and set as active.`);
+  await vscode.commands.executeCommand("sesam.showProfiles");
 };
 
 export const runDeleteProfile = async (): Promise<void> => {
