@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Socket.IO (`socket.io-client`) for real-time `pipes_updated` / `pipes_added` / `pipes_deleted`
   push events; replaces 30 s polling; falls back to poll on connection failure; live/polling/offline
   badge in the Node Status WebView
+- **F25**: Credential Safety — node hostname shown in the status bar (Option A); `.sesamprofile`
+  lockfile read on workspace open to validate the active profile targets the expected node URL
+  (Option C); destructive commands (upload, wipe, sync) blocked with a confirmation modal when
+  a mismatch is detected (Option B)
 
 ---
 
@@ -66,7 +70,7 @@ what is live on the node before deciding what to push.
 
 ---
 
-## [0.1.0] — 2026-04-15
+## [0.1.0] — 2026-04-16
 
 The foundation release. The goal was simple: open VS Code, open a pipe, and never touch a
 terminal again. All sesam-py operations are available from the Command Palette, credentials
@@ -108,6 +112,11 @@ and the full pipe graph sidebar shipped ahead of schedule alongside the core MVP
   all Sesam-specific diagnostics across the workspace
 - **F23**: Centralized Network Status Bar — status bar item showing live connection state to
   the configured Sesam node
+- **F24**: Live Updates via Socket.IO — real-time push events from the Sesam node via
+  Socket.IO; replaces 30 s polling; live/polling/offline badge in the Node Status WebView
+- **F25**: Credential Safety — node hostname displayed in the status bar; `.sesamprofile`
+  lockfile validated on workspace open to confirm the active profile targets the correct node;
+  destructive commands show a confirmation modal on profile/node mismatch
 
 ---
 
@@ -115,7 +124,7 @@ and the full pipe graph sidebar shipped ahead of schedule alongside the core MVP
 
 | Version | Phase | Key theme | Planned features |
 |---|---|---|---|
-| 0.1.0 | Phase 1 + 3 + 4 | Initial release | F00–F04, F09, F12–F23 |
+| 0.1.0 | Phase 1 + 3 + 4 | Initial release | F00–F04, F09, F12–F25 |
 | 0.2.0 | Phase 2 | Testing & Diff | F05, F06 |
 | 0.3.0 | Phase 3 | Node Diagnostics | F10 |
 | 0.4.0 | Phase 4 | Visual & AI Polish | F07/F15, F08 |

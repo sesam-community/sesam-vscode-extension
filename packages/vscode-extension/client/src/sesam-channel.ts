@@ -51,5 +51,6 @@ export const logNodeRequest = (entry: NodeRequestLogEntry): void => {
     ch.show(/* preserveFocus */ true);
   } else {
     ch.appendLine(`[${ts}] ${entry.method} ${entry.url}  ${entry.statusCode}  ${duration}`);
+    ch.show(/* preserveFocus */ true);
   }
 };

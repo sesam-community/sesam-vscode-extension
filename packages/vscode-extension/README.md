@@ -17,7 +17,7 @@
 - [Pipe Dependents](#pipe-dependents)
 - [System Pipes](#system-pipes)
 - [Sesam Panel](#sesam-panel)
-- [Pipe Preview](#pipe-preview)
+- [Pipe Preview](#pipe-preview) — live server-side evaluation with syntax-highlighted output
 - [Node Integration — Upload & Download](#node-integration--upload--download)
 - [Node Integration — Run Pipe](#node-integration--run-pipe)
 - [Node Status](#node-status)
@@ -278,14 +278,23 @@ A dedicated **bottom panel tab** (alongside Terminal / Output) that shows all Se
 
 ### Pipe Preview
 
-A live preview panel that evaluates DTL transforms against a sample input entity — without needing a running Sesam node.
+A live preview panel that evaluates DTL transforms against a sample input entity by posting to the configured Sesam node.
 
 1. Open a pipe config file.
-2. Run **DTL: Preview Pipe** from the Command Palette (`Ctrl+Shift+P`).
-3. Edit the **Input Entity** and press **▶ Evaluate** (or `Ctrl+Enter`).
-4. The **Output Entity** updates instantly.
+2. Run **Sesam: Preview Pipe** from the Command Palette (`Ctrl+Shift+P`).
+3. Edit the **Input Entity** and press **▶ Run preview** (or `Ctrl+Enter`).
+4. Both the **Input Entity** and **Output Entity** render with syntax-highlighted JSON.
 
-> Functions that require a live Sesam node (e.g. `hops`, `apply-hops`, `lookup-entity`, encryption, UUID) return `null` with a warning rather than throwing.
+The output pane renders JSON with token colours that match your VS Code theme:
+
+| Token | Dark mode | Light mode |
+|---|---|---|
+| Object keys | green | teal |
+| String values | yellow | dark green |
+| Numbers, booleans | purple | blue |
+| `null`, braces, brackets, commas, colons | purple | black |
+
+> The panel requires a configured Sesam node URL and JWT token. If credentials are missing the error banner shows a **Open Settings** link to set them without leaving the panel.
 
 ---
 
@@ -419,7 +428,7 @@ You can configure multiple named **profiles** (e.g. `dev`, `staging`, `prod`) an
 2. Navigate to your subscription → **Settings** → **JWT** (or use the portal's **Connect** token page).
 3. Copy the token and paste it into the extension when prompted.
 
-JWTs expire — re-run **Sesam: Store JWT Token** when yours is refreshed.
+JWTs expire — re-run **Sesam: Set JWT Token** when yours is refreshed.
 
 #### Available commands
 
@@ -427,16 +436,16 @@ JWTs expire — re-run **Sesam: Store JWT Token** when yours is refreshed.
 |---|---|
 | `Sesam: Add Profile` | 4-step wizard — name, portal URL (default: `https://portal.sesam.io`), node URL, JWT. Creates or replaces a full profile. |
 | `Sesam: Delete Profile` | Remove a profile entirely (JWT from SecretStorage + node URL from workspace state). |
-| `Sesam: Store JWT Token` | Quick command to store (or update) just the JWT for a named profile. |
+| `Sesam: Set JWT Token` | Quick command to store (or update) just the JWT for a named profile. |
 | `Sesam: Delete JWT Token` | Remove only the stored JWT for a profile, keeping the node URL. |
 | `Sesam: Switch Profile` | Switch the active profile from a QuickPick list. Same as clicking the status bar item. |
 | `Sesam: List Profiles` | Print all configured profiles (name, node URL, portal URL, token status) to the Sesam output channel. |
 
 #### Falling back to settings
 
-If no JWT is stored in SecretStorage for the active profile, the extension falls back to the `sesam.jwt` workspace/user setting. This means existing setups continue to work without any changes — just migrate at your own pace by running **Sesam: Store JWT Token**.
+If no JWT is stored in SecretStorage for the active profile, the extension falls back to the `sesam.jwt` workspace/user setting. This means existing setups continue to work without any changes — just migrate at your own pace by running **Sesam: Set JWT Token**.
 
-> **Security note:** The `sesam.jwt` setting stores the token in plain text in VS Code settings files. Use **Sesam: Store JWT Token** or **Sesam: Add Profile** to move tokens to SecretStorage.
+> **Security note:** The `sesam.jwt` setting stores the token in plain text in VS Code settings files. Use **Sesam: Set JWT Token** or **Sesam: Add Profile** to move tokens to SecretStorage.
 
 ---
 
@@ -614,7 +623,7 @@ my-sesam-project/
 | `Sesam: Clear Errors` | — | Clear all entries from the Sesam panel |
 | `Sesam: Add Profile` | — | Add a named Sesam profile (node URL + JWT) |
 | `Sesam: Delete Profile` | — | Remove a profile (JWT + node URL) entirely |
-| `Sesam: Store JWT Token` | — | Store or update the JWT for a named profile |
+| `Sesam: Set JWT Token` | — | Store or update the JWT for a named profile |
 | `Sesam: Delete JWT Token` | — | Remove only the JWT for a profile, keeping the node URL |
 | `Sesam: Switch Profile` | — | Switch the active profile (also available via the status bar) |
 | `Sesam: List Profiles` | — | Print all configured profiles to the Sesam output channel |
@@ -680,9 +689,8 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 | `dtl.format.reorderKeys` | `true` | Reorder root-level config keys to canonical order on save |
 | `dtl.trace.server` | `off` | LSP communication trace (`off`/`messages`/`verbose`) |
 | `dtl.graph.scanDepth` | `3` | Directory depth to scan for pipe/system files |
-| `sesam.activeProfile` | `"default"` | Name of the active Sesam profile. Credentials for this profile are resolved from SecretStorage. Run **Sesam: Add Profile** to configure. |
 | `sesam.nodeUrl` | `""` | Base URL of your Sesam node — used as a fallback when no profile nodeUrl is configured |
-| `sesam.jwt` | `""` | JWT token stored in plain text in settings. Superseded by SecretStorage — use **Sesam: Store JWT Token** instead. |
+| `sesam.jwt` | `""` | JWT token stored in plain text in settings. Superseded by SecretStorage — use **Sesam: Set JWT Token** instead. |
 
 ---
 

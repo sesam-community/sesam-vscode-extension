@@ -267,10 +267,41 @@ Panel disposed
 
 #### No more setInterval
 
-The `_refreshTimer` `setInterval` is **removed entirely**. There is no polling fallback. The only
-ways data refreshes are:
+The `_refreshTimer` `setInterval` in `NodeStatusPanel` is **removed entirely**. The only ways the
+pipe status table refreshes are:
 1. Socket.IO push event (when live updates are on and supported).
 2. Manual Refresh button click in the webview (`{ type: "refresh" }` → `_loadAndSend()`) — only visible when live updates are off.
+
+#### Hibernation/provisioning poll — also triggered by NodeStatusPanel
+
+The **provisioning poller** (`startProvisioningPoller` / `_provisioningPoller` in `extension.ts` and
+`portal-client.ts`) must fire whenever **any** node API request fails because the node is sleeping —
+including requests made by `NodeStatusPanel`.
+
+The existing pattern (used by `PreviewPanel` and the `runPipe` command) is a static callback:
+
+```ts
+// NodeStatusPanel.ts
+static onProvisioningNeeded: ((nodeUrl: string, jwt: string) => void) | undefined;
+
+// In _loadAndSend() catch block:
+if (hint) {
+  NodeStatusPanel.onProvisioningNeeded?.(creds.nodeUrl, creds.jwt);
+}
+
+// extension.ts — in activate():
+NodeStatusPanel.onProvisioningNeeded = startPollerIfNeeded;
+```
+
+Once wired, opening the Node Status panel on a hibernated node:
+1. `_loadAndSend()` fails → `fetchNodeStatusHint` returns a hint string.
+2. Error overlay shown in the webview.
+3. `startPollerIfNeeded` fires → provisioning status bar spinner starts, 30 s poll begins.
+4. When the node is ready the user is notified and can manually Refresh to load pipe statuses.
+
+For the Socket.IO connection (when F24 live updates are implemented), `connect_error` from a
+hibernated node also fires `onProvisioningNeeded` before hiding the toggle and showing
+`"not-supported"`.
 
 #### Refresh button visibility
 

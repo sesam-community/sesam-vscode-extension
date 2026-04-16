@@ -42,6 +42,8 @@ type MessageFromWebview =
 export class NodeStatusPanel {
   static currentPanel: NodeStatusPanel | undefined;
   private static readonly viewType = "sesamNodeStatus";
+  /** Set by extension.ts to start the provisioning poller when node requests fail. */
+  static onProvisioningNeeded: ((nodeUrl: string, jwt: string) => void) | undefined;
 
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
@@ -195,8 +197,13 @@ export class NodeStatusPanel {
       const detail = err instanceof Error ? err.message : String(err);
       this._panel.webview.postMessage({
         type: "error",
-        message: hint ? `${detail}\n\n${hint}` : detail,
+        message: hint ?? detail,
+        provisioning: hint !== null,
       });
+
+      if (hint) {
+        NodeStatusPanel.onProvisioningNeeded?.(creds.nodeUrl, creds.jwt);
+      }
     }
   }
 
@@ -530,7 +537,7 @@ export class NodeStatusPanel {
   <div class="status-overlay hidden" id="errorOverlay">
     <span style="font-size:24px">⚠️</span>
     <pre class="error-msg" id="errorMsg"></pre>
-    <button onclick="sendRefresh()">Try again</button>
+    <button id="tryAgainBtn" onclick="sendRefresh()">Try again</button>
   </div>
   <div class="status-overlay hidden" id="emptyOverlay">
     <span style="font-size:24px">🎉</span>
@@ -580,6 +587,7 @@ export class NodeStatusPanel {
 
     if (msg.type === 'error') {
       document.getElementById('errorMsg').textContent = msg.message;
+      document.getElementById('tryAgainBtn').style.display = msg.provisioning ? 'none' : '';
       showOverlay('error');
       document.getElementById('refreshBtn').disabled = false;
       return;

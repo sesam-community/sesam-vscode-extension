@@ -30,13 +30,13 @@ import { SystemPipesProvider } from "./graph/SystemPipesProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
 import {
   initProfileManager,
-  getStoredProfiles,
+  getActiveProfileName,
+  refreshStatusBar,
+  resolveNodeUrl,
   runAddProfile,
   runDeleteProfile,
   runListProfiles,
   runSwitchProfile,
-  setActiveProfileName,
-  upsertProfile,
 } from "./profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
@@ -48,10 +48,12 @@ import {
   extractSubscriptionId,
   clearWakeUpSent,
 } from "./portal-client";
+import { pingNode } from "./node-client";
 import { disposeSesamChannel, getSesamChannel, logNodeRequest } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
 import { NodeStatusPanel } from "./node-status/NodeStatusPanel";
+import { ProfilesPanel } from "./profile-manager/ProfilesPanel";
 import { ValidationFailedError } from "@sesam/core";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
@@ -189,8 +191,9 @@ const ensureNodeReady = async (nodeUrl: string, jwt: string): Promise<boolean> =
 };
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  // Wire the provisioning poller into PreviewPanel live eval failures
+  // Wire the provisioning poller into PreviewPanel and NodeStatusPanel live eval failures
   PreviewPanel.onProvisioningNeeded = startPollerIfNeeded;
+  NodeStatusPanel.onProvisioningNeeded = startPollerIfNeeded;
 
   // ── Network Status Bar (F23) ──────────────────────────────────────────────
   createNetworkStatusBar(context);
@@ -440,9 +443,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const creds = await resolveCredentials();
 
       if (!creds) {
-        vscode.window.showErrorMessage(
-          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        const action = await vscode.window.showErrorMessage(
+          "Sesam: No credentials configured for this profile.",
+          "Set JWT Token",
         );
+
+        if (action === "Set JWT Token") {
+          await vscode.commands.executeCommand("sesam.setToken");
+        }
+
         return;
       }
 
@@ -509,10 +518,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.commands.registerCommand("dtl.previewPipe", () => {
       const editor = vscode.window.activeTextEditor;
+
       if (!editor) {
         vscode.window.showWarningMessage("Pipe preview: No active editor.");
         return;
       }
+
+      const errors = vscode.languages
+        .getDiagnostics(editor.document.uri)
+        .filter((d) => d.severity === vscode.DiagnosticSeverity.Error);
+
+      if (errors.length > 0) {
+        vscode.window.showWarningMessage(
+          `Pipe preview blocked: ${errors.length} error${errors.length === 1 ? "" : "s"} in this file. Fix all errors before previewing.`,
+        );
+        return;
+      }
+
       PreviewPanel.createOrShow(context.extensionUri, editor.document, context);
     }),
 
@@ -528,9 +550,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const creds = await resolveCredentials();
 
       if (!creds) {
-        vscode.window.showErrorMessage(
-          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        const action = await vscode.window.showErrorMessage(
+          "Sesam: No credentials configured for this profile.",
+          "Set JWT Token",
         );
+
+        if (action === "Set JWT Token") {
+          await vscode.commands.executeCommand("sesam.setToken");
+        }
+
         return;
       }
 
@@ -669,7 +697,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       );
     }),
 
-    vscode.commands.registerCommand("sesam.download", async () => {
+    vscode.commands.registerCommand("sesam.download", async (opts?: { skipConfirm?: boolean }) => {
       const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
       if (!workspaceDir) {
@@ -680,9 +708,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const creds = await resolveCredentials();
 
       if (!creds) {
-        vscode.window.showErrorMessage(
-          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        const action = await vscode.window.showErrorMessage(
+          "Sesam: No credentials configured for this profile.",
+          "Set JWT Token",
         );
+
+        if (action === "Set JWT Token") {
+          await vscode.commands.executeCommand("sesam.setToken");
+        }
+
         return;
       }
 
@@ -692,14 +726,38 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      const confirmed = await vscode.window.showWarningMessage(
-        "Sesam: Download will overwrite local pipe and system configs. Continue?",
-        { modal: true },
-        "Download",
+      // Direct node connectivity check — logs to Sesam output channel
+      getSesamChannel().appendLine(`[download] pinging node ${creds.nodeUrl} …`);
+      const ping = await pingNode(creds.nodeUrl, creds.jwt, logNodeRequest);
+      getSesamChannel().appendLine(
+        `[download] ping: ${ping.status}${"message" in ping ? ` — ${ping.message}` : ""}`,
       );
 
-      if (confirmed !== "Download") {
+      if (ping.status === "auth") {
+        vscode.window
+          .showErrorMessage(
+            "Sesam: Authentication failed — JWT may be invalid or expired.",
+            "Set JWT Token",
+          )
+          .then((action) => {
+            if (action === "Set JWT Token") {
+              void vscode.commands.executeCommand("sesam.setToken");
+            }
+          });
+
         return;
+      }
+
+      if (!opts?.skipConfirm) {
+        const confirmed = await vscode.window.showWarningMessage(
+          "Sesam: Download will overwrite local pipe and system configs. Continue?",
+          { modal: true },
+          "Download",
+        );
+
+        if (confirmed !== "Download") {
+          return;
+        }
       }
 
       await vscode.window.withProgress(
@@ -750,9 +808,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const creds = await resolveCredentials();
 
       if (!creds) {
-        vscode.window.showErrorMessage(
-          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        const action = await vscode.window.showErrorMessage(
+          "Sesam: No credentials configured for this profile.",
+          "Set JWT Token",
         );
+
+        if (action === "Set JWT Token") {
+          await vscode.commands.executeCommand("sesam.setToken");
+        }
+
         return;
       }
 
@@ -844,9 +908,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const creds = await resolveCredentials();
 
       if (!creds) {
-        vscode.window.showErrorMessage(
-          "Sesam: No credentials configured. Use 'Sesam: Store JWT Token' to set up a profile.",
+        const action = await vscode.window.showErrorMessage(
+          "Sesam: No credentials configured for this profile.",
+          "Set JWT Token",
         );
+
+        if (action === "Set JWT Token") {
+          await vscode.commands.executeCommand("sesam.setToken");
+        }
+
         return;
       }
 
@@ -954,47 +1024,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // ── F03: Secure credential commands ──────────────────────────────────
     vscode.commands.registerCommand("sesam.setToken", async () => {
-      const profileName = await vscode.window.showInputBox({
-        title: "Sesam: Store JWT — Step 1 of 2",
-        prompt: "Profile name to store the token under",
-        value: "default",
-        placeHolder: "default",
-        ignoreFocusOut: true,
-        validateInput: (v) => (v.trim() ? undefined : "Profile name cannot be empty"),
-      });
-
-      if (profileName === undefined) {
-        return;
-      }
-
-      const trimmedName = profileName.trim();
-
-      // If this profile has no nodeUrl stored and sesam.nodeUrl setting is also empty,
-      // prompt for one so resolveCredentials() can succeed.
-      const existingMeta = getStoredProfiles().find((p) => p.name === trimmedName);
-      const fallbackNodeUrl = vscode.workspace
-        .getConfiguration("sesam")
-        .get<string>("nodeUrl", "")
-        .trim();
-
-      if (!existingMeta?.nodeUrl && !fallbackNodeUrl) {
-        const nodeUrl = await vscode.window.showInputBox({
-          title: "Sesam: Store JWT — Node URL",
-          prompt: "No node URL found for this profile. Enter the Sesam node URL.",
-          placeHolder: "https://datahub-xxxxxxxx.sesam.cloud",
-          ignoreFocusOut: true,
-          validateInput: (v) => (v.trim() ? undefined : "Node URL cannot be empty"),
-        });
-
-        if (nodeUrl === undefined) {
-          return;
-        }
-
-        await upsertProfile({ name: trimmedName, nodeUrl: nodeUrl.trim() });
-      }
+      const activeProfile = getActiveProfileName();
 
       const jwt = await vscode.window.showInputBox({
-        title: "Sesam: Store JWT — Step 2 of 2",
+        title: `Sesam: Set JWT Token — ${activeProfile}`,
         prompt: "Paste your JWT token (obtained from the Sesam portal)",
         placeHolder: "eyJ…",
         password: true,
@@ -1006,9 +1039,42 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      await storeToken(trimmedName, jwt.trim());
-      await setActiveProfileName(trimmedName);
-      vscode.window.showInformationMessage(`Sesam: JWT stored for profile '${trimmedName}'.`);
+      await storeToken(activeProfile, jwt.trim());
+      refreshStatusBar();
+
+      const nodeUrl = resolveNodeUrl(activeProfile);
+      const ch = getSesamChannel();
+      ch.appendLine(`[setToken] profile='${activeProfile}'  nodeUrl='${nodeUrl || "(none)"}'`);
+      ch.show(true);
+
+      if (nodeUrl) {
+        ch.appendLine(`[setToken] pinging ${nodeUrl}/api/config …`);
+        const ping = await pingNode(nodeUrl, jwt.trim(), logNodeRequest);
+        ch.appendLine(
+          `[setToken] ping result: ${ping.status}${"message" in ping ? `  — ${ping.message}` : ""}`,
+        );
+
+        if (ping.status === "ok") {
+          vscode.window.showInformationMessage(
+            `Sesam: JWT stored for '${activeProfile}' — node is reachable.`,
+          );
+        } else if (ping.status === "auth") {
+          vscode.window.showWarningMessage(
+            `Sesam: JWT stored, but authentication failed — token may be invalid or expired.`,
+          );
+        } else {
+          vscode.window.showWarningMessage(
+            `Sesam: JWT stored, but node is unreachable — ${ping.message}`,
+          );
+        }
+      } else {
+        ch.appendLine(
+          `[setToken] no nodeUrl configured for '${activeProfile}' — skipping ping. Run 'Sesam: Add Profile' to set a node URL.`,
+        );
+        vscode.window.showWarningMessage(
+          `Sesam: JWT stored for '${activeProfile}', but no node URL is configured. Run 'Sesam: Add Profile' to associate a node URL with this profile.`,
+        );
+      }
     }),
 
     vscode.commands.registerCommand("sesam.deleteToken", async () => {
@@ -1046,6 +1112,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("sesam.deleteProfile", () => runDeleteProfile()),
     vscode.commands.registerCommand("sesam.listProfiles", () => runListProfiles()),
     vscode.commands.registerCommand("sesam.switchProfile", () => runSwitchProfile()),
+    vscode.commands.registerCommand("sesam.showProfiles", () => ProfilesPanel.createOrShow()),
 
     vscode.commands.registerCommand("dtl.openDocs", () => {
       vscode.env.openExternal(

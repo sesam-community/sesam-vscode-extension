@@ -329,3 +329,31 @@ export const fetchDatasetEntities = async (
 
   return JSON.parse(responseText) as Entity[];
 };
+
+/**
+ * Lightweight connectivity + auth check.
+ * GETs /api/config and returns `"ok"`, `"auth"`, or `"network"`.
+ *
+ * @throws never — all errors are caught and returned as a discriminated string
+ */
+export const pingNode = async (
+  nodeUrl: string,
+  jwt: string,
+  logger?: NodeRequestLogger,
+): Promise<
+  { status: "ok" } | { status: "auth"; message: string } | { status: "network"; message: string }
+> => {
+  try {
+    const base = validateUrl(nodeUrl);
+    const url = new URL("/api/config", base);
+    await request("GET", url, jwt, undefined, undefined, logger);
+
+    return { status: "ok" };
+  } catch (err) {
+    if (err instanceof NodeAuthError) {
+      return { status: "auth", message: err.message };
+    }
+
+    return { status: "network", message: err instanceof Error ? err.message : String(err) };
+  }
+};
