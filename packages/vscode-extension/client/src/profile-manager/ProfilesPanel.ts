@@ -14,9 +14,10 @@
  * missing), which causes "No credentials configured" errors.
  */
 
-import * as vscode from "vscode";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-import profilesPanelHtml from "./profiles-panel.html?raw";
+import * as vscode from "vscode";
 
 import { getToken, listStoredProfileNames, deleteToken } from "../credential-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
@@ -65,11 +66,12 @@ export class ProfilesPanel {
   private static readonly _viewType = "sesamProfiles";
 
   private readonly _panel: vscode.WebviewPanel;
+  private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
 
   // ── Static factory ────────────────────────────────────────────────────────
 
-  static createOrShow(): void {
+  static createOrShow(extensionUri: vscode.Uri): void {
     const column = vscode.ViewColumn.Beside;
 
     if (ProfilesPanel.currentPanel) {
@@ -88,13 +90,14 @@ export class ProfilesPanel {
       },
     );
 
-    ProfilesPanel.currentPanel = new ProfilesPanel(panel);
+    ProfilesPanel.currentPanel = new ProfilesPanel(panel, extensionUri);
   }
 
   // ── Constructor ───────────────────────────────────────────────────────────
 
-  private constructor(panel: vscode.WebviewPanel) {
+  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this._panel = panel;
+    this._extensionUri = extensionUri;
     this._panel.webview.html = this._buildHtml();
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -225,6 +228,8 @@ export class ProfilesPanel {
   // ── HTML ──────────────────────────────────────────────────────────────────
 
   private _buildHtml(): string {
-    return profilesPanelHtml;
+    const htmlPath = path.join(this._extensionUri.fsPath, "resources", "profiles-panel.html");
+
+    return fs.readFileSync(htmlPath, "utf8");
   }
 }
