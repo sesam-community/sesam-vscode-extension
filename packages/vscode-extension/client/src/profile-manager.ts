@@ -364,44 +364,24 @@ export const runSwitchProfile = async (): Promise<void> => {
   await vscode.commands.executeCommand("sesam.download", { skipConfirm: true });
 };
 
-export const runAddProfile = async (): Promise<void> => {
+type RunAddProfileOptions = { isNew: true } | { profileName: string } | undefined;
+
+export const runAddProfile = async (options?: RunAddProfileOptions): Promise<void> => {
   const profileMetas = getStoredProfiles();
   const storedNames = listStoredProfileNames();
   const activeProfile = getActiveProfileName();
 
-  // Build list of all known profiles (active first), then a "New profile…" option
-  const allKnown = [
-    activeProfile,
-    ...[...new Set([...storedNames, ...profileMetas.map((p) => p.name)])].filter(
-      (n) => n !== activeProfile,
-    ),
-  ];
-
-  const NEW_PROFILE_LABEL = "$(add) New profile…";
-
-  const profileItems: vscode.QuickPickItem[] = [
-    ...allKnown.map((name) => ({
-      label: name,
-      description: name === activeProfile ? "$(check) active" : undefined,
-      detail: profileMetas.find((p) => p.name === name)?.nodeUrl,
-    })),
-    { label: NEW_PROFILE_LABEL, description: "Create a brand-new profile" },
-  ];
-
-  const profilePick = await vscode.window.showQuickPick(profileItems, {
-    title: "Sesam: Add / Update Profile — Step 1: Select or create",
-    placeHolder: "Select an existing profile to update, or create a new one",
-    ignoreFocusOut: true,
-  });
-
-  if (!profilePick) {
-    return;
-  }
-
   let profileName: string;
   let existingMeta: ProfileMeta | undefined;
+  let isNew: boolean;
 
-  if (profilePick.label === NEW_PROFILE_LABEL) {
+  if (options && "profileName" in options) {
+    // Edit flow: profile name is already known — skip the selection QuickPick
+    profileName = options.profileName;
+    existingMeta = profileMetas.find((p) => p.name === profileName);
+    isNew = false;
+  } else if (options && "isNew" in options && options.isNew) {
+    // Add flow: go directly to the name input box
     const name = await vscode.window.showInputBox({
       title: "Sesam: Add Profile — Profile name",
       prompt: "Profile name (e.g. dev, staging, prod)",
@@ -416,13 +396,62 @@ export const runAddProfile = async (): Promise<void> => {
 
     profileName = name.trim();
     existingMeta = undefined;
+    isNew = true;
   } else {
-    profileName = profilePick.label;
-    existingMeta = profileMetas.find((p) => p.name === profileName);
+    // Default: show the full QuickPick (used from sesam.switchProfile / command palette)
+    const allKnown = [
+      activeProfile,
+      ...[...new Set([...storedNames, ...profileMetas.map((p) => p.name)])].filter(
+        (n) => n !== activeProfile,
+      ),
+    ];
+
+    const NEW_PROFILE_LABEL = "$(add) New profile…";
+
+    const profileItems: vscode.QuickPickItem[] = [
+      ...allKnown.map((name) => ({
+        label: name,
+        description: name === activeProfile ? "$(check) active" : undefined,
+        detail: profileMetas.find((p) => p.name === name)?.nodeUrl,
+      })),
+      { label: NEW_PROFILE_LABEL, description: "Create a brand-new profile" },
+    ];
+
+    const profilePick = await vscode.window.showQuickPick(profileItems, {
+      title: "Sesam: Add / Update Profile — Step 1: Select or create",
+      placeHolder: "Select an existing profile to update, or create a new one",
+      ignoreFocusOut: true,
+    });
+
+    if (!profilePick) {
+      return;
+    }
+
+    if (profilePick.label === NEW_PROFILE_LABEL) {
+      const name = await vscode.window.showInputBox({
+        title: "Sesam: Add Profile — Profile name",
+        prompt: "Profile name (e.g. dev, staging, prod)",
+        placeHolder: "dev",
+        ignoreFocusOut: true,
+        validateInput: (v) => (v.trim() ? undefined : "Profile name cannot be empty"),
+      });
+
+      if (name === undefined) {
+        return;
+      }
+
+      profileName = name.trim();
+      existingMeta = undefined;
+      isNew = true;
+    } else {
+      profileName = profilePick.label;
+      existingMeta = profileMetas.find((p) => p.name === profileName);
+      isNew = false;
+    }
   }
 
-  const stepOffset = profilePick.label === NEW_PROFILE_LABEL ? 2 : 1;
-  const totalSteps = profilePick.label === NEW_PROFILE_LABEL ? 5 : 4;
+  const stepOffset = isNew ? 2 : 1;
+  const totalSteps = isNew ? 5 : 4;
 
   const portalUrl = await vscode.window.showInputBox({
     title: `Sesam: Profile '${profileName}' — Step ${stepOffset} of ${totalSteps}: Portal URL`,

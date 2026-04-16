@@ -128,8 +128,7 @@ export class ProfilesPanel {
     }
 
     if (message.type === "editProfile") {
-      // runAddProfile QuickPick will pre-select the existing profile
-      await runAddProfile();
+      await runAddProfile({ profileName: message.profileName });
       await this._loadAndSend();
       return;
     }
@@ -174,7 +173,7 @@ export class ProfilesPanel {
     }
 
     if (message.type === "addProfile") {
-      await runAddProfile();
+      await runAddProfile({ isNew: true });
       await this._loadAndSend();
     }
   }
