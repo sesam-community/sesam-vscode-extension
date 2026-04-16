@@ -37,6 +37,7 @@
 | F23 | Centralized Network Status Bar | Phase 1 | `implemented` | [impl-f23-network-status.prompt.md](impl-f23-network-status.prompt.md) |
 | F24 | Live Updates via Socket.IO | Phase 1 | `planned` | [impl-f24-live-updates.prompt.md](impl-f24-live-updates.prompt.md) |
 | F25 | Credential Safety (status bar hostname + `.sesamprofile` lockfile + destructive-command guard) | Phase 1 | `planned` | [credential-safety.prompt.md](../plans/credential-safety.prompt.md) |
+| F26 | Safe Profile Switching (unsaved-file + git guard + node teardown) | Phase 1 | `implemented` | [impl-f26-switch-profile.prompt.md](impl-f26-switch-profile.prompt.md) |
 | F05 | Test Management (Testing API) | Phase 2 | `planned` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
 | F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
 | F04 | Node-Connected Live Preview | Phase 3 | `implemented` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
@@ -78,6 +79,7 @@
 | F23: Centralized Network Status Bar | `implemented` |
 | F24: Live Updates via Socket.IO | `planned` |
 | F25: Credential Safety | `planned` |
+| F26: Safe Profile Switching | `implemented` |
 
 ### Phase 2: Testing & Diff Loop
 
