@@ -40,15 +40,6 @@ export const initProfileManager = (context: vscode.ExtensionContext): void => {
   context.subscriptions.push(_statusBarItem);
 
   _refreshStatusBar();
-
-  // Refresh status bar when the active profile setting changes
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration(ACTIVE_PROFILE_SETTING)) {
-        _refreshStatusBar();
-      }
-    }),
-  );
 };
 
 const ctx = (): vscode.ExtensionContext => {
