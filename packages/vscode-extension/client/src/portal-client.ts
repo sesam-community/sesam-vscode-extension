@@ -15,7 +15,7 @@ import * as https from "node:https";
 
 import * as vscode from "vscode";
 
-import { getSesamChannel } from "./sesam-channel";
+import { getSesamChannel, logPortalRequest } from "./sesam-channel";
 import { trackRequest } from "./network-status";
 import { DEFAULT_PORTAL_URL } from "./constants";
 
@@ -130,15 +130,12 @@ const triggerNodeWakeUp = (jwt: string, subId: string): Promise<void> =>
         res.resume();
         res.on("end", () => {
           done((res.statusCode ?? 0) < 400, res.statusCode);
-          const ch = getSesamChannel();
-          const ts = new Date();
-          const tsStr = [
-            ts.getHours().toString().padStart(2, "0"),
-            ts.getMinutes().toString().padStart(2, "0"),
-            ts.getSeconds().toString().padStart(2, "0"),
-          ].join(":");
-          ch.appendLine(
-            `[${tsStr}] POST ${analyticsUrl}  ${res.statusCode ?? 0}  ${Date.now() - startMs} ms  — wake-up sent`,
+          logPortalRequest(
+            "POST",
+            analyticsUrl,
+            res.statusCode ?? 0,
+            Date.now() - startMs,
+            "wake-up sent",
           );
           resolve();
         });
@@ -186,21 +183,15 @@ const fetchSubscriptionStatus = (jwt: string, subId: string): Promise<Subscripti
           const body = Buffer.concat(chunks).toString("utf8");
           const status = res.statusCode ?? 0;
           done(status < 400, status === 0 ? undefined : status);
-          const ch = getSesamChannel();
-          const ts = new Date();
-          const hh = ts.getHours().toString().padStart(2, "0");
-          const mm = ts.getMinutes().toString().padStart(2, "0");
-          const ss = ts.getSeconds().toString().padStart(2, "0");
-          const tsStr = `${hh}:${mm}:${ss}`;
-
-          ch.appendLine(`[${tsStr}] GET ${url}  ${status}  ${durationMs} ms`);
+          logPortalRequest("GET", url, status, durationMs);
 
           const verbose = vscode.workspace
             .getConfiguration("sesam.portal")
             .get<boolean>("verboseLogging", false);
 
           if (verbose) {
-            ch.appendLine(`[${tsStr}] Portal response: ${body}`);
+            const ch = getSesamChannel();
+            ch.appendLine(`Portal response: ${body}`);
           }
 
           try {

@@ -332,7 +332,7 @@ export const runSwitchProfile = async (targetProfile?: string): Promise<void> =>
   void vscode.commands.executeCommand("sesam.refreshProfilesPanel");
 
   const ch = getSesamChannel();
-  ch.appendLine(`[switchProfile] switched to '${selectedProfile}'`);
+  ch.appendLine(`[PROFILE] switched to '${selectedProfile}'`);
   ch.show(true);
 
   // ── Teardown current node state ─────────────────────────────────────────
@@ -368,7 +368,7 @@ export const runSwitchProfile = async (targetProfile?: string): Promise<void> =>
     );
   }
 
-  ch.appendLine(`[switchProfile] triggering download for '${selectedProfile}'…`);
+  ch.appendLine(`  triggering download for '${selectedProfile}'…`);
 
   // Use executeCommand with a flag so sesam.download skips its own confirmation dialog
   await vscode.commands.executeCommand("sesam.download", { skipConfirm: true });
@@ -601,10 +601,12 @@ export const runListProfiles = (): void => {
       const nodeUrl = meta?.nodeUrl ?? "(node URL from sesam.nodeUrl setting)";
       const hasToken = storedNames.includes(name);
       const active = name === activeProfile ? " [active]" : "";
-
+      const isProd = meta?.production ? " [PROD]" : "";
       const portalUrl = meta?.portalUrl ?? DEFAULT_PORTAL_URL;
+      const jwtStr = hasToken ? "stored" : "not stored";
+
       channel.appendLine(
-        `  ${name}${active}: ${nodeUrl}  portal: ${portalUrl}  JWT: ${hasToken ? "stored" : "not stored"}`,
+        `  ${name}${active}${isProd}: ${nodeUrl}  portal: ${portalUrl}  JWT: ${jwtStr}`,
       );
     }
   }

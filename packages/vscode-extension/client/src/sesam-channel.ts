@@ -17,19 +17,6 @@ export const disposeSesamChannel = (): void => {
   _channel = undefined;
 };
 
-// ANSI escape helpers (rendered by VS Code output channels)
-export const ansi = {
-  reset: "\x1b[0m",
-  bold: "\x1b[1m",
-  dim: "\x1b[2m",
-  red: "\x1b[31m",
-  yellow: "\x1b[33m",
-  cyan: "\x1b[36m",
-  white: "\x1b[37m",
-  brightRed: "\x1b[91m",
-  brightYellow: "\x1b[93m",
-} as const;
-
 const timestamp = (): string => {
   const d = new Date();
   const hh = d.getHours().toString().padStart(2, "0");
@@ -42,15 +29,34 @@ const timestamp = (): string => {
 export const logNodeRequest = (entry: NodeRequestLogEntry): void => {
   const ch = getSesamChannel();
   const ts = timestamp();
-  const duration = `${entry.durationMs} ms`;
+  const status = entry.statusCode > 0 ? String(entry.statusCode) : "(network)";
 
   if (entry.error) {
-    const code = entry.statusCode > 0 ? ` ${entry.statusCode}` : " (network)";
-
-    ch.appendLine(`[${ts}] ${entry.method} ${entry.url}${code}  ${duration}  — ${entry.error}`);
+    ch.appendLine(
+      `[${ts}] [NODE] ${entry.method} ${entry.url}  ${status}  ${entry.durationMs} ms  — ${entry.error}`,
+    );
     ch.show(/* preserveFocus */ true);
   } else {
-    ch.appendLine(`[${ts}] ${entry.method} ${entry.url}  ${entry.statusCode}  ${duration}`);
+    ch.appendLine(`[${ts}] [NODE] ${entry.method} ${entry.url}  ${status}  ${entry.durationMs} ms`);
     ch.show(/* preserveFocus */ true);
   }
+};
+
+/**
+ * Log a portal HTTP request line to the Sesam output channel.
+ * Used by portal-client.ts to avoid duplicating timestamp + formatting logic.
+ */
+export const logPortalRequest = (
+  method: string,
+  url: string,
+  status: number,
+  durationMs: number,
+  extra?: string,
+): void => {
+  const ch = getSesamChannel();
+  const ts = timestamp();
+  const statusStr = status > 0 ? String(status) : "(network)";
+  const extraStr = extra ? `  — ${extra}` : "";
+
+  ch.appendLine(`[${ts}] [PORTAL] ${method} ${url}  ${statusStr}  ${durationMs} ms${extraStr}`);
 };
