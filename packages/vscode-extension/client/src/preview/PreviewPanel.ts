@@ -290,50 +290,57 @@ export class PreviewPanel {
     const fileName = vscode.workspace.asRelativePath(this._document.uri, false);
     const pipeId = extractPipeId(text);
 
-    // Start with embedded entities; testdata loading is async and updates separately
+    // Start with embedded entities; async loading updates separately
     const embeddedEntities = extractEmbeddedEntities(text);
+    const willLoadAsync = (!embeddedEntities || embeddedEntities.length === 0) && !!pipeId;
 
     this._panel.webview.postMessage({
       type: "documentState",
       fileName,
       entities: embeddedEntities,
       entitySource: embeddedEntities && embeddedEntities.length > 0 ? "embedded" : null,
+      loadingEntities: willLoadAsync,
       resetOutput,
     });
 
-    // Kick off async testdata load (and node fetch fallback) if no embedded entities
-    if ((!embeddedEntities || embeddedEntities.length === 0) && pipeId) {
-      void this._loadTestdataEntities(pipeId).then(async (testdataEntities) => {
-        if (testdataEntities && testdataEntities.length > 0) {
-          this._panel.webview.postMessage({
-            type: "documentState",
-            fileName,
-            entities: testdataEntities,
-            entitySource: "testdata",
-            resetOutput: false,
-          });
-
-          return;
-        }
-
-        // Fetch real entities from the source dataset on the node as a fallback
-        await this._fetchAndSendNodeEntities(fileName);
-      });
+    if (!willLoadAsync) {
+      return;
     }
+
+    // Kick off async load; always send a final message so the loader clears
+    void this._loadEntitiesAsync(pipeId!).then((result) => {
+      this._panel.webview.postMessage({
+        type: "documentState",
+        fileName,
+        entities: result?.entities ?? [],
+        entitySource: result?.entitySource ?? null,
+        loadingEntities: false,
+        resetOutput: false,
+      });
+    });
   }
 
-  private async _fetchAndSendNodeEntities(fileName: string): Promise<void> {
+  /** Tries testdata first, then node source dataset. Always resolves (never throws). */
+  private async _loadEntitiesAsync(
+    pipeId: string,
+  ): Promise<{ entities: Entity[]; entitySource: string } | null> {
+    const testdata = await this._loadTestdataEntities(pipeId);
+
+    if (testdata && testdata.length > 0) {
+      return { entities: testdata as Entity[], entitySource: "testdata" };
+    }
+
     const credentials = await resolveCredentials();
 
     if (!credentials) {
-      return;
+      return null;
     }
 
     const text = this._document.getText();
     const sourceDataset = extractSourceDataset(text);
 
     if (!sourceDataset) {
-      return;
+      return null;
     }
 
     try {
@@ -346,17 +353,9 @@ export class PreviewPanel {
         logNodeRequest,
       );
 
-      if (entities.length > 0) {
-        this._panel.webview.postMessage({
-          type: "documentState",
-          fileName,
-          entities,
-          entitySource: "node",
-          resetOutput: false,
-        });
-      }
+      return entities.length > 0 ? { entities, entitySource: "node" } : null;
     } catch {
-      // Silently ignore — user will still see the manual input textarea
+      return null;
     }
   }
 
