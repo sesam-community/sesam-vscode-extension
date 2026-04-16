@@ -549,11 +549,6 @@
           "default": 3,
           "description": "Folder depth to scan for pipe config files in the workspace."
         },
-        "sesam.activeProfile": {
-          "type": "string",
-          "default": "default",
-          "description": "Name of the active Sesam profile. The JWT for this profile is resolved from secure storage (SecretStorage). Run 'Sesam: Add Profile' or 'Sesam: Store JWT Token' to configure profiles."
-        },
         "sesam.nodeUrl": {
           "type": "string",
           "default": "",

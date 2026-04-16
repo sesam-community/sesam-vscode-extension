@@ -680,7 +680,6 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 | `dtl.format.reorderKeys` | `true` | Reorder root-level config keys to canonical order on save |
 | `dtl.trace.server` | `off` | LSP communication trace (`off`/`messages`/`verbose`) |
 | `dtl.graph.scanDepth` | `3` | Directory depth to scan for pipe/system files |
-| `sesam.activeProfile` | `"default"` | Name of the active Sesam profile. Credentials for this profile are resolved from SecretStorage. Run **Sesam: Add Profile** to configure. |
 | `sesam.nodeUrl` | `""` | Base URL of your Sesam node — used as a fallback when no profile nodeUrl is configured |
 | `sesam.jwt` | `""` | JWT token stored in plain text in settings. Superseded by SecretStorage — use **Sesam: Store JWT Token** instead. |
 

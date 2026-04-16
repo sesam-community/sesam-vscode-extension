@@ -60,30 +60,58 @@ extension disabled), this guard is skipped entirely and the switch proceeds norm
 ## Profile picker
 
 After both guards pass, `showQuickPick` presents the profile list as before. Picking
-`$(add) Add profile…` delegates to `runAddProfile()` without any teardown.
+`$(add) Add profile…` delegates to `runAddProfile()` without any further steps.
+
+---
+
+## Confirmation dialog
+
+Before switching, the extension compares the current profile's `nodeUrl` with the target profile's
+`nodeUrl` (via `resolveNodeUrl()`).
+
+### Same node URL (or either URL is unknown)
+
+A simple modal confirmation is shown:
+
+> **Sesam: Switch profile to 'staging'?**
+> Switch to profile 'staging'?
+> [ Switch ] [ Cancel ]
+
+### Different node URL
+
+A richer modal is shown that makes the destructive consequence explicit:
+
+> **Sesam: Switch profile to 'prod'?**
+> Switching from https://datahub-dev-xxx.sesam.cloud to https://datahub-prod-yyy.sesam.cloud.
+>
+> Local configs (pipes/ and systems/) will be deleted and replaced with a fresh download from the new node.
+> [ Switch & Download ] [ Cancel ]
 
 ---
 
 ## Teardown after switch
 
-After `setActiveProfileName(picked.label)`:
+After `setActiveProfileName(picked.label)` and `_refreshStatusBar()`:
 
-1. **Node Status panel** — `NodeStatusPanel.currentPanel?.dispose()` closes the panel and clears
-   its in-memory pipe cache. A dynamic `import()` is used to avoid a circular dependency
-   (`NodeStatusPanel` imports helpers from `profile-manager`):
+1. **Node Status panel** — dynamically imported `NodeStatusPanel.currentPanel?.dispose()`.
+2. **Status bar** — updated to new profile.
 
-   ```ts
-   const { NodeStatusPanel } = await import("./node-status/NodeStatusPanel");
-   NodeStatusPanel.currentPanel?.dispose();
-   ```
+### When node URL changed
 
-2. **Status bar** — `_refreshStatusBar()` updates the status bar item label to the new profile name.
+3. **Delete local configs** — `vscode.workspace.fs.delete(folderUri, { recursive: true })` for
+   both `pipes/` and `systems/` under the first workspace folder. Missing folders are silently
+   ignored. Runs under a progress notification "Sesam: Switching node…".
 
-3. **Notification** — `showInformationMessage("Sesam: active profile set to '<name>'.")`.
+4. **Download from new node** — `vscode.commands.executeCommand("sesam.download")`. This reuses
+   the full existing download flow (credential resolution, `ensureNodeReady`, progress
+   notification, formatting, key-reordering). The download command shows its own "Download will
+   overwrite…" confirmation — this is intentional as a final safety check before writing to disk.
+
+### When node URL unchanged
+
+3. `showInformationMessage("Sesam: active profile set to '<name>'.")` — no file operations.
 
 ---
-
-## What is NOT reset on switch
 
 | State | Reason |
 |---|---|

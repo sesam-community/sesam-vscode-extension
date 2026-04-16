@@ -26,7 +26,7 @@ export interface ProfileMeta {
 }
 
 const PROFILES_KEY = "sesam.profiles";
-const ACTIVE_PROFILE_SETTING = "sesam.activeProfile";
+const ACTIVE_PROFILE_KEY = "sesam.activeProfile"; // workspaceState key — never written to settings.json
 
 let _context: vscode.ExtensionContext | undefined;
 let _statusBarItem: vscode.StatusBarItem | undefined;
@@ -63,13 +63,35 @@ const ctx = (): vscode.ExtensionContext => {
 // Active profile
 // ---------------------------------------------------------------------------
 
-export const getActiveProfileName = (): string =>
-  vscode.workspace.getConfiguration("sesam").get<string>("activeProfile", "default");
+/**
+ * Returns the active profile name.
+ *
+ * Storage: `workspaceState` (VS Code's private workspace storage — never written
+ * to `.vscode/settings.json` and therefore never committed to version control).
+ *
+ * Migration: if the old `sesam.activeProfile` workspace setting is present it is
+ * read once, written to workspaceState, and then cleared from settings so the
+ * user's settings.json stays clean.
+ */
+export const getActiveProfileName = (): string => {
+  // One-time migration from old ConfigurationTarget.Workspace setting
+  const legacyValue = vscode.workspace
+    .getConfiguration("sesam")
+    .inspect<string>("activeProfile")?.workspaceValue;
+
+  if (legacyValue) {
+    // Persist to workspaceState synchronously (fire-and-forget the async clear)
+    void ctx().workspaceState.update(ACTIVE_PROFILE_KEY, legacyValue);
+    void vscode.workspace
+      .getConfiguration("sesam")
+      .update("activeProfile", undefined, vscode.ConfigurationTarget.Workspace);
+  }
+
+  return ctx().workspaceState.get<string>(ACTIVE_PROFILE_KEY) ?? legacyValue ?? "default";
+};
 
 export const setActiveProfileName = async (name: string): Promise<void> => {
-  await vscode.workspace
-    .getConfiguration("sesam")
-    .update("activeProfile", name, vscode.ConfigurationTarget.Workspace);
+  await ctx().workspaceState.update(ACTIVE_PROFILE_KEY, name);
 };
 
 // ---------------------------------------------------------------------------
@@ -191,6 +213,7 @@ export const runSwitchProfile = async (): Promise<void> => {
   // Build union of profiles known from credentials and from metadata
   const knownNames = [...new Set([...storedNames, ...profileMetas.map((p) => p.name), "default"])];
   const activeProfile = getActiveProfileName();
+  const currentNodeUrl = resolveNodeUrl(activeProfile);
 
   const items: vscode.QuickPickItem[] = [
     ...knownNames.map((name) => ({
@@ -215,6 +238,25 @@ export const runSwitchProfile = async (): Promise<void> => {
     return;
   }
 
+  const nextNodeUrl = resolveNodeUrl(picked.label);
+  const nodeChanged = nextNodeUrl && currentNodeUrl && nextNodeUrl !== currentNodeUrl;
+
+  // ── Confirmation dialog ─────────────────────────────────────────────────
+  const confirmDetail = nodeChanged
+    ? `Switching from ${currentNodeUrl} to ${nextNodeUrl}.\n\nLocal configs (pipes/ and systems/) will be deleted and replaced with a fresh download from the new node.`
+    : `Switch to profile '${picked.label}'?`;
+
+  const confirmLabel = nodeChanged ? "Switch & Download" : "Switch";
+  const confirmed = await vscode.window.showWarningMessage(
+    `Sesam: Switch profile to '${picked.label}'?`,
+    { modal: true, detail: confirmDetail },
+    confirmLabel,
+  );
+
+  if (confirmed !== confirmLabel) {
+    return;
+  }
+
   await setActiveProfileName(picked.label);
   _refreshStatusBar();
 
@@ -223,6 +265,37 @@ export const runSwitchProfile = async (): Promise<void> => {
   // circular dep (NodeStatusPanel imports from profile-manager).
   const { NodeStatusPanel } = await import("./node-status/NodeStatusPanel");
   NodeStatusPanel.currentPanel?.dispose();
+
+  // ── Node URL changed: clean workspace and download new configs ──────────
+  if (nodeChanged) {
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri;
+
+    if (workspaceDir) {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Sesam: Switching node…",
+          cancellable: false,
+        },
+        async () => {
+          for (const folder of ["pipes", "systems"]) {
+            const folderUri = vscode.Uri.joinPath(workspaceDir, folder);
+
+            try {
+              await vscode.workspace.fs.delete(folderUri, { recursive: true, useTrash: false });
+            } catch {
+              // folder may not exist — ignore
+            }
+          }
+        },
+      );
+    }
+
+    // Trigger a fresh download from the new node (command resolves its own credentials)
+    await vscode.commands.executeCommand("sesam.download");
+
+    return;
+  }
 
   vscode.window.showInformationMessage(`Sesam: active profile set to '${picked.label}'.`);
 };
