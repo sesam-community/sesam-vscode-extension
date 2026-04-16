@@ -17,7 +17,7 @@
 - [Pipe Dependents](#pipe-dependents)
 - [System Pipes](#system-pipes)
 - [Sesam Panel](#sesam-panel)
-- [Pipe Preview](#pipe-preview)
+- [Pipe Preview](#pipe-preview) — live server-side evaluation with syntax-highlighted output
 - [Node Integration — Upload & Download](#node-integration--upload--download)
 - [Node Integration — Run Pipe](#node-integration--run-pipe)
 - [Node Status](#node-status)
@@ -278,14 +278,23 @@ A dedicated **bottom panel tab** (alongside Terminal / Output) that shows all Se
 
 ### Pipe Preview
 
-A live preview panel that evaluates DTL transforms against a sample input entity — without needing a running Sesam node.
+A live preview panel that evaluates DTL transforms against a sample input entity by posting to the configured Sesam node.
 
 1. Open a pipe config file.
-2. Run **DTL: Preview Pipe** from the Command Palette (`Ctrl+Shift+P`).
-3. Edit the **Input Entity** and press **▶ Evaluate** (or `Ctrl+Enter`).
-4. The **Output Entity** updates instantly.
+2. Run **Sesam: Preview Pipe** from the Command Palette (`Ctrl+Shift+P`).
+3. Edit the **Input Entity** and press **▶ Run preview** (or `Ctrl+Enter`).
+4. Both the **Input Entity** and **Output Entity** render with syntax-highlighted JSON.
 
-> Functions that require a live Sesam node (e.g. `hops`, `apply-hops`, `lookup-entity`, encryption, UUID) return `null` with a warning rather than throwing.
+The output pane renders JSON with token colours that match your VS Code theme:
+
+| Token | Dark mode | Light mode |
+|---|---|---|
+| Object keys | green | teal |
+| String values | yellow | dark green |
+| Numbers, booleans | purple | blue |
+| `null`, braces, brackets, commas, colons | purple | black |
+
+> The panel requires a configured Sesam node URL and JWT token. If credentials are missing the error banner shows a **Open Settings** link to set them without leaving the panel.
 
 ---
 

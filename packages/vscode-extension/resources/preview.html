@@ -118,7 +118,8 @@
       opacity: 0.6;
     }
     .copy-btn:hover { opacity: 1; background: var(--vscode-button-secondaryBackground); }
-    textarea, .output-box {
+    /* Shared font/padding for both the textarea and its highlight overlay */
+    textarea, .output-box, .input-highlight {
       flex: 1;
       padding: 10px;
       font-family: var(--vscode-editor-font-family, monospace);
@@ -132,7 +133,40 @@
       white-space: pre;
       position: relative;
     }
+    /* Overlay highlight div sits behind the textarea */
+    .input-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    .input-highlight {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      color: transparent; /* base text invisible; only spans show colour */
+      z-index: 0;
+    }
+    textarea {
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      caret-color: var(--vscode-editor-foreground);
+      color: transparent;
+      z-index: 1;
+    }
     .output-box { user-select: text; }
+    /* Dark mode (default) */
+    .json-key   { color: rgb(80,  250, 123); }
+    .json-str   { color: rgb(241, 250, 140); }
+    .json-punct { color: rgb(189, 147, 249); }
+    /* Light mode */
+    body.vscode-light .json-key   { color: rgb(49,  132, 149); }
+    body.vscode-light .json-str   { color: rgb(3,   106,   7); }
+    body.vscode-light .json-punct { color: rgb(88,   92, 246); }
+    body.vscode-light .json-punct.json-structural { color: rgb(0, 0, 0); }
     .output-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
     .spinner-overlay {
       display: none;
@@ -213,11 +247,14 @@
         <button id="next-btn" onclick="nextEntity()">&#9654;</button>
         <span id="entity-source" class="entity-source-label"></span>
       </div>
-      <textarea id="input-entity" spellcheck="false" placeholder='{\n  "_id": "example-1",\n  "name": "Alice"\n}'>{
+      <div class="input-wrapper">
+        <div class="input-highlight" id="input-highlight"></div>
+        <textarea id="input-entity" spellcheck="false" placeholder='{\n  "_id": "example-1",\n  "name": "Alice"\n}'>{
   "_id": "example-1",
   "name": "Alice",
   "status": "active"
 }</textarea>
+      </div>
     </div>
 
     <!-- Output Entity -->
@@ -274,6 +311,7 @@
       document.getElementById('entity-counter').textContent = (entityIndex + 1) + ' / ' + embeddedEntities.length;
       document.getElementById('prev-btn').disabled = entityIndex === 0;
       document.getElementById('next-btn').disabled = entityIndex === embeddedEntities.length - 1;
+      syncHighlight();
       clearOutput();
 
       runEval();
@@ -292,6 +330,25 @@
         runEval();
       }
     });
+
+    // Keep highlight overlay in sync with textarea content and scroll
+    const inputEl = document.getElementById('input-entity');
+    const highlightEl = document.getElementById('input-highlight');
+
+    function syncHighlight() {
+      highlightEl.innerHTML = colorizeJson(inputEl.value);
+      highlightEl.scrollTop = inputEl.scrollTop;
+      highlightEl.scrollLeft = inputEl.scrollLeft;
+    }
+
+    inputEl.addEventListener('input', syncHighlight);
+    inputEl.addEventListener('scroll', () => {
+      highlightEl.scrollTop = inputEl.scrollTop;
+      highlightEl.scrollLeft = inputEl.scrollLeft;
+    });
+
+    // Initial render
+    syncHighlight();
 
     function openSettings() {
       vscode.postMessage({ type: 'openSettings' });
@@ -329,6 +386,41 @@
 
     function escHtml(str) {
       return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function colorizeJson(json) {
+      // Tokenize JSON into: keys (green), string values (yellow),
+      // and everything else — numbers, booleans, null, brackets, braces,
+      // commas, colons (purple in dark / blue in light).
+      // Structural tokens (braces, brackets, commas, colons, null) also carry
+      // the `json-structural` class so light mode can colour them separately.
+      const re = /("(?:\\u[0-9a-fA-F]{4}|\\[^u]|[^\\"])*")(\s*:)?|\b(true|false)\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|[{}\[\],]/g;
+      let out = '';
+      let last = 0;
+      let m;
+      while ((m = re.exec(json)) !== null) {
+        out += escHtml(json.slice(last, m.index));
+        last = re.lastIndex;
+        const token = m[0];
+        if (m[1] !== undefined) {
+          // quoted string
+          if (m[2] !== undefined) {
+            // object key + colon
+            out += '<span class="json-key">' + escHtml(m[1]) + '</span>'
+                 + '<span class="json-punct json-structural">' + escHtml(m[2]) + '</span>';
+          } else {
+            out += '<span class="json-str">' + escHtml(token) + '</span>';
+          }
+        } else if (token === 'null' || token === '{' || token === '}' || token === '[' || token === ']' || token === ',') {
+          // structural: braces, brackets, commas, null
+          out += '<span class="json-punct json-structural">' + escHtml(token) + '</span>';
+        } else {
+          // boolean, number — value punctuation
+          out += '<span class="json-punct">' + escHtml(token) + '</span>';
+        }
+      }
+      out += escHtml(json.slice(last));
+      return out;
     }
 
     // ── Message handler ───────────────────────────────────────────────────────
@@ -388,7 +480,7 @@
           lastOutputText = null;
         } else {
           const text = JSON.stringify(msg.output.length === 1 ? msg.output[0] : msg.output, null, 2);
-          outputBox.textContent = text;
+          outputBox.innerHTML = colorizeJson(text);
           lastOutputText = text;
           statusBar.className = 'status-bar ok';
           const count = msg.output.length;
