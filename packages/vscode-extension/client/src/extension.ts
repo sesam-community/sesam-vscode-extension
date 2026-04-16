@@ -1124,7 +1124,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("sesam.addProfile", () => runAddProfile()),
     vscode.commands.registerCommand("sesam.deleteProfile", () => runDeleteProfile()),
     vscode.commands.registerCommand("sesam.listProfiles", () => runListProfiles()),
-    vscode.commands.registerCommand("sesam.switchProfile", () => runSwitchProfile()),
+    vscode.commands.registerCommand("sesam.switchProfile", (targetProfile?: string) =>
+      runSwitchProfile(targetProfile),
+    ),
     vscode.commands.registerCommand("sesam.showProfiles", () =>
       ProfilesPanel.createOrShow(context.extensionUri),
     ),

@@ -140,9 +140,7 @@ export class ProfilesPanel {
     }
 
     if (message.type === "makeActive") {
-      await setActiveProfileName(message.profileName);
-      // Refresh status bar
-      await vscode.commands.executeCommand("sesam.switchProfile");
+      await vscode.commands.executeCommand("sesam.switchProfile", message.profileName);
       await this._loadAndSend();
       return;
     }

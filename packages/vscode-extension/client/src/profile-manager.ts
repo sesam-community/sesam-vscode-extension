@@ -223,7 +223,7 @@ export const confirmIfProduction = async (actionLabel: string): Promise<boolean>
 // Commands (registered in extension.ts, logic lives here)
 // ---------------------------------------------------------------------------
 
-export const runSwitchProfile = async (): Promise<void> => {
+export const runSwitchProfile = async (targetProfile?: string): Promise<void> => {
   // ── Guard: unsaved files ────────────────────────────────────────────────
   const dirtyFiles = vscode.workspace.textDocuments.filter((d) => d.isDirty && !d.isUntitled);
 
@@ -268,39 +268,48 @@ export const runSwitchProfile = async (): Promise<void> => {
     }
   }
 
-  const storedNames = listStoredProfileNames();
-  const profileMetas = getStoredProfiles();
   const activeProfile = getActiveProfileName();
   const currentNodeUrl = resolveNodeUrl(activeProfile);
 
-  // Build union of known profiles, active profile first, no phantom "default"
-  const allNames = [...new Set([...storedNames, ...profileMetas.map((p) => p.name)])];
-  const knownNames = [activeProfile, ...allNames.filter((n) => n !== activeProfile)];
+  let selectedProfile: string;
 
-  const items: vscode.QuickPickItem[] = [
-    ...knownNames.map((name) => ({
-      label: name,
-      description: name === activeProfile ? "$(check) active" : undefined,
-    })),
-    { label: "$(add) Add profile…", description: "" },
-  ];
+  if (targetProfile) {
+    selectedProfile = targetProfile;
+  } else {
+    const storedNames = listStoredProfileNames();
+    const profileMetas = getStoredProfiles();
 
-  const picked = await vscode.window.showQuickPick(items, {
-    title: "Switch Sesam Profile",
-    placeHolder: `Active: ${activeProfile}`,
-  });
+    // Build union of known profiles, active profile first, no phantom "default"
+    const allNames = [...new Set([...storedNames, ...profileMetas.map((p) => p.name)])];
+    const knownNames = [activeProfile, ...allNames.filter((n) => n !== activeProfile)];
 
-  if (!picked) {
-    return;
+    const items: vscode.QuickPickItem[] = [
+      ...knownNames.map((name) => ({
+        label: name,
+        description: name === activeProfile ? "$(check) active" : undefined,
+      })),
+      { label: "$(add) Add profile…", description: "" },
+    ];
+
+    const picked = await vscode.window.showQuickPick(items, {
+      title: "Switch Sesam Profile",
+      placeHolder: `Active: ${activeProfile}`,
+    });
+
+    if (!picked) {
+      return;
+    }
+
+    if (picked.label === "$(add) Add profile…") {
+      await runAddProfile();
+
+      return;
+    }
+
+    selectedProfile = picked.label;
   }
 
-  if (picked.label === "$(add) Add profile…") {
-    await runAddProfile();
-
-    return;
-  }
-
-  const nextNodeUrl = resolveNodeUrl(picked.label);
+  const nextNodeUrl = resolveNodeUrl(selectedProfile);
   const nodeChanged = nextNodeUrl && currentNodeUrl && nextNodeUrl !== currentNodeUrl;
 
   // ── Confirmation dialog ─────────────────────────────────────────────────
@@ -309,7 +318,7 @@ export const runSwitchProfile = async (): Promise<void> => {
     : `Local configs (pipes/ and systems/) will be deleted and replaced with a fresh download.`;
 
   const confirmed = await vscode.window.showWarningMessage(
-    `Sesam: Switch profile to '${picked.label}'?`,
+    `Sesam: Switch profile to '${selectedProfile}'?`,
     { modal: true, detail: confirmDetail },
     "Switch & Download",
   );
@@ -318,11 +327,12 @@ export const runSwitchProfile = async (): Promise<void> => {
     return;
   }
 
-  await setActiveProfileName(picked.label);
+  await setActiveProfileName(selectedProfile);
   void _refreshStatusBar();
+  void vscode.commands.executeCommand("sesam.refreshProfilesPanel");
 
   const ch = getSesamChannel();
-  ch.appendLine(`[switchProfile] switched to '${picked.label}'`);
+  ch.appendLine(`[switchProfile] switched to '${selectedProfile}'`);
   ch.show(true);
 
   // ── Teardown current node state ─────────────────────────────────────────
@@ -358,7 +368,7 @@ export const runSwitchProfile = async (): Promise<void> => {
     );
   }
 
-  ch.appendLine(`[switchProfile] triggering download for '${picked.label}'…`);
+  ch.appendLine(`[switchProfile] triggering download for '${selectedProfile}'…`);
 
   // Use executeCommand with a flag so sesam.download skips its own confirmation dialog
   await vscode.commands.executeCommand("sesam.download", { skipConfirm: true });
