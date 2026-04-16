@@ -23,6 +23,8 @@ export interface ProfileMeta {
   /** Base URL of the Sesam Management Portal (default: https://portal.sesam.io). */
   portalUrl?: string;
   nodeUrl: string;
+  /** When true, destructive commands (upload, download) require an extra typed confirmation. */
+  production?: boolean;
 }
 
 const PROFILES_KEY = "sesam.profiles";
@@ -149,18 +151,27 @@ const _refreshStatusBar = async (): Promise<void> => {
     // malformed nodeUrl — fall back to profile name only
   }
 
-  if (hasCredentials) {
-    _statusBarItem.backgroundColor = undefined;
-    _statusBarItem.color = new vscode.ThemeColor("testing.iconPassed");
-    _statusBarItem.text = hostname
-      ? `$(check) ${active} · ${hostname}`
-      : `$(check) Sesam: [${active}]`;
-  } else {
+  const profiles = getStoredProfiles();
+  const isProd = profiles.find((p) => p.name === active)?.production ?? false;
+
+  if (!hasCredentials) {
     _statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
     _statusBarItem.color = undefined;
     _statusBarItem.text = hostname
       ? `$(warning) ${active} · ${hostname}`
       : `$(warning) Sesam: No credentials`;
+  } else if (isProd) {
+    _statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
+    _statusBarItem.color = undefined;
+    _statusBarItem.text = hostname
+      ? `$(lock) PROD · ${active} · ${hostname}`
+      : `$(lock) PROD · ${active}`;
+  } else {
+    _statusBarItem.backgroundColor = undefined;
+    _statusBarItem.color = new vscode.ThemeColor("testing.iconPassed");
+    _statusBarItem.text = hostname
+      ? `$(check) ${active} · ${hostname}`
+      : `$(check) Sesam: [${active}]`;
   }
 
   _statusBarItem.show();
@@ -169,6 +180,43 @@ const _refreshStatusBar = async (): Promise<void> => {
 /** Public re-export so callers outside this module can trigger a status bar refresh. */
 export const refreshStatusBar = (): void => {
   void _refreshStatusBar();
+};
+
+/**
+ * If the active profile is flagged as production, shows a two-step confirmation
+ * (modal warning + type-the-name input box). Returns true if the user confirms
+ * or if the profile is not production. Returns false if the user cancels.
+ */
+export const confirmIfProduction = async (actionLabel: string): Promise<boolean> => {
+  const active = getActiveProfileName();
+  const meta = getStoredProfiles().find((p) => p.name === active);
+
+  if (!meta?.production) {
+    return true;
+  }
+
+  const proceed = await vscode.window.showWarningMessage(
+    `⚠ Production profile '${active}'`,
+    {
+      modal: true,
+      detail: `You are about to ${actionLabel} on a PRODUCTION Sesam node (${meta.nodeUrl}).\n\nClick Continue to type the profile name and confirm.`,
+    },
+    "Continue",
+  );
+
+  if (proceed !== "Continue") {
+    return false;
+  }
+
+  const typed = await vscode.window.showInputBox({
+    title: `Confirm ${actionLabel} — PRODUCTION`,
+    prompt: `Type '${active}' to confirm`,
+    placeHolder: active,
+    ignoreFocusOut: true,
+    validateInput: (v) => (v === active ? undefined : `Must match '${active}' exactly`),
+  });
+
+  return typed === active;
 };
 
 // ---------------------------------------------------------------------------
@@ -374,7 +422,7 @@ export const runAddProfile = async (): Promise<void> => {
   }
 
   const stepOffset = profilePick.label === NEW_PROFILE_LABEL ? 2 : 1;
-  const totalSteps = profilePick.label === NEW_PROFILE_LABEL ? 4 : 3;
+  const totalSteps = profilePick.label === NEW_PROFILE_LABEL ? 5 : 4;
 
   const portalUrl = await vscode.window.showInputBox({
     title: `Sesam: Profile '${profileName}' — Step ${stepOffset} of ${totalSteps}: Portal URL`,
@@ -404,7 +452,7 @@ export const runAddProfile = async (): Promise<void> => {
   }
 
   const jwt = await vscode.window.showInputBox({
-    title: `Sesam: Profile '${profileName}' — Step ${totalSteps} of ${totalSteps}: JWT Token`,
+    title: `Sesam: Profile '${profileName}' — Step ${totalSteps - 1} of ${totalSteps}: JWT Token`,
     prompt: "Paste your JWT token (obtained from the Sesam portal)",
     placeHolder: "eyJ…",
     password: true,
@@ -416,11 +464,31 @@ export const runAddProfile = async (): Promise<void> => {
     return;
   }
 
+  const productionPick = await vscode.window.showQuickPick(
+    [
+      { label: "No", description: "Standard profile — no extra confirmation required" },
+      {
+        label: "Yes",
+        description: "Mark as production — destructive commands will require typed confirmation",
+      },
+    ],
+    {
+      title: `Sesam: Profile '${profileName}' — Step ${totalSteps} of ${totalSteps}: Production?`,
+      placeHolder: "Is this a production environment?",
+      ignoreFocusOut: true,
+    },
+  );
+
+  if (productionPick === undefined) {
+    return;
+  }
+
   const trimmedPortalUrl = portalUrl.trim();
   await upsertProfile({
     name: profileName,
     portalUrl: trimmedPortalUrl === DEFAULT_PORTAL_URL ? undefined : trimmedPortalUrl,
     nodeUrl: nodeUrl.trim(),
+    production: productionPick.label === "Yes",
   });
   await storeToken(profileName, jwt.trim());
   await setActiveProfileName(profileName);

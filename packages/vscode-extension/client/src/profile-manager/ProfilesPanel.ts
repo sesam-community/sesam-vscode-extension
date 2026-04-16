@@ -23,6 +23,7 @@ import {
   getStoredProfiles,
   runAddProfile,
   setActiveProfileName,
+  upsertProfile,
 } from "../profile-manager";
 
 // ---------------------------------------------------------------------------
@@ -39,6 +40,7 @@ interface ProfileRow {
   isActive: boolean;
   /** Profile has metadata in workspaceState. */
   hasMetadata: boolean;
+  production: boolean;
 }
 
 type MessageFromWebview =
@@ -47,6 +49,7 @@ type MessageFromWebview =
   | { type: "setToken"; profileName: string }
   | { type: "editProfile"; profileName: string }
   | { type: "makeActive"; profileName: string }
+  | { type: "toggleProduction"; profileName: string }
   | { type: "addProfile" };
 
 // ---------------------------------------------------------------------------
@@ -132,6 +135,19 @@ export class ProfilesPanel {
       return;
     }
 
+    if (message.type === "toggleProduction") {
+      const metas = getStoredProfiles();
+      const meta = metas.find((p) => p.name === message.profileName);
+
+      if (meta) {
+        await upsertProfile({ ...meta, production: !meta.production });
+        await vscode.commands.executeCommand("sesam.refreshStatusBar");
+      }
+
+      await this._loadAndSend();
+      return;
+    }
+
     if (message.type === "addProfile") {
       await runAddProfile();
       await this._loadAndSend();
@@ -167,6 +183,7 @@ export class ProfilesPanel {
           tokenHint,
           isActive: name === activeProfile,
           hasMetadata: !!meta,
+          production: meta?.production ?? false,
         };
       }),
     );
@@ -302,6 +319,11 @@ export class ProfilesPanel {
     .badge-warning {
       background: #e6a817;
       color: #1a1a1a;
+    }
+
+    .badge-prod {
+      background: #d9534f;
+      color: #fff;
     }
 
     .card-fields {
@@ -440,6 +462,10 @@ export class ProfilesPanel {
           ? '<span class="badge badge-active">active</span>'
           : '';
 
+        const prodBadge = row.production
+          ? '<span class="badge badge-prod">🔒 PROD</span>'
+          : '';
+
         const warnBadge = (!row.hasMetadata && row.hasToken)
           ? '<span class="badge badge-warning">⚠ no node URL</span>'
           : '';
@@ -470,6 +496,7 @@ export class ProfilesPanel {
           '<div class="card-header">'
           + '<span class="profile-name">' + escHtml(row.name) + '</span>'
           + activeBadge
+          + prodBadge
           + warnBadge
           + '</div>'
           + '<div class="card-fields">'
@@ -481,6 +508,9 @@ export class ProfilesPanel {
           + '<button class="secondary" data-action="editProfile" data-profile="' + escAttr(row.name) + '">Edit Profile</button>'
           + '<button class="secondary" data-action="setToken" data-profile="' + escAttr(row.name) + '">'
           + (row.hasToken ? 'Update JWT' : 'Set JWT')
+          + '</button>'
+          + '<button class="secondary" data-action="toggleProduction" data-profile="' + escAttr(row.name) + '">'
+          + (row.production ? 'Unmark Production' : 'Mark as Production')
           + '</button>'
           + makeActiveBtn
           + '</div>';

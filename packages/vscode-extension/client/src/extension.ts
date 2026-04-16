@@ -37,6 +37,7 @@ import {
   runDeleteProfile,
   runListProfiles,
   runSwitchProfile,
+  confirmIfProduction,
 } from "./profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
@@ -562,6 +563,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
+      if (!(await confirmIfProduction("upload all configs"))) {
+        return;
+      }
+
       const uploadReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
 
       if (!uploadReady) {
@@ -720,6 +725,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
+      if (!(await confirmIfProduction("download all configs"))) {
+        return;
+      }
+
       const downloadReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
 
       if (!downloadReady) {
@@ -817,6 +826,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           await vscode.commands.executeCommand("sesam.setToken");
         }
 
+        return;
+      }
+
+      if (!(await confirmIfProduction(`upload '${pipeId}'`))) {
         return;
       }
 
@@ -1113,6 +1126,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("sesam.listProfiles", () => runListProfiles()),
     vscode.commands.registerCommand("sesam.switchProfile", () => runSwitchProfile()),
     vscode.commands.registerCommand("sesam.showProfiles", () => ProfilesPanel.createOrShow()),
+    vscode.commands.registerCommand("sesam.refreshStatusBar", () => refreshStatusBar()),
 
     vscode.commands.registerCommand("dtl.openDocs", () => {
       vscode.env.openExternal(
