@@ -191,6 +191,12 @@
         "title": "Sesam: Show Profiles"
       },
       {
+        "command": "sesam.runPipeTests",
+        "title": "Sesam: Run Pipe Tests",
+        "icon": "$(beaker)",
+        "enablement": "!sesam.testRunning"
+      },
+      {
         "command": "sesam.runPipe",
         "title": "Sesam: Run Pipe",
         "icon": {
@@ -309,6 +315,11 @@
         {
           "command": "dtl.previewPipe",
           "when": "resourceLangId == json || resourceLangId == sesam-config",
+          "group": "navigation@3"
+        },
+        {
+          "command": "sesam.runPipeTests",
+          "when": "(resourceLangId == json || resourceLangId == sesam-config) && !sesam.testRunning",
           "group": "navigation@3"
         },
         {

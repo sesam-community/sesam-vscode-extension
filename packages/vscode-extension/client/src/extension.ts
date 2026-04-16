@@ -43,6 +43,7 @@ import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
 import { registerSesamChatParticipant } from "./sesam-chat-participant";
 import { resolveCredentials } from "./credential-resolver";
+import { registerSesamTestController, isSesamTestRunning } from "./testing/sesam-test-controller";
 import {
   fetchNodeStatusHint,
   startProvisioningPoller,
@@ -272,6 +273,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   registerSesamLmTools(context, client);
   registerSesamChatParticipant(context, client);
+  registerSesamTestController(context);
 
   // ── Pipe DAG Views (Lineage + Dependents) ───────────────────────────────
   const dagRef: { current: DagIndex | null } = { current: null };
@@ -541,6 +543,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // ── Upload / Download ─────────────────────────────────────────────────
     vscode.commands.registerCommand("sesam.upload", async () => {
+      if (isSesamTestRunning()) {
+        vscode.window.showWarningMessage(
+          "Sesam tests are running. Please wait for them to finish.",
+        );
+        return;
+      }
+
       const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
       if (!workspaceDir) {
@@ -703,6 +712,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
 
     vscode.commands.registerCommand("sesam.download", async (opts?: { skipConfirm?: boolean }) => {
+      if (isSesamTestRunning()) {
+        vscode.window.showWarningMessage(
+          "Sesam tests are running. Please wait for them to finish.",
+        );
+        return;
+      }
+
       const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
       if (!workspaceDir) {
@@ -803,6 +819,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // ── Upload / Download single file ─────────────────────────────────────
     vscode.commands.registerCommand("sesam.uploadFile", async () => {
+      if (isSesamTestRunning()) {
+        vscode.window.showWarningMessage(
+          "Sesam tests are running. Please wait for them to finish.",
+        );
+        return;
+      }
+
       const editor =
         vscode.window.activeTextEditor ??
         _lastSesamEditor ??
@@ -1134,6 +1157,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       ProfilesPanel.refreshIfOpen(),
     ),
     vscode.commands.registerCommand("sesam.refreshStatusBar", () => refreshStatusBar()),
+
+    vscode.commands.registerCommand("sesam.runPipeTests", async () => {
+      if (isSesamTestRunning()) {
+        vscode.window.showWarningMessage("Sesam tests are already running. Please wait.");
+        return;
+      }
+
+      // Trigger a test run through the VS Code Testing API (runs the default profile)
+      await vscode.commands.executeCommand("testing.runAll");
+    }),
 
     vscode.commands.registerCommand("dtl.openDocs", () => {
       vscode.env.openExternal(
