@@ -736,10 +736,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
 
       // Direct node connectivity check — logs to Sesam output channel
-      getSesamChannel().appendLine(`[download] pinging node ${creds.nodeUrl} …`);
+      getSesamChannel().appendLine(`[DOWNLOAD] pinging node ${creds.nodeUrl} …`);
       const ping = await pingNode(creds.nodeUrl, creds.jwt, logNodeRequest);
       getSesamChannel().appendLine(
-        `[download] ping: ${ping.status}${"message" in ping ? ` — ${ping.message}` : ""}`,
+        `[DOWNLOAD] ping: ${ping.status}${"message" in ping ? ` — ${ping.message}` : ""}`,
       );
 
       if (ping.status === "auth") {
@@ -1057,14 +1057,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       const nodeUrl = resolveNodeUrl(activeProfile);
       const ch = getSesamChannel();
-      ch.appendLine(`[setToken] profile='${activeProfile}'  nodeUrl='${nodeUrl || "(none)"}'`);
+      ch.appendLine(`[TOKEN] profile='${activeProfile}'  nodeUrl='${nodeUrl || "(none)"}'`);
       ch.show(true);
 
       if (nodeUrl) {
-        ch.appendLine(`[setToken] pinging ${nodeUrl}/api/config …`);
+        ch.appendLine(`[TOKEN] pinging ${nodeUrl}/api/config …`);
         const ping = await pingNode(nodeUrl, jwt.trim(), logNodeRequest);
         ch.appendLine(
-          `[setToken] ping result: ${ping.status}${"message" in ping ? `  — ${ping.message}` : ""}`,
+          `[TOKEN] ping result: ${ping.status}${"message" in ping ? `  — ${ping.message}` : ""}`,
         );
 
         if (ping.status === "ok") {
