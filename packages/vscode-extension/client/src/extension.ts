@@ -53,6 +53,7 @@ import { disposeSesamChannel, getSesamChannel, logNodeRequest } from "./sesam-ch
 import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
 import { NodeStatusPanel } from "./node-status/NodeStatusPanel";
+import { ProfilesPanel } from "./profile-manager/ProfilesPanel";
 import { ValidationFailedError } from "@sesam/core";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
@@ -1111,6 +1112,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("sesam.deleteProfile", () => runDeleteProfile()),
     vscode.commands.registerCommand("sesam.listProfiles", () => runListProfiles()),
     vscode.commands.registerCommand("sesam.switchProfile", () => runSwitchProfile()),
+    vscode.commands.registerCommand("sesam.showProfiles", () => ProfilesPanel.createOrShow()),
 
     vscode.commands.registerCommand("dtl.openDocs", () => {
       vscode.env.openExternal(

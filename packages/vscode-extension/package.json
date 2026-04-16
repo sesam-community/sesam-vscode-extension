@@ -187,6 +187,10 @@
         "title": "Sesam: Switch Profile"
       },
       {
+        "command": "sesam.showProfiles",
+        "title": "Sesam: Show Profiles"
+      },
+      {
         "command": "sesam.runPipe",
         "title": "Sesam: Run Pipe",
         "icon": {
