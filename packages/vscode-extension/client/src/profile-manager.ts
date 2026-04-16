@@ -141,6 +141,50 @@ const _refreshStatusBar = (): void => {
 // ---------------------------------------------------------------------------
 
 export const runSwitchProfile = async (): Promise<void> => {
+  // ── Guard: unsaved files ────────────────────────────────────────────────
+  const dirtyFiles = vscode.workspace.textDocuments.filter((d) => d.isDirty && !d.isUntitled);
+
+  if (dirtyFiles.length > 0) {
+    const names = dirtyFiles.map((d) => vscode.workspace.asRelativePath(d.uri)).join(", ");
+    vscode.window.showWarningMessage(
+      `Sesam: Save all files before switching profiles. Unsaved: ${names}`,
+    );
+
+    return;
+  }
+
+  // ── Guard: uncommitted git changes ─────────────────────────────────────
+  const gitExt = vscode.extensions.getExtension("vscode.git");
+
+  if (gitExt) {
+    const git = gitExt.isActive ? gitExt.exports : await gitExt.activate();
+    const api = git.getAPI(1);
+    const repo = api.repositories[0];
+
+    if (repo) {
+      const { modified, untracked, staged } = repo.state.workingTreeChanges
+        ? {
+            modified: repo.state.workingTreeChanges.length,
+            untracked: 0,
+            staged: repo.state.indexChanges?.length ?? 0,
+          }
+        : {
+            modified: 0,
+            untracked: 0,
+            staged: 0,
+          };
+      const total = modified + untracked + staged + (repo.state.indexChanges?.length ?? 0);
+
+      if (total > 0) {
+        vscode.window.showWarningMessage(
+          "Sesam: Commit or stash all changes before switching profiles.",
+        );
+
+        return;
+      }
+    }
+  }
+
   const storedNames = listStoredProfileNames();
   const profileMetas = getStoredProfiles();
 
@@ -173,6 +217,13 @@ export const runSwitchProfile = async (): Promise<void> => {
 
   await setActiveProfileName(picked.label);
   _refreshStatusBar();
+
+  // ── Teardown current node state ─────────────────────────────────────────
+  // Import is at the top of the call chain — use dynamic import to avoid a
+  // circular dep (NodeStatusPanel imports from profile-manager).
+  const { NodeStatusPanel } = await import("./node-status/NodeStatusPanel");
+  NodeStatusPanel.currentPanel?.dispose();
+
   vscode.window.showInformationMessage(`Sesam: active profile set to '${picked.label}'.`);
 };
 
