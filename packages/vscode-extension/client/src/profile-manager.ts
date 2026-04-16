@@ -166,6 +166,11 @@ const _refreshStatusBar = async (): Promise<void> => {
   _statusBarItem.show();
 };
 
+/** Public re-export so callers outside this module can trigger a status bar refresh. */
+export const refreshStatusBar = (): void => {
+  void _refreshStatusBar();
+};
+
 // ---------------------------------------------------------------------------
 // Commands (registered in extension.ts, logic lives here)
 // ---------------------------------------------------------------------------
@@ -217,11 +222,12 @@ export const runSwitchProfile = async (): Promise<void> => {
 
   const storedNames = listStoredProfileNames();
   const profileMetas = getStoredProfiles();
-
-  // Build union of profiles known from credentials and from metadata
-  const knownNames = [...new Set([...storedNames, ...profileMetas.map((p) => p.name), "default"])];
   const activeProfile = getActiveProfileName();
   const currentNodeUrl = resolveNodeUrl(activeProfile);
+
+  // Build union of known profiles, active profile first, no phantom "default"
+  const allNames = [...new Set([...storedNames, ...profileMetas.map((p) => p.name)])];
+  const knownNames = [activeProfile, ...allNames.filter((n) => n !== activeProfile)];
 
   const items: vscode.QuickPickItem[] = [
     ...knownNames.map((name) => ({
@@ -309,24 +315,70 @@ export const runSwitchProfile = async (): Promise<void> => {
 };
 
 export const runAddProfile = async (): Promise<void> => {
-  const name = await vscode.window.showInputBox({
-    title: "Add Sesam Profile — Step 1 of 4",
-    prompt: "Profile name (e.g. dev, staging, prod)",
-    placeHolder: "default",
-    value: "default",
+  const profileMetas = getStoredProfiles();
+  const storedNames = listStoredProfileNames();
+  const activeProfile = getActiveProfileName();
+
+  // Build list of all known profiles (active first), then a "New profile…" option
+  const allKnown = [
+    activeProfile,
+    ...[...new Set([...storedNames, ...profileMetas.map((p) => p.name)])].filter(
+      (n) => n !== activeProfile,
+    ),
+  ];
+
+  const NEW_PROFILE_LABEL = "$(add) New profile…";
+
+  const profileItems: vscode.QuickPickItem[] = [
+    ...allKnown.map((name) => ({
+      label: name,
+      description: name === activeProfile ? "$(check) active" : undefined,
+      detail: profileMetas.find((p) => p.name === name)?.nodeUrl,
+    })),
+    { label: NEW_PROFILE_LABEL, description: "Create a brand-new profile" },
+  ];
+
+  const profilePick = await vscode.window.showQuickPick(profileItems, {
+    title: "Sesam: Add / Update Profile — Step 1: Select or create",
+    placeHolder: "Select an existing profile to update, or create a new one",
     ignoreFocusOut: true,
-    validateInput: (v) => (v.trim() ? undefined : "Profile name cannot be empty"),
   });
 
-  if (name === undefined) {
+  if (!profilePick) {
     return;
   }
 
+  let profileName: string;
+  let existingMeta: ProfileMeta | undefined;
+
+  if (profilePick.label === NEW_PROFILE_LABEL) {
+    const name = await vscode.window.showInputBox({
+      title: "Sesam: Add Profile — Profile name",
+      prompt: "Profile name (e.g. dev, staging, prod)",
+      placeHolder: "dev",
+      ignoreFocusOut: true,
+      validateInput: (v) => (v.trim() ? undefined : "Profile name cannot be empty"),
+    });
+
+    if (name === undefined) {
+      return;
+    }
+
+    profileName = name.trim();
+    existingMeta = undefined;
+  } else {
+    profileName = profilePick.label;
+    existingMeta = profileMetas.find((p) => p.name === profileName);
+  }
+
+  const stepOffset = profilePick.label === NEW_PROFILE_LABEL ? 2 : 1;
+  const totalSteps = profilePick.label === NEW_PROFILE_LABEL ? 4 : 3;
+
   const portalUrl = await vscode.window.showInputBox({
-    title: "Add Sesam Profile — Step 2 of 4",
-    prompt: "Management Studio URL (press Enter to use the default)",
+    title: `Sesam: Profile '${profileName}' — Step ${stepOffset} of ${totalSteps}: Portal URL`,
+    prompt: "Management Studio URL (press Enter to keep / use the default)",
     placeHolder: DEFAULT_PORTAL_URL,
-    value: DEFAULT_PORTAL_URL,
+    value: existingMeta?.portalUrl ?? DEFAULT_PORTAL_URL,
     ignoreFocusOut: true,
     validateInput: (v) =>
       v.trim().startsWith("http") ? undefined : "Must be a valid URL starting with http(s)://",
@@ -337,9 +389,10 @@ export const runAddProfile = async (): Promise<void> => {
   }
 
   const nodeUrl = await vscode.window.showInputBox({
-    title: "Add Sesam Profile — Step 3 of 4",
+    title: `Sesam: Profile '${profileName}' — Step ${stepOffset + 1} of ${totalSteps}: Node URL`,
     prompt: "Sesam node URL",
     placeHolder: "https://datahub-xxxxxxxx.sesam.cloud",
+    value: existingMeta?.nodeUrl ?? "",
     ignoreFocusOut: true,
     validateInput: (v) => (v.trim() ? undefined : "Node URL cannot be empty"),
   });
@@ -349,7 +402,7 @@ export const runAddProfile = async (): Promise<void> => {
   }
 
   const jwt = await vscode.window.showInputBox({
-    title: "Add Sesam Profile — Step 4 of 4",
+    title: `Sesam: Profile '${profileName}' — Step ${totalSteps} of ${totalSteps}: JWT Token`,
     prompt: "Paste your JWT token (obtained from the Sesam portal)",
     placeHolder: "eyJ…",
     password: true,
@@ -363,14 +416,14 @@ export const runAddProfile = async (): Promise<void> => {
 
   const trimmedPortalUrl = portalUrl.trim();
   await upsertProfile({
-    name: name.trim(),
+    name: profileName,
     portalUrl: trimmedPortalUrl === DEFAULT_PORTAL_URL ? undefined : trimmedPortalUrl,
     nodeUrl: nodeUrl.trim(),
   });
-  await storeToken(name.trim(), jwt.trim());
-  await setActiveProfileName(name.trim());
+  await storeToken(profileName, jwt.trim());
+  await setActiveProfileName(profileName);
   void _refreshStatusBar();
-  vscode.window.showInformationMessage(`Sesam: profile '${name.trim()}' saved and set as active.`);
+  vscode.window.showInformationMessage(`Sesam: profile '${profileName}' saved and set as active.`);
 };
 
 export const runDeleteProfile = async (): Promise<void> => {
