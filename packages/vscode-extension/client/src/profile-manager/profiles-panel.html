@@ -334,12 +334,6 @@
           const action = btn.getAttribute('data-action');
           const profile = btn.getAttribute('data-profile');
 
-          if (action === 'deleteProfile') {
-            if (!confirm('Delete profile \'' + profile + '\'?\n\nThis removes its stored JWT and node URL. The active profile will not be affected.')) {
-              return;
-            }
-          }
-
           vscode.postMessage({ type: action, profileName: profile });
         });
       });

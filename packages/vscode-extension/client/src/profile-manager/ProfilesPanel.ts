@@ -153,6 +153,16 @@ export class ProfilesPanel {
     }
 
     if (message.type === "deleteProfile") {
+      const answer = await vscode.window.showWarningMessage(
+        `Delete profile '${message.profileName}'? This removes its stored JWT and node URL.`,
+        { modal: true },
+        "Delete",
+      );
+
+      if (answer !== "Delete") {
+        return;
+      }
+
       await deleteToken(message.profileName);
       await removeProfile(message.profileName);
       await vscode.commands.executeCommand("sesam.refreshStatusBar");
