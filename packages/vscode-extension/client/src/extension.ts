@@ -1128,6 +1128,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("sesam.showProfiles", () =>
       ProfilesPanel.createOrShow(context.extensionUri),
     ),
+    vscode.commands.registerCommand("sesam.refreshProfilesPanel", () =>
+      ProfilesPanel.refreshIfOpen(),
+    ),
     vscode.commands.registerCommand("sesam.refreshStatusBar", () => refreshStatusBar()),
 
     vscode.commands.registerCommand("dtl.openDocs", () => {

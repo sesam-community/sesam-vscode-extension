@@ -93,6 +93,12 @@ export class ProfilesPanel {
     ProfilesPanel.currentPanel = new ProfilesPanel(panel, extensionUri);
   }
 
+  static refreshIfOpen(): void {
+    if (ProfilesPanel.currentPanel) {
+      void ProfilesPanel.currentPanel._loadAndSend();
+    }
+  }
+
   // ── Constructor ───────────────────────────────────────────────────────────
 
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {

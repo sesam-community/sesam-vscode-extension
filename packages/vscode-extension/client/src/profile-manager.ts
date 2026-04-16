@@ -521,7 +521,7 @@ export const runAddProfile = async (options?: RunAddProfileOptions): Promise<voi
   });
   await storeToken(profileName, jwt.trim());
   void _refreshStatusBar();
-  await vscode.commands.executeCommand("sesam.showProfiles");
+  void vscode.commands.executeCommand("sesam.refreshProfilesPanel");
 };
 
 export const runDeleteProfile = async (): Promise<void> => {
@@ -570,6 +570,7 @@ export const runDeleteProfile = async (): Promise<void> => {
   }
 
   vscode.window.showInformationMessage(`Sesam: profile '${picked.label}' deleted.`);
+  void vscode.commands.executeCommand("sesam.refreshProfilesPanel");
 };
 
 export const runListProfiles = (): void => {
