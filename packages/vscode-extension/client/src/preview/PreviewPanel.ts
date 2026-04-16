@@ -714,7 +714,7 @@ export class PreviewPanel {
     <span class="file-name" id="file-name"></span>
     <div class="header-actions">
       <button class="btn btn-secondary" id="mode-btn" onclick="toggleMode()">🔌 Offline</button>
-      <button class="btn btn-primary" id="run-btn" onclick="runEval()">▶ Evaluate</button>
+      <button class="btn btn-primary" id="run-btn" onclick="runEval()">▶ Run preview</button>
     </div>
   </header>
 
@@ -755,7 +755,7 @@ export class PreviewPanel {
       </div>
       <div class="output-wrapper">
         <div class="output-box" id="output-box" style="color: var(--vscode-descriptionForeground);">
-          Press ▶ Evaluate to see output.
+          Press ▶ Run preview to see output.
         </div>
         <div class="spinner-overlay" id="spinner">
           <div class="spinner-icon"></div>
@@ -782,7 +782,7 @@ export class PreviewPanel {
     function clearOutput() {
       const outputBox = document.getElementById('output-box');
       outputBox.style.color = 'var(--vscode-descriptionForeground)';
-      outputBox.textContent = 'Press \u25ba Evaluate to see output.';
+      outputBox.textContent = 'Press \u25ba Run preview to see output.';
       document.getElementById('status-bar').className = 'status-bar';
       document.getElementById('status-bar').textContent = 'Ready.';
       setErrorBanner('');
@@ -910,7 +910,7 @@ export class PreviewPanel {
         if (msg.resetOutput) {
           const outputBox = document.getElementById('output-box');
           outputBox.style.color = 'var(--vscode-descriptionForeground)';
-          outputBox.textContent = 'Press \u25ba Evaluate to see output.';
+          outputBox.textContent = 'Press \u25ba Run preview to see output.';
           document.getElementById('status-bar').className = 'status-bar';
           document.getElementById('status-bar').textContent = 'Ready.';
           document.getElementById('warnings-box').style.display = 'none';
