@@ -30,13 +30,12 @@ import { SystemPipesProvider } from "./graph/SystemPipesProvider";
 import { PreviewPanel } from "./preview/PreviewPanel";
 import {
   initProfileManager,
+  getActiveProfileName,
   getStoredProfiles,
   runAddProfile,
   runDeleteProfile,
   runListProfiles,
   runSwitchProfile,
-  setActiveProfileName,
-  upsertProfile,
 } from "./profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
@@ -968,47 +967,37 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // ── F03: Secure credential commands ──────────────────────────────────
     vscode.commands.registerCommand("sesam.setToken", async () => {
-      const profileName = await vscode.window.showInputBox({
-        title: "Sesam: Store JWT — Step 1 of 2",
-        prompt: "Profile name to store the token under",
-        value: "default",
-        placeHolder: "default",
-        ignoreFocusOut: true,
-        validateInput: (v) => (v.trim() ? undefined : "Profile name cannot be empty"),
-      });
+      const profiles = getStoredProfiles();
 
-      if (profileName === undefined) {
+      if (profiles.length === 0) {
+        vscode.window.showWarningMessage(
+          "Sesam: No profiles configured. Use 'Sesam: Add Profile' to create one first.",
+        );
+
         return;
       }
 
-      const trimmedName = profileName.trim();
+      const activeProfile = getActiveProfileName();
+      const items: vscode.QuickPickItem[] = profiles.map((p) => ({
+        label: p.name,
+        description: p.name === activeProfile ? "$(check) active" : undefined,
+        detail: p.nodeUrl,
+      }));
 
-      // If this profile has no nodeUrl stored and sesam.nodeUrl setting is also empty,
-      // prompt for one so resolveCredentials() can succeed.
-      const existingMeta = getStoredProfiles().find((p) => p.name === trimmedName);
-      const fallbackNodeUrl = vscode.workspace
-        .getConfiguration("sesam")
-        .get<string>("nodeUrl", "")
-        .trim();
+      const picked = await vscode.window.showQuickPick(items, {
+        title: "Sesam: Set JWT Token — Select profile",
+        placeHolder: "Select the profile to update",
+        ignoreFocusOut: true,
+      });
 
-      if (!existingMeta?.nodeUrl && !fallbackNodeUrl) {
-        const nodeUrl = await vscode.window.showInputBox({
-          title: "Sesam: Store JWT — Node URL",
-          prompt: "No node URL found for this profile. Enter the Sesam node URL.",
-          placeHolder: "https://datahub-xxxxxxxx.sesam.cloud",
-          ignoreFocusOut: true,
-          validateInput: (v) => (v.trim() ? undefined : "Node URL cannot be empty"),
-        });
-
-        if (nodeUrl === undefined) {
-          return;
-        }
-
-        await upsertProfile({ name: trimmedName, nodeUrl: nodeUrl.trim() });
+      if (!picked) {
+        return;
       }
 
+      const selectedName = picked.label;
+
       const jwt = await vscode.window.showInputBox({
-        title: "Sesam: Store JWT — Step 2 of 2",
+        title: `Sesam: Set JWT Token — ${selectedName}`,
         prompt: "Paste your JWT token (obtained from the Sesam portal)",
         placeHolder: "eyJ…",
         password: true,
@@ -1020,9 +1009,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      await storeToken(trimmedName, jwt.trim());
-      await setActiveProfileName(trimmedName);
-      vscode.window.showInformationMessage(`Sesam: JWT stored for profile '${trimmedName}'.`);
+      await storeToken(selectedName, jwt.trim());
+      vscode.window.showInformationMessage(`Sesam: JWT updated for profile '${selectedName}'.`);
     }),
 
     vscode.commands.registerCommand("sesam.deleteToken", async () => {

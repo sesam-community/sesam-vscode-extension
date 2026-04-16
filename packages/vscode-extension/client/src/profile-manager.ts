@@ -14,7 +14,7 @@
 
 import * as vscode from "vscode";
 
-import { deleteToken, listStoredProfileNames, storeToken } from "./credential-manager";
+import { deleteToken, getToken, listStoredProfileNames, storeToken } from "./credential-manager";
 import { DEFAULT_PORTAL_URL } from "./constants";
 import { getSesamChannel } from "./sesam-channel";
 
@@ -39,7 +39,7 @@ export const initProfileManager = (context: vscode.ExtensionContext): void => {
   _statusBarItem.tooltip = "Click to switch Sesam profile";
   context.subscriptions.push(_statusBarItem);
 
-  _refreshStatusBar();
+  void _refreshStatusBar();
 };
 
 const ctx = (): vscode.ExtensionContext => {
@@ -128,13 +128,17 @@ export const resolvePortalUrl = (profileName: string): string => {
 // Status bar
 // ---------------------------------------------------------------------------
 
-const _refreshStatusBar = (): void => {
+const _refreshStatusBar = async (): Promise<void> => {
   if (!_statusBarItem) {
     return;
   }
 
   const active = getActiveProfileName();
   const nodeUrl = resolveNodeUrl(active);
+  const secretJwt = await getToken(active);
+  const legacyJwt = vscode.workspace.getConfiguration("sesam").get<string>("jwt", "").trim();
+  const hasCredentials = !!nodeUrl && !!(secretJwt || legacyJwt);
+
   let hostname = "";
 
   try {
@@ -145,7 +149,20 @@ const _refreshStatusBar = (): void => {
     // malformed nodeUrl — fall back to profile name only
   }
 
-  _statusBarItem.text = hostname ? `$(key) ${active} · ${hostname}` : `$(key) Sesam: [${active}]`;
+  if (hasCredentials) {
+    _statusBarItem.backgroundColor = undefined;
+    _statusBarItem.color = new vscode.ThemeColor("testing.iconPassed");
+    _statusBarItem.text = hostname
+      ? `$(check) ${active} · ${hostname}`
+      : `$(check) Sesam: [${active}]`;
+  } else {
+    _statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+    _statusBarItem.color = undefined;
+    _statusBarItem.text = hostname
+      ? `$(warning) ${active} · ${hostname}`
+      : `$(warning) Sesam: No credentials`;
+  }
+
   _statusBarItem.show();
 };
 
@@ -249,7 +266,7 @@ export const runSwitchProfile = async (): Promise<void> => {
   }
 
   await setActiveProfileName(picked.label);
-  _refreshStatusBar();
+  void _refreshStatusBar();
 
   // ── Teardown current node state ─────────────────────────────────────────
   // Import is at the top of the call chain — use dynamic import to avoid a
@@ -352,7 +369,7 @@ export const runAddProfile = async (): Promise<void> => {
   });
   await storeToken(name.trim(), jwt.trim());
   await setActiveProfileName(name.trim());
-  _refreshStatusBar();
+  void _refreshStatusBar();
   vscode.window.showInformationMessage(`Sesam: profile '${name.trim()}' saved and set as active.`);
 };
 
@@ -398,7 +415,7 @@ export const runDeleteProfile = async (): Promise<void> => {
   // If the deleted profile was active, fall back to "default"
   if (picked.label === activeProfile) {
     await setActiveProfileName("default");
-    _refreshStatusBar();
+    void _refreshStatusBar();
   }
 
   vscode.window.showInformationMessage(`Sesam: profile '${picked.label}' deleted.`);
