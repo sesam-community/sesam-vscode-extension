@@ -164,7 +164,7 @@
     "commands": [
       {
         "command": "sesam.setToken",
-        "title": "Sesam: Store JWT Token"
+        "title": "Sesam: Set JWT Token"
       },
       {
         "command": "sesam.deleteToken",
