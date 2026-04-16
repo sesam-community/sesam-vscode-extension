@@ -318,6 +318,21 @@ export class PreviewPanel {
         throw previewErr;
       }
 
+      const errorEntity = outputEntities.find(
+        (e) => (e as Record<string, unknown>)["_id"] === "error",
+      );
+
+      if (errorEntity) {
+        const msg = (errorEntity as Record<string, unknown>)["message"];
+        this._panel.webview.postMessage({
+          type: "liveError",
+          kind: "dtl",
+          message: typeof msg === "string" ? msg : "DTL evaluation failed.",
+        });
+
+        return;
+      }
+
       const output = outputEntities.length > 0 ? outputEntities : null;
       this._lastOutputJson = output !== null ? JSON.stringify(output, null, 2) : undefined;
 

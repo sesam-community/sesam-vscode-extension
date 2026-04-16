@@ -510,10 +510,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.commands.registerCommand("dtl.previewPipe", () => {
       const editor = vscode.window.activeTextEditor;
+
       if (!editor) {
         vscode.window.showWarningMessage("Pipe preview: No active editor.");
         return;
       }
+
+      const errors = vscode.languages
+        .getDiagnostics(editor.document.uri)
+        .filter((d) => d.severity === vscode.DiagnosticSeverity.Error);
+
+      if (errors.length > 0) {
+        vscode.window.showWarningMessage(
+          `Pipe preview blocked: ${errors.length} error${errors.length === 1 ? "" : "s"} in this file. Fix all errors before previewing.`,
+        );
+        return;
+      }
+
       PreviewPanel.createOrShow(context.extensionUri, editor.document, context);
     }),
 
