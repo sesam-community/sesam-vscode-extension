@@ -2,11 +2,8 @@
  * Pipe Preview Panel
  *
  * Two-pane webview: editable input entity (left) / computed output (right).
- * Supports two evaluation modes:
- *   - Offline: local dtl-evaluator.ts (default, no credentials needed)
- *   - Live:    POST /api/pipes/{id}/preview on the configured Sesam node
- *
- * Mode is persisted per workspace in workspaceState under "sesam.previewMode".
+ * Evaluation is always performed live against the configured Sesam node
+ * via POST /api/pipes/{id}/preview.
  */
 
 import * as fs from "node:fs";
@@ -14,14 +11,12 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { evaluate } from "../../../src/shared/dtl-evaluator";
 import { resolveCredentials } from "../credential-resolver";
 import { fetchDatasetEntities, previewPipe } from "../node-client";
 import { fetchNodeStatusHint } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
 import { trackRequest } from "../network-status";
 
-import type { EvalEntity } from "../../../src/shared/dtl-evaluator";
 import type { Entity } from "../node-client";
 
 // ---------------------------------------------------------------------------
@@ -30,14 +25,10 @@ import type { Entity } from "../node-client";
 
 type MessageFromWebview =
   | { type: "evaluate"; inputJson: string }
-  | { type: "toggleMode" }
   | { type: "openSettings" }
   | { type: "copyOutput"; text: string }
   | { type: "copyInput"; text: string };
 
-type PreviewMode = "offline" | "live";
-
-const MODE_KEY = "sesam.previewMode";
 const DEBOUNCE_MS = 300;
 
 export class PreviewPanel {
@@ -50,7 +41,6 @@ export class PreviewPanel {
   private readonly _extensionUri: vscode.Uri;
   private readonly _context: vscode.ExtensionContext;
   private _document: vscode.TextDocument;
-  private _mode: PreviewMode;
   private _nodeProvisioning = false;
   private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private _lastOutputJson: string | undefined;
@@ -95,8 +85,6 @@ export class PreviewPanel {
     this._extensionUri = extensionUri;
     this._document = document;
     this._context = context;
-    this._mode = context.workspaceState.get<PreviewMode>(MODE_KEY) ?? "offline";
-
     this._panel.webview.html = this._buildHtml();
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -124,12 +112,10 @@ export class PreviewPanel {
     );
 
     this._sendDocumentState();
-    void this._sendModeState();
   }
 
   setNodeProvisioning(provisioning: boolean): void {
     this._nodeProvisioning = provisioning;
-    void this._sendModeState();
   }
 
   updateDocument(document: vscode.TextDocument): void {
@@ -152,43 +138,12 @@ export class PreviewPanel {
 
   private async _handleMessage(message: MessageFromWebview): Promise<void> {
     if (message.type === "evaluate") {
-      if (this._mode === "live") {
-        await this._runLiveEvaluation(message.inputJson);
-      } else {
-        this._runOfflineEvaluation(message.inputJson);
-      }
-
-      return;
-    }
-
-    if (message.type === "toggleMode") {
-      this._mode = this._mode === "offline" ? "live" : "offline";
-      await this._context.workspaceState.update(MODE_KEY, this._mode);
-      await this._sendModeState();
-
-      // When switching to live, try to populate entities from the node if none loaded locally
-      if (this._mode === "live") {
-        const text = this._document.getText();
-        const pipeId = extractPipeId(text);
-        const hasEmbedded = (extractEmbeddedEntities(text) ?? []).length > 0;
-
-        if (!hasEmbedded && pipeId) {
-          const testdata = await this._loadTestdataEntities(pipeId);
-
-          if (!testdata || testdata.length === 0) {
-            const fileName = vscode.workspace.asRelativePath(this._document.uri, false);
-            await this._fetchAndSendNodeEntities(fileName);
-          }
-        }
-      }
-
+      await this._runLiveEvaluation(message.inputJson);
       return;
     }
 
     if (message.type === "openSettings") {
       await vscode.commands.executeCommand("sesam.setToken");
-      await this._sendModeState();
-
       return;
     }
 
@@ -203,40 +158,6 @@ export class PreviewPanel {
 
       return;
     }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Offline evaluation
-  // ---------------------------------------------------------------------------
-
-  private _runOfflineEvaluation(inputJson: string): void {
-    let inputEntity: EvalEntity;
-
-    try {
-      inputEntity = JSON.parse(inputJson) as EvalEntity;
-    } catch (e) {
-      this._panel.webview.postMessage({
-        type: "error",
-        message: `Invalid input JSON: ${String(e)}`,
-      });
-
-      return;
-    }
-
-    const text = this._document.getText();
-    const rules = extractRules(text);
-
-    if (!rules || !Array.isArray(rules)) {
-      this._panel.webview.postMessage({
-        type: "error",
-        message: "Could not extract DTL rules from the active document.",
-      });
-
-      return;
-    }
-
-    const result = evaluate(rules, inputEntity);
-    this._panel.webview.postMessage({ type: "result", result });
   }
 
   // ---------------------------------------------------------------------------
@@ -258,8 +179,11 @@ export class PreviewPanel {
     const credentials = await resolveCredentials();
 
     if (!credentials) {
-      await this._sendModeState();
-
+      this._panel.webview.postMessage({
+        type: "liveError",
+        kind: "auth",
+        message: "No credentials configured. Use 'Sesam: Set JWT Token' to set up a profile.",
+      });
       return;
     }
 
@@ -358,20 +282,6 @@ export class PreviewPanel {
   }
 
   // ---------------------------------------------------------------------------
-  // Mode state
-  // ---------------------------------------------------------------------------
-
-  private async _sendModeState(): Promise<void> {
-    const hasCredentials = (await resolveCredentials()) !== null;
-    this._panel.webview.postMessage({
-      type: "modeChanged",
-      mode: this._mode,
-      hasCredentials,
-      nodeProvisioning: this._nodeProvisioning,
-    });
-  }
-
-  // ---------------------------------------------------------------------------
   // Document state + entity sourcing
   // ---------------------------------------------------------------------------
 
@@ -406,10 +316,8 @@ export class PreviewPanel {
           return;
         }
 
-        // Live mode fallback: fetch real entities from the source dataset on the node
-        if (this._mode === "live") {
-          await this._fetchAndSendNodeEntities(fileName);
-        }
+        // Fetch real entities from the source dataset on the node as a fallback
+        await this._fetchAndSendNodeEntities(fileName);
       });
     }
   }
@@ -497,53 +405,6 @@ export class PreviewPanel {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function extractRules(text: string): unknown[] | null {
-  try {
-    const parsed: unknown = JSON.parse(text);
-
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-
-    if (typeof parsed !== "object" || parsed === null) {
-      return null;
-    }
-
-    const obj = parsed as Record<string, unknown>;
-    const transform = obj["transform"] as Record<string, unknown> | unknown[] | undefined;
-
-    if (!transform) {
-      return null;
-    }
-
-    if (Array.isArray(transform)) {
-      return transform;
-    }
-
-    const rules = (transform as Record<string, unknown>)["rules"] as
-      | Record<string, unknown>
-      | undefined;
-
-    if (!rules) {
-      return null;
-    }
-
-    if (Array.isArray(rules["default"])) {
-      return rules["default"] as unknown[];
-    }
-
-    const firstKey = Object.keys(rules)[0];
-
-    if (firstKey && Array.isArray(rules[firstKey])) {
-      return rules[firstKey] as unknown[];
-    }
-  } catch {
-    // Not valid JSON
-  }
-
-  return null;
-}
 
 function extractEmbeddedEntities(text: string): unknown[] | null {
   try {
