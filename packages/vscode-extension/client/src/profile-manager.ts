@@ -258,16 +258,15 @@ export const runSwitchProfile = async (): Promise<void> => {
   // ── Confirmation dialog ─────────────────────────────────────────────────
   const confirmDetail = nodeChanged
     ? `Switching from ${currentNodeUrl} to ${nextNodeUrl}.\n\nLocal configs (pipes/ and systems/) will be deleted and replaced with a fresh download from the new node.`
-    : `Switch to profile '${picked.label}'?`;
+    : `Local configs (pipes/ and systems/) will be deleted and replaced with a fresh download.`;
 
-  const confirmLabel = nodeChanged ? "Switch & Download" : "Switch";
   const confirmed = await vscode.window.showWarningMessage(
     `Sesam: Switch profile to '${picked.label}'?`,
     { modal: true, detail: confirmDetail },
-    confirmLabel,
+    "Switch & Download",
   );
 
-  if (confirmed !== confirmLabel) {
+  if (confirmed !== "Switch & Download") {
     return;
   }
 
@@ -280,38 +279,34 @@ export const runSwitchProfile = async (): Promise<void> => {
   const { NodeStatusPanel } = await import("./node-status/NodeStatusPanel");
   NodeStatusPanel.currentPanel?.dispose();
 
-  // ── Node URL changed: clean workspace and download new configs ──────────
-  if (nodeChanged) {
-    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri;
+  await vscode.commands.executeCommand("workbench.action.closeAllEditors");
 
-    if (workspaceDir) {
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Sesam: Switching node…",
-          cancellable: false,
-        },
-        async () => {
-          for (const folder of ["pipes", "systems"]) {
-            const folderUri = vscode.Uri.joinPath(workspaceDir, folder);
+  // ── Always clean workspace and download new configs ─────────────────────
+  const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri;
 
-            try {
-              await vscode.workspace.fs.delete(folderUri, { recursive: true, useTrash: false });
-            } catch {
-              // folder may not exist — ignore
-            }
+  if (workspaceDir) {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Sesam: Switching profile…",
+        cancellable: false,
+      },
+      async () => {
+        for (const folder of ["pipes", "systems"]) {
+          const folderUri = vscode.Uri.joinPath(workspaceDir, folder);
+
+          try {
+            await vscode.workspace.fs.delete(folderUri, { recursive: true, useTrash: false });
+          } catch {
+            // folder may not exist — ignore
           }
-        },
-      );
-    }
-
-    // Trigger a fresh download from the new node (command resolves its own credentials)
-    await vscode.commands.executeCommand("sesam.download");
-
-    return;
+        }
+      },
+    );
   }
 
-  vscode.window.showInformationMessage(`Sesam: active profile set to '${picked.label}'.`);
+  // Trigger a fresh download from the new node (command resolves its own credentials)
+  await vscode.commands.executeCommand("sesam.download");
 };
 
 export const runAddProfile = async (): Promise<void> => {
