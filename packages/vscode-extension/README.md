@@ -419,7 +419,7 @@ You can configure multiple named **profiles** (e.g. `dev`, `staging`, `prod`) an
 2. Navigate to your subscription → **Settings** → **JWT** (or use the portal's **Connect** token page).
 3. Copy the token and paste it into the extension when prompted.
 
-JWTs expire — re-run **Sesam: Store JWT Token** when yours is refreshed.
+JWTs expire — re-run **Sesam: Set JWT Token** when yours is refreshed.
 
 #### Available commands
 
@@ -427,16 +427,16 @@ JWTs expire — re-run **Sesam: Store JWT Token** when yours is refreshed.
 |---|---|
 | `Sesam: Add Profile` | 4-step wizard — name, portal URL (default: `https://portal.sesam.io`), node URL, JWT. Creates or replaces a full profile. |
 | `Sesam: Delete Profile` | Remove a profile entirely (JWT from SecretStorage + node URL from workspace state). |
-| `Sesam: Store JWT Token` | Quick command to store (or update) just the JWT for a named profile. |
+| `Sesam: Set JWT Token` | Quick command to store (or update) just the JWT for a named profile. |
 | `Sesam: Delete JWT Token` | Remove only the stored JWT for a profile, keeping the node URL. |
 | `Sesam: Switch Profile` | Switch the active profile from a QuickPick list. Same as clicking the status bar item. |
 | `Sesam: List Profiles` | Print all configured profiles (name, node URL, portal URL, token status) to the Sesam output channel. |
 
 #### Falling back to settings
 
-If no JWT is stored in SecretStorage for the active profile, the extension falls back to the `sesam.jwt` workspace/user setting. This means existing setups continue to work without any changes — just migrate at your own pace by running **Sesam: Store JWT Token**.
+If no JWT is stored in SecretStorage for the active profile, the extension falls back to the `sesam.jwt` workspace/user setting. This means existing setups continue to work without any changes — just migrate at your own pace by running **Sesam: Set JWT Token**.
 
-> **Security note:** The `sesam.jwt` setting stores the token in plain text in VS Code settings files. Use **Sesam: Store JWT Token** or **Sesam: Add Profile** to move tokens to SecretStorage.
+> **Security note:** The `sesam.jwt` setting stores the token in plain text in VS Code settings files. Use **Sesam: Set JWT Token** or **Sesam: Add Profile** to move tokens to SecretStorage.
 
 ---
 
@@ -614,7 +614,7 @@ my-sesam-project/
 | `Sesam: Clear Errors` | — | Clear all entries from the Sesam panel |
 | `Sesam: Add Profile` | — | Add a named Sesam profile (node URL + JWT) |
 | `Sesam: Delete Profile` | — | Remove a profile (JWT + node URL) entirely |
-| `Sesam: Store JWT Token` | — | Store or update the JWT for a named profile |
+| `Sesam: Set JWT Token` | — | Store or update the JWT for a named profile |
 | `Sesam: Delete JWT Token` | — | Remove only the JWT for a profile, keeping the node URL |
 | `Sesam: Switch Profile` | — | Switch the active profile (also available via the status bar) |
 | `Sesam: List Profiles` | — | Print all configured profiles to the Sesam output channel |
@@ -681,7 +681,7 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 | `dtl.trace.server` | `off` | LSP communication trace (`off`/`messages`/`verbose`) |
 | `dtl.graph.scanDepth` | `3` | Directory depth to scan for pipe/system files |
 | `sesam.nodeUrl` | `""` | Base URL of your Sesam node — used as a fallback when no profile nodeUrl is configured |
-| `sesam.jwt` | `""` | JWT token stored in plain text in settings. Superseded by SecretStorage — use **Sesam: Store JWT Token** instead. |
+| `sesam.jwt` | `""` | JWT token stored in plain text in settings. Superseded by SecretStorage — use **Sesam: Set JWT Token** instead. |
 
 ---
 
