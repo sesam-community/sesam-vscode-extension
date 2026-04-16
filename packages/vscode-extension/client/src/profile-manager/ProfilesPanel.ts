@@ -185,7 +185,6 @@ export class ProfilesPanel {
 
   // ── HTML ──────────────────────────────────────────────────────────────────
 
-  // eslint-disable-next-line max-lines-per-function
   private _buildHtml(): string {
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -301,8 +300,8 @@ export class ProfilesPanel {
     }
 
     .badge-warning {
-      background: var(--vscode-inputValidation-warningBackground, #cca700);
-      color: #000;
+      background: #e6a817;
+      color: #1a1a1a;
     }
 
     .card-fields {
