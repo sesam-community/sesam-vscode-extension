@@ -273,6 +273,10 @@ export const runSwitchProfile = async (): Promise<void> => {
   await setActiveProfileName(picked.label);
   void _refreshStatusBar();
 
+  const ch = getSesamChannel();
+  ch.appendLine(`[switchProfile] switched to '${picked.label}'`);
+  ch.show(true);
+
   // ── Teardown current node state ─────────────────────────────────────────
   // Import is at the top of the call chain — use dynamic import to avoid a
   // circular dep (NodeStatusPanel imports from profile-manager).
@@ -297,6 +301,7 @@ export const runSwitchProfile = async (): Promise<void> => {
 
           try {
             await vscode.workspace.fs.delete(folderUri, { recursive: true, useTrash: false });
+            ch.appendLine(`[switchProfile] deleted ${folder}/`);
           } catch {
             // folder may not exist — ignore
           }
@@ -305,8 +310,10 @@ export const runSwitchProfile = async (): Promise<void> => {
     );
   }
 
-  // Trigger a fresh download from the new node (command resolves its own credentials)
-  await vscode.commands.executeCommand("sesam.download");
+  ch.appendLine(`[switchProfile] triggering download for '${picked.label}'…`);
+
+  // Use executeCommand with a flag so sesam.download skips its own confirmation dialog
+  await vscode.commands.executeCommand("sesam.download", { skipConfirm: true });
 };
 
 export const runAddProfile = async (): Promise<void> => {
