@@ -150,17 +150,23 @@ export class NodeClient {
    * Poll until no pipe has `runtime.state === "Deploying"`.
    * Throws NodeApiError when timeoutMs is exceeded.
    */
-  async waitForDeploy(timeoutMs = 120_000): Promise<void> {
+  async waitForDeploy(
+    timeoutMs = 120_000,
+    onProgress?: (deployingPipes: string[]) => void,
+  ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
       const pipes = await this.getPipes();
-      const deploying = pipes.some((p) => p.runtime?.state === "Deploying");
+      const deployingPipes = pipes
+        .filter((p) => p.runtime?.state === "Deploying")
+        .map((p) => p._id);
 
-      if (!deploying) {
+      if (deployingPipes.length === 0) {
         return;
       }
 
+      onProgress?.(deployingPipes);
       await sleep(2_000);
     }
 

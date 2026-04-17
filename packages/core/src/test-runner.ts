@@ -32,6 +32,8 @@ export interface TestPipesOptions extends RunOptions {
   skipValidate?: boolean;
   /** Called after each individual test result is available (for streaming UI updates). */
   onResult?: (result: TestResult) => void;
+  /** Called at the start of each pipeline phase for progress logging. */
+  onPhase?: (phase: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,11 +70,14 @@ export const testPipes = async (
 
   // ── 1. Validate ──────────────────────────────────────────────────────────
   if (!opts?.skipValidate) {
+    opts?.onPhase?.("Validating local config files...");
     const validation = await validateWorkspace(workspaceDir);
 
     if (!validation.valid) {
       throw new ValidationFailedError(validation.errors);
     }
+
+    opts?.onPhase?.("Validation passed — no errors found.");
   }
 
   // ── 2. PUT env vars (test-env.json) ──────────────────────────────────────
@@ -80,13 +85,18 @@ export const testPipes = async (
   const testEnv = await readJson<Record<string, string>>(testEnvPath);
 
   if (testEnv && Object.keys(testEnv).length > 0) {
+    opts?.onPhase?.("Uploading environment variables...");
     await client.putEnvVars(testEnv);
   }
 
   // ── 3. ZIP + PUT config ───────────────────────────────────────────────────
+  opts?.onPhase?.("Uploading config...");
   const zipBuffer = await zipWorkspaceConfig(workspaceDir);
   await client.putConfig(zipBuffer);
-  await client.waitForDeploy();
+  opts?.onPhase?.("Waiting for deploy...");
+  await client.waitForDeploy(120_000, (deployingPipes) => {
+    opts?.onPhase?.(`Still deploying: ${deployingPipes.join(", ")}...`);
+  });
 
   // ── 4. POST testdata to receivers ─────────────────────────────────────────
   const testdataDir = path.join(workspaceDir, "testdata");
@@ -94,6 +104,10 @@ export const testPipes = async (
   try {
     const entries = await fs.readdir(testdataDir);
     const jsonFiles = entries.filter((f) => f.endsWith(".json"));
+
+    if (jsonFiles.length > 0) {
+      opts?.onPhase?.(`Posting testdata (${jsonFiles.length} file(s))...`);
+    }
 
     await Promise.all(
       jsonFiles.map(async (file) => {
@@ -110,6 +124,7 @@ export const testPipes = async (
   }
 
   // ── 5. Run all pipes ─────────────────────────────────────────────────────
+  opts?.onPhase?.("Running all pipes...");
   await client.runAllPipes({
     extraZeroRuns: opts?.extraZeroRuns ?? 2,
     maxRuns: opts?.maxRuns ?? 100,
@@ -117,6 +132,7 @@ export const testPipes = async (
   });
 
   // ── 6. Discover specs ────────────────────────────────────────────────────
+  opts?.onPhase?.("Verifying test specs...");
   const allSpecPaths = await discoverTestSpecs(workspaceDir);
   const specPaths = opts?.whitelist
     ? allSpecPaths.filter((p) => {
