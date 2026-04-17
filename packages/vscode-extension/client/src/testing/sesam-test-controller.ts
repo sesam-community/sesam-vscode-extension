@@ -158,6 +158,8 @@ export const registerSesamTestController = (context: vscode.ExtensionContext): v
           `\n[TEST] ──────────────── Sesam pipe tests started (${new Date().toLocaleTimeString()}) ────────────────`,
         );
 
+        const failedResults: TestResult[] = [];
+
         await testPipes(
           { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
           workspaceRoot,
@@ -184,31 +186,11 @@ export const registerSesamTestController = (context: vscode.ExtensionContext): v
                 appendOutput(`${ansi.green}✔ ${result.spec.pipe}${ansi.reset}`);
                 run.passed(item);
               } else if (result.error) {
-                appendOutput(
-                  `${ansi.red}✘ ${result.spec.pipe}  ${ansi.dim}${result.error}${ansi.reset}`,
-                );
+                appendOutput(`${ansi.red}✘ ${result.spec.pipe}${ansi.reset}`);
                 run.errored(item, new vscode.TestMessage(result.error));
+                failedResults.push(result);
               } else {
-                appendOutput(
-                  `${ansi.red}✘ ${result.spec.pipe}  output does not match${ansi.reset}`,
-                );
-                if (result.diff) {
-                  appendOutput("");
-                  result.diff.split("\n").forEach((line) => {
-                    if (line.startsWith("---") || line.startsWith("+++")) {
-                      appendOutput(`${ansi.dim}${line}${ansi.reset}`);
-                    } else if (line.startsWith("-")) {
-                      appendOutput(`${ansi.red}${line}${ansi.reset}`);
-                    } else if (line.startsWith("+")) {
-                      appendOutput(`${ansi.green}${line}${ansi.reset}`);
-                    } else if (line.startsWith("@@")) {
-                      appendOutput(`${ansi.cyan}${ansi.dim}${line}${ansi.reset}`);
-                    } else {
-                      appendOutput(line);
-                    }
-                  });
-                  appendOutput("");
-                }
+                appendOutput(`${ansi.red}✘ ${result.spec.pipe}${ansi.reset}`);
                 const msg = result.diff
                   ? vscode.TestMessage.diff(
                       `${result.spec.pipe}: output does not match`,
@@ -217,10 +199,46 @@ export const registerSesamTestController = (context: vscode.ExtensionContext): v
                     )
                   : new vscode.TestMessage(`${result.spec.pipe}: output does not match`);
                 run.failed(item, msg);
+                failedResults.push(result);
               }
             },
           },
         );
+
+        // ── Failed summary (Vitest-style) ────────────────────────────────
+        if (failedResults.length > 0) {
+          const bar = "⎯".repeat(32);
+          appendOutput("");
+          appendOutput(
+            `${ansi.red}${ansi.bold}${bar} Failed Tests ${failedResults.length} ${bar}${ansi.reset}`,
+          );
+          for (const result of failedResults) {
+            appendOutput("");
+            appendOutput(`${ansi.red}${ansi.bold} FAIL ${result.spec.pipe}.test.json${ansi.reset}`);
+            appendOutput("");
+            if (result.error) {
+              appendOutput(`${ansi.red}${result.error}${ansi.reset}`);
+            } else if (result.diff) {
+              appendOutput(`${ansi.red}${ansi.bold}- Expected${ansi.reset}`);
+              appendOutput(`${ansi.green}${ansi.bold}+ Received${ansi.reset}`);
+              appendOutput("");
+              result.diff.split("\n").forEach((line) => {
+                if (line.startsWith("---") || line.startsWith("+++")) {
+                  appendOutput(`${ansi.dim}${line}${ansi.reset}`);
+                } else if (line.startsWith("-")) {
+                  appendOutput(`${ansi.red}${line}${ansi.reset}`);
+                } else if (line.startsWith("+")) {
+                  appendOutput(`${ansi.green}${line}${ansi.reset}`);
+                } else if (line.startsWith("@@")) {
+                  appendOutput(`${ansi.cyan}${ansi.dim}${line}${ansi.reset}`);
+                } else {
+                  appendOutput(line);
+                }
+              });
+            }
+          }
+          appendOutput("");
+        }
       } catch (err) {
         const items = request.include ?? [...ctrl.items].map(([, item]) => item);
 
