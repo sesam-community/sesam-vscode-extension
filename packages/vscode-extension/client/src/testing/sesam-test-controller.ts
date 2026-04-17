@@ -182,15 +182,40 @@ export const registerSesamTestController = (context: vscode.ExtensionContext): v
                 return;
               }
 
+              // Helper: write output pinned to this test item so clicking the
+              // test in the tree shows only its own output, not the global log.
+              const appendItemOutput = (line: string): void => {
+                run.appendOutput(line + "\r\n", undefined, item);
+              };
+
               if (result.passed) {
                 appendOutput(`${ansi.green}✔ ${result.spec.pipe}${ansi.reset}`);
                 run.passed(item);
               } else if (result.error) {
                 appendOutput(`${ansi.red}✘ ${result.spec.pipe}${ansi.reset}`);
+                appendItemOutput(`${ansi.red}${ansi.bold}${result.error}${ansi.reset}`);
                 run.errored(item, new vscode.TestMessage(result.error));
                 failedResults.push(result);
               } else {
                 appendOutput(`${ansi.red}✘ ${result.spec.pipe}${ansi.reset}`);
+                if (result.diff) {
+                  appendItemOutput(`${ansi.red}${ansi.bold}- Expected${ansi.reset}`);
+                  appendItemOutput(`${ansi.green}${ansi.bold}+ Received${ansi.reset}`);
+                  appendItemOutput("");
+                  result.diff.split("\n").forEach((line) => {
+                    if (line.startsWith("---") || line.startsWith("+++")) {
+                      appendItemOutput(`${ansi.dim}${line}${ansi.reset}`);
+                    } else if (line.startsWith("-")) {
+                      appendItemOutput(`${ansi.red}${line}${ansi.reset}`);
+                    } else if (line.startsWith("+")) {
+                      appendItemOutput(`${ansi.green}${line}${ansi.reset}`);
+                    } else if (line.startsWith("@@")) {
+                      appendItemOutput(`${ansi.cyan}${ansi.dim}${line}${ansi.reset}`);
+                    } else {
+                      appendItemOutput(line);
+                    }
+                  });
+                }
                 const msg = result.diff
                   ? vscode.TestMessage.diff(
                       `${result.spec.pipe}: output does not match`,
@@ -205,7 +230,7 @@ export const registerSesamTestController = (context: vscode.ExtensionContext): v
           },
         );
 
-        // ── Failed summary (Vitest-style) ────────────────────────────────
+        // ── Failed summary (Vitest-style overview) ───────────────────────
         if (failedResults.length > 0) {
           const bar = "⎯".repeat(32);
           appendOutput("");
@@ -215,26 +240,12 @@ export const registerSesamTestController = (context: vscode.ExtensionContext): v
           for (const result of failedResults) {
             appendOutput("");
             appendOutput(`${ansi.red}${ansi.bold} FAIL ${result.spec.pipe}.test.json${ansi.reset}`);
-            appendOutput("");
             if (result.error) {
-              appendOutput(`${ansi.red}${result.error}${ansi.reset}`);
-            } else if (result.diff) {
-              appendOutput(`${ansi.red}${ansi.bold}- Expected${ansi.reset}`);
-              appendOutput(`${ansi.green}${ansi.bold}+ Received${ansi.reset}`);
-              appendOutput("");
-              result.diff.split("\n").forEach((line) => {
-                if (line.startsWith("---") || line.startsWith("+++")) {
-                  appendOutput(`${ansi.dim}${line}${ansi.reset}`);
-                } else if (line.startsWith("-")) {
-                  appendOutput(`${ansi.red}${line}${ansi.reset}`);
-                } else if (line.startsWith("+")) {
-                  appendOutput(`${ansi.green}${line}${ansi.reset}`);
-                } else if (line.startsWith("@@")) {
-                  appendOutput(`${ansi.cyan}${ansi.dim}${line}${ansi.reset}`);
-                } else {
-                  appendOutput(line);
-                }
-              });
+              appendOutput(`${ansi.dim}       ${result.error}${ansi.reset}`);
+            } else {
+              appendOutput(
+                `${ansi.dim}       output does not match expected — click to inspect diff${ansi.reset}`,
+              );
             }
           }
           appendOutput("");
