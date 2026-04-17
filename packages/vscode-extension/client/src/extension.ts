@@ -1692,17 +1692,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
-  // Keep the PreviewPanel updated when the active document changes
+  // Keep the PreviewPanel updated when the active document changes.
+  // Only react to files inside a pipes/ folder — not expected/, testdata/, systems/, etc.
+  const isPipeConfigFile = (document: vscode.TextDocument): boolean => {
+    const segments = document.uri.fsPath.split(path.sep);
+    return segments.includes("pipes");
+  };
+
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (editor && PreviewPanel.currentPanel) {
+      if (editor && PreviewPanel.currentPanel && isPipeConfigFile(editor.document)) {
         PreviewPanel.currentPanel.updateDocument(editor.document);
       }
     }),
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (
         PreviewPanel.currentPanel &&
-        event.document === vscode.window.activeTextEditor?.document
+        event.document === vscode.window.activeTextEditor?.document &&
+        isPipeConfigFile(event.document)
       ) {
         PreviewPanel.currentPanel.updateDocument(event.document);
       }
