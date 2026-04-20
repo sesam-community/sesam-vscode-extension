@@ -308,6 +308,11 @@
         "command": "sesam.viewDiff",
         "title": "Sesam: View Diff with Node",
         "icon": "$(diff)"
+      },
+      {
+        "command": "sesam.revertConfig",
+        "title": "Sesam: Revert to Remote Node Version",
+        "icon": "$(discard)"
       }
     ],
     "menus": {
@@ -460,6 +465,10 @@
         {
           "command": "sesam.showStatus",
           "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "sesam.revertConfig",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -503,7 +512,12 @@
         {
           "command": "sesam.viewDiff",
           "when": "viewItem == syncItem.modified || viewItem == syncItem.node-only",
-          "group": "inline"
+          "group": "inline@1"
+        },
+        {
+          "command": "sesam.revertConfig",
+          "when": "viewItem == syncItem.modified",
+          "group": "inline@2"
         }
       ],
       "viewsWelcome": []

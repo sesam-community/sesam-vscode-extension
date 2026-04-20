@@ -2183,6 +2183,71 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       void workspaceDir;
     }),
+
+    vscode.commands.registerCommand(
+      "sesam.revertConfig",
+      async (item: ConfigStatusItem | unknown) => {
+        const resolved = item instanceof ConfigStatusItem ? item : undefined;
+
+        if (!resolved || resolved.syncItem.state !== "modified" || !resolved.syncItem.localPath) {
+          vscode.window.showWarningMessage(
+            "Sesam: Revert must be invoked from a Modified item in the Sync Status view.",
+          );
+          return;
+        }
+
+        const { id, kind, localPath } = resolved.syncItem;
+
+        const answer = await vscode.window.showWarningMessage(
+          `Sesam: Revert '${id}' to the remote node version? This will overwrite your local changes.`,
+          { modal: true },
+          "Revert",
+        );
+
+        if (answer !== "Revert") {
+          return;
+        }
+
+        const creds = await resolveCredentials();
+
+        if (!creds) {
+          vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+          return;
+        }
+
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Sesam: Reverting '${id}' to node version…`,
+            cancellable: false,
+          },
+          async () => {
+            try {
+              const nodeConfig = await getNodeConfig(
+                { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+                id,
+                kind,
+              );
+              const reorderKeys =
+                vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ??
+                false;
+              const content = formatSesamJson(nodeConfig, 2, { reorderKeys });
+              await vscode.workspace.fs.writeFile(
+                vscode.Uri.file(localPath),
+                Buffer.from(content, "utf-8"),
+              );
+              vscode.window.showInformationMessage(
+                `Sesam: '${id}' reverted to remote node version.`,
+              );
+              refreshSyncStatusSilently();
+            } catch (err) {
+              const detail = err instanceof Error ? err.message : String(err);
+              vscode.window.showErrorMessage(`Sesam: Revert failed: ${detail}`);
+            }
+          },
+        );
+      },
+    ),
   );
 
   // Keep the PreviewPanel updated when the active document changes.
