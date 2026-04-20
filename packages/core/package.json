@@ -12,9 +12,11 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "diff": "^9.0.0",
     "jszip": "^3.10.1"
   },
   "devDependencies": {
+    "@types/diff": "^8.0.0",
     "@types/jszip": "^3.4.1",
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",

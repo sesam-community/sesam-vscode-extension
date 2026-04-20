@@ -35,10 +35,8 @@ export const logNodeRequest = (entry: NodeRequestLogEntry): void => {
     ch.appendLine(
       `[${ts}] [NODE] ${entry.method} ${entry.url}  ${status}  ${entry.durationMs} ms  — ${entry.error}`,
     );
-    ch.show(/* preserveFocus */ true);
   } else {
     ch.appendLine(`[${ts}] [NODE] ${entry.method} ${entry.url}  ${status}  ${entry.durationMs} ms`);
-    ch.show(/* preserveFocus */ true);
   }
 };
 

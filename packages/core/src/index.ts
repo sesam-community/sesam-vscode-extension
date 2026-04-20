@@ -22,3 +22,17 @@ export { downloadConfig, downloadSingleConfig } from "./download.js";
 export { runPipe, runAllPipes } from "./run-pipes.js";
 export { getStatus, getPipeStatus } from "./status.js";
 export { validateWorkspace } from "./validate.js";
+
+// Test management (F05)
+export { readTestSpec, readExpectedOutput, discoverTestSpecs } from "./test-spec-reader.js";
+export {
+  filterEntity,
+  applyIgnoreDeletes,
+  normalizeDecimal,
+  normalizeEntity,
+  sortEntities,
+} from "./test-entity-filter.js";
+export { compareTestOutput } from "./test-comparator.js";
+export type { TestCompareResult } from "./test-comparator.js";
+export { testPipes } from "./test-runner.js";
+export type { TestPipesOptions } from "./test-runner.js";
