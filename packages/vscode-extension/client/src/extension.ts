@@ -427,6 +427,77 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
   };
 
+  // Wire per-row diff from NodeStatusPanel (systems) → open diff directly via nodeConfigProvider
+  NodeStatusPanel.onDiffSystem = async (systemId: string) => {
+    const creds = await resolveCredentials();
+
+    if (!creds) {
+      vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+      return;
+    }
+
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Sesam: Fetching node config for '${systemId}'…`,
+        cancellable: false,
+      },
+      async () => {
+        try {
+          const nodeConfig = await getNodeConfig(
+            { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+            systemId,
+            "system",
+          );
+          const reorderKeys =
+            vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+          const content = formatSesamJson(nodeConfig, 2, { reorderKeys });
+          const nodeUri = nodeConfigProvider.store(systemId, "system", content);
+
+          const all = await vscode.workspace.findFiles(
+            "**/{pipes,systems}/**",
+            "**/node_modules/**",
+          );
+          const CONFIG_EXTS = [".conf.json", ".conf.system", ".json"];
+          const localMatch = all.find((uri) => {
+            const base = uri.fsPath.split("/").at(-1) ?? "";
+            return CONFIG_EXTS.some((ext) => base === `${systemId}${ext}`);
+          });
+
+          if (localMatch) {
+            await vscode.commands.executeCommand(
+              "vscode.diff",
+              nodeUri,
+              localMatch,
+              `${systemId}: Node ↔ Local`,
+            );
+          } else {
+            const doc = await vscode.workspace.openTextDocument(nodeUri);
+            await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+
+            if (workspaceDir) {
+              vscode.window
+                .showInformationMessage(
+                  `'${systemId}' exists on the node but has no local file. Download it to compare.`,
+                  "Download",
+                )
+                .then((action) => {
+                  if (action === "Download") {
+                    void vscode.commands.executeCommand("sesam.downloadFile");
+                  }
+                });
+            }
+          }
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(`Sesam: Failed to fetch node config: ${detail}`);
+        }
+      },
+    );
+  };
+
   // Sync active config to all DAG views
   const syncActivePipe = (editor: vscode.TextEditor | undefined): void => {
     if (editor && getActivePipeId(editor) !== undefined) {

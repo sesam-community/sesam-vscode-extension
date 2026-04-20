@@ -121,6 +121,20 @@ export interface PipeStatus {
 }
 
 // ---------------------------------------------------------------------------
+// System status (for Node Status panel)
+// ---------------------------------------------------------------------------
+
+export interface SystemSummary {
+  id: string;
+  /** e.g. "system:rest", "system:microservice" */
+  systemType: string;
+  /** Pipes whose source.system = this id */
+  pipesIn: number;
+  /** Pipes whose sink.system = this id */
+  pipesOut: number;
+}
+
+// ---------------------------------------------------------------------------
 // Sync Status (F06)
 // ---------------------------------------------------------------------------
 

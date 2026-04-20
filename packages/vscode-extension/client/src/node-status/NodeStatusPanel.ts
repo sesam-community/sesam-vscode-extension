@@ -34,6 +34,7 @@ type MessageFromWebview =
   | { type: "openLocalFile"; pipeId: string }
   | { type: "openInManagementStudio"; pipeId: string; portalUrl: string; subId: string }
   | { type: "diffPipe"; pipeId: string }
+  | { type: "diffSystem"; systemId: string }
   | { type: "showSyncStatus" }
   | { type: "ready" };
 
@@ -48,6 +49,8 @@ export class NodeStatusPanel {
   static onProvisioningNeeded: ((nodeUrl: string, jwt: string) => void) | undefined;
   /** Set by extension.ts to open a diff for a specific pipe against the node. */
   static onDiffPipe: ((pipeId: string) => void) | undefined;
+  /** Set by extension.ts to open a diff for a specific system against the node. */
+  static onDiffSystem: ((systemId: string) => void) | undefined;
 
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
@@ -151,6 +154,11 @@ export class NodeStatusPanel {
       return;
     }
 
+    if (message.type === "diffSystem") {
+      NodeStatusPanel.onDiffSystem?.(message.systemId);
+      return;
+    }
+
     if (message.type === "showSyncStatus") {
       await vscode.commands.executeCommand("sesam.showStatus");
       return;
@@ -179,18 +187,23 @@ export class NodeStatusPanel {
 
     try {
       const runner = new SesamRunner();
-      const statuses = this._filterPipeId
-        ? [
-            await runner.pipeStatus(
-              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
-              this._filterPipeId,
-            ),
-          ]
-        : await runner.status({
-            nodeUrl: creds.nodeUrl,
-            jwtToken: creds.jwt,
-            logger: logNodeRequest,
-          });
+      const [statuses, systems] = await Promise.all([
+        this._filterPipeId
+          ? runner
+              .pipeStatus(
+                { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+                this._filterPipeId,
+              )
+              .then((s) => [s])
+          : runner.status({ nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest }),
+        this._filterPipeId
+          ? Promise.resolve([])
+          : runner.systemSummaries({
+              nodeUrl: creds.nodeUrl,
+              jwtToken: creds.jwt,
+              logger: logNodeRequest,
+            }),
+      ]);
       done(true);
 
       const subId = extractSubscriptionId(creds.jwt) ?? "";
@@ -199,6 +212,7 @@ export class NodeStatusPanel {
       this._panel.webview.postMessage({
         type: "data",
         statuses,
+        systems,
         nodeUrl: creds.nodeUrl,
         subId,
         portalUrl,
@@ -529,6 +543,37 @@ export class NodeStatusPanel {
     }
 
     .hidden { display: none !important; }
+
+    /* ── tabs ── */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      background: transparent;
+      color: var(--vscode-foreground);
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      padding: 6px 16px;
+      font-size: 12px;
+      cursor: pointer;
+      opacity: 0.65;
+    }
+
+    .tab-btn:hover { opacity: 1; background: transparent; }
+
+    .tab-btn.active {
+      opacity: 1;
+      border-bottom-color: var(--vscode-focusBorder);
+      outline: none;
+    }
+
+    .tab-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
   </style>
 </head>
 <body>
@@ -541,6 +586,15 @@ export class NodeStatusPanel {
   <button id="refreshBtn" class="secondary" onclick="sendRefresh()">↻ Refresh</button>
   <button class="secondary" onclick="syncDiff()" title="Compare local config with node — opens diff editor">⇄ Sync Diff</button>
 </div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" id="tab-pipes" onclick="switchTab('pipes')">Pipes</button>
+  <button class="tab-btn" id="tab-systems" onclick="switchTab('systems')">Systems</button>
+</div>
+
+<!-- ══ PIPES TAB ══ -->
+<div class="tab-panel" id="panel-pipes">
 
 <!-- Filter bar -->
 <div class="filter-bar">
@@ -587,6 +641,47 @@ export class NodeStatusPanel {
   </table>
 </div>
 
+</div><!-- /panel-pipes -->
+
+<!-- ══ SYSTEMS TAB ══ -->
+<div class="tab-panel hidden" id="panel-systems">
+
+<!-- Filter bar -->
+<div class="filter-bar">
+  <input type="search" id="sysSearchBox" placeholder='Filter by system ID…' oninput="applySysFilters()" />
+</div>
+
+<!-- Loading / error / empty overlays -->
+<div class="table-wrapper" id="sysTableWrapper">
+  <div class="status-overlay" id="sysLoadingOverlay">
+    <div class="spinner"></div>
+    <span>Loading…</span>
+  </div>
+  <div class="status-overlay hidden" id="sysErrorOverlay">
+    <span style="font-size:24px">⚠️</span>
+    <pre class="error-msg" id="sysErrorMsg"></pre>
+    <button onclick="sendRefresh()">Try again</button>
+  </div>
+  <div class="status-overlay hidden" id="sysEmptyOverlay">
+    <span style="font-size:24px">🔍</span>
+    <span>No systems match the filter.</span>
+  </div>
+  <table id="sysTable" class="hidden">
+    <thead>
+      <tr>
+        <th onclick="sortSysBy('id')">System ID <span class="sort-arrow" id="sys-sort-id"></span></th>
+        <th onclick="sortSysBy('systemType')">Type <span class="sort-arrow" id="sys-sort-systemType"></span></th>
+        <th onclick="sortSysBy('pipesIn')" title="Pipes using this system as source">Pipes In <span class="sort-arrow" id="sys-sort-pipesIn"></span></th>
+        <th onclick="sortSysBy('pipesOut')" title="Pipes using this system as sink">Pipes Out <span class="sort-arrow" id="sys-sort-pipesOut"></span></th>
+        <th>Config Status</th>
+      </tr>
+    </thead>
+    <tbody id="sys-tbody"></tbody>
+  </table>
+</div>
+
+</div><!-- /panel-systems -->
+
 <script>
   const vscode = acquireVsCodeApi();
 
@@ -599,6 +694,13 @@ export class NodeStatusPanel {
   let currentSubId   = '';
   let currentPortalUrl = ${JSON.stringify(DEFAULT_PORTAL_URL)};
   let currentFilterPipeId = null;
+
+  // systems state
+  let allSystems = [];
+  let sysSortKey = 'id';
+  let sysSortAsc = true;
+  let sysConfigStatus = {}; // id -> 'modified'|'node-only'|'local-only'|undefined
+  let activeTab = 'pipes';
 
   // ── Sync Diff ──────────────────────────────────────────────────────────
   function syncDiff() {
@@ -636,6 +738,7 @@ export class NodeStatusPanel {
 
     if (msg.type === 'data') {
       allStatuses = msg.statuses;
+      allSystems  = msg.systems || [];
       currentNodeUrl   = msg.nodeUrl;
       currentSubId     = msg.subId   || '';
       currentPortalUrl = msg.portalUrl || ${JSON.stringify(DEFAULT_PORTAL_URL)};
@@ -651,11 +754,136 @@ export class NodeStatusPanel {
       }
       renderSummary();
       renderTable();
+      renderSysTable();
+    }
+
+    if (msg.type === 'syncStatus') {
+      // update config-status badges for systems
+      sysConfigStatus = {};
+      (msg.items || []).forEach(item => {
+        if (item.kind === 'system') sysConfigStatus[item.id] = item.state;
+      });
+      renderSysTable();
     }
   });
 
   // Notify extension that the webview is ready
   vscode.postMessage({ type: 'ready' });
+
+  // ── Tab switching ──────────────────────────────────────────────────────
+  function switchTab(tab) {
+    activeTab = tab;
+    document.getElementById('panel-pipes').classList.toggle('hidden', tab !== 'pipes');
+    document.getElementById('panel-systems').classList.toggle('hidden', tab !== 'systems');
+    document.getElementById('tab-pipes').classList.toggle('active', tab === 'pipes');
+    document.getElementById('tab-systems').classList.toggle('active', tab === 'systems');
+  }
+
+  // ── Systems rendering ──────────────────────────────────────────────────
+  function getSysFiltered() {
+    const q = (document.getElementById('sysSearchBox')?.value || '').trim().toLowerCase();
+    if (!q) return allSystems;
+    return allSystems.filter(s => s.id.toLowerCase().includes(q));
+  }
+
+  function getSysSorted(rows) {
+    return [...rows].sort((a, b) => {
+      const av = a[sysSortKey] ?? '';
+      const bv = b[sysSortKey] ?? '';
+      const cmp = typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv));
+      return sysSortAsc ? cmp : -cmp;
+    });
+  }
+
+  function sortSysBy(key) {
+    if (sysSortKey === key) { sysSortAsc = !sysSortAsc; }
+    else { sysSortKey = key; sysSortAsc = true; }
+    renderSysTable();
+  }
+
+  function applySysFilters() { renderSysTable(); }
+
+  function renderSysTable() {
+    ['id','systemType','pipesIn','pipesOut'].forEach(k => {
+      const el = document.getElementById('sys-sort-' + k);
+      if (el) el.textContent = k === sysSortKey ? (sysSortAsc ? '▲' : '▼') : '';
+    });
+
+    const rows = getSysSorted(getSysFiltered());
+
+    if (allSystems.length === 0) {
+      showSysOverlay('loading');
+      return;
+    }
+
+    if (rows.length === 0) {
+      showSysOverlay('empty');
+      return;
+    }
+
+    showSysOverlay('table');
+
+    const tbody = document.getElementById('sys-tbody');
+    const diffSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h11A1.5 1.5 0 0 1 15 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5ZM5.25 5.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5a.75.75 0 0 1 .75-.75Zm5.5 0a.75.75 0 0 1 .75.75v1.25h1.25a.75.75 0 0 1 0 1.5H11.5v1.25a.75.75 0 0 1-1.5 0V9h-1.25a.75.75 0 0 1 0-1.5H10V6.25a.75.75 0 0 1 .75-.75Z"/></svg>';
+
+    tbody.innerHTML = rows.map(s => {
+      const safeId = escHtml(s.id);
+      const safeType = escHtml(s.systemType || '—');
+      const status = sysConfigStatus[s.id];
+      const statusBadge = status
+        ? '<span class="badge ' + configStatusBadgeClass(status) + '">' + escHtml(configStatusLabel(status)) + '</span>'
+        : '<span style="opacity:.45">—</span>';
+
+      return '<tr>' +
+        '<td>' +
+          '<span class="pipe-id" data-action="open-sys-local" data-sys-id="' + safeId + '" title="Open local config file">' + safeId + '</span>' +
+          '<span class="pipe-diff-link" data-action="diff-system" data-sys-id="' + safeId + '" title="View diff with node config">' +
+            diffSvg +
+          '</span>' +
+        '</td>' +
+        '<td style="opacity:.85;font-size:11px">' + safeType + '</td>' +
+        '<td class="count-cell">' + (s.pipesIn > 0 ? s.pipesIn : '<span style="opacity:.35">0</span>') + '</td>' +
+        '<td class="count-cell">' + (s.pipesOut > 0 ? s.pipesOut : '<span style="opacity:.35">0</span>') + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function showSysOverlay(kind) {
+    document.getElementById('sysLoadingOverlay').classList.add('hidden');
+    document.getElementById('sysErrorOverlay').classList.add('hidden');
+    document.getElementById('sysEmptyOverlay').classList.add('hidden');
+    document.getElementById('sysTable').classList.add('hidden');
+
+    if (kind === 'loading')      document.getElementById('sysLoadingOverlay').classList.remove('hidden');
+    else if (kind === 'error')   document.getElementById('sysErrorOverlay').classList.remove('hidden');
+    else if (kind === 'empty')   document.getElementById('sysEmptyOverlay').classList.remove('hidden');
+    else                         document.getElementById('sysTable').classList.remove('hidden');
+  }
+
+  function configStatusBadgeClass(state) {
+    if (state === 'modified')   return 'badge-queued';
+    if (state === 'node-only')  return 'badge-running';
+    if (state === 'local-only') return 'badge-disabled';
+    return '';
+  }
+
+  function configStatusLabel(state) {
+    if (state === 'modified')   return 'Modified';
+    if (state === 'node-only')  return 'Remote Only';
+    if (state === 'local-only') return 'Local Only';
+    return state;
+  }
+
+  // Delegated click listener for systems table
+  document.getElementById('sys-tbody').addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const sysId = el.dataset.sysId;
+    const action = el.dataset.action;
+    if (action === 'open-sys-local')  vscode.postMessage({ type: 'openLocalFile', pipeId: sysId });
+    if (action === 'diff-system')     vscode.postMessage({ type: 'diffSystem', systemId: sysId });
+  });
 
   // ── Overlay helpers ────────────────────────────────────────────────────
   function showOverlay(kind) {
