@@ -373,6 +373,20 @@ Run the currently open pipe on the connected Sesam node.
 - The play button is replaced by a spinner while the run is in progress; all other node commands are disabled.
 - On failure, a hint is shown about the node status; if the node is provisioning, the provisioning poller starts automatically.
 
+#### Node status bar indicator
+
+A shared status bar item (bottom-left) tracks the node connection lifecycle and updates automatically whenever any command contacts the node:
+
+| Stage | Text | Background |
+|---|---|---|
+| Checking node | `$(sync~spin) Sesam: Checking node…` | Amber |
+| Node hibernated | `$(warning) Sesam: Node hibernated` | Amber |
+| Starting provisioning | `$(sync~spin) Sesam: Starting provisioning…` | Amber |
+| Trying to connect | `$(sync~spin) Sesam: Trying to connect…` | Amber |
+| Connected | `$(check) Sesam: Connected` | Default |
+
+Each stage shows an informative **tooltip** on hover. The **Connected** state auto-hides after 2.5 seconds.
+
 ---
 
 ### Node Status

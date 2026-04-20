@@ -60,6 +60,10 @@ export class NodeStatusPanel {
   static onDiffSystem: ((systemId: string) => void) | undefined;
   /** Set by extension.ts so the panel can persist the live-updates preference. */
   static context: vscode.ExtensionContext | undefined;
+  /** Called when a node REST request is about to start. */
+  static onNodeCheckStart: (() => void) | undefined;
+  /** Called when a node REST request succeeds (node is reachable). */
+  static onNodeCheckSuccess: (() => void) | undefined;
 
   private static readonly _liveEnabledKey = "sesam.liveUpdates.enabled";
 
@@ -245,6 +249,8 @@ export class NodeStatusPanel {
     this._subId = extractSubscriptionId(creds.jwt) ?? "";
     this._portalUrl = resolvePortalUrl(getActiveProfileName());
 
+    NodeStatusPanel.onNodeCheckStart?.();
+
     const done = trackRequest(
       "GET",
       this._filterPipeId ? `pipe-status/${this._filterPipeId}` : "node-status",
@@ -274,6 +280,8 @@ export class NodeStatusPanel {
       this._cachedStatuses = statuses;
       this._cachedSystems = systems;
       this._postDataMessage();
+
+      NodeStatusPanel.onNodeCheckSuccess?.();
 
       if (this._filterPipeId) {
         // Single-pipe view: live updates not applicable — reveal refresh button
