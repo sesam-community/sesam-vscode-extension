@@ -21,6 +21,7 @@
 - [Node Integration — Upload & Download](#node-integration--upload--download)
 - [Node Integration — Run Pipe](#node-integration--run-pipe)
 - [Node Status](#node-status)
+- [Sync Status & Diff View](#sync-status--diff-view)
 - [New Sesam Config File](#new-sesam-config-file)
 - [Credential Management](#credential-management)
 - [Copilot Agent Integration](#copilot-agent-integration)
@@ -408,6 +409,65 @@ Available from the **editor title bar** when a Sesam config file is open. Opens 
 
 Clicking the button for a different pipe while the panel is already open updates the search filter to the new pipe.
 
+#### System Status (`sesam.systemStatus`)
+
+Open from the **Explorer toolbar** or the Command Palette. Opens the same Node Status WebView with the **Systems tab** pre-selected.
+
+**Systems tab columns:**
+
+| Column | Description |
+|---|---|
+| System | System ID |
+| Type | Sesam system type (`rest`, `microservice`, …) |
+| Pipes In | Number of pipes that read from this system |
+| Pipes Out | Number of pipes that write to this system |
+| Config Status | `Modified` / `Node only` / `Local only` / `—` — same sync state as the Sync Status view |
+
+The **Config Status** column updates automatically when the Sync Status view refreshes. Clicking the badge opens a diff panel (same behaviour as the Pipes tab).
+
+---
+
+### Sync Status & Diff View
+
+A sidebar tree view (**Sesam Sync Status**) that compares local config files against the versions currently on the connected node.
+
+#### Tree view
+
+Items are grouped into three states:
+
+| State | Description |
+|---|---|
+| **Modified** | File exists both locally and on the node, but the contents differ |
+| **Node only** | Config exists on the node but has no matching local file |
+| **Local only** | Config exists locally but is not present on the node |
+
+Hovering any item shows a tooltip: `"<kind> '<id>' <state description>"`.
+
+The view auto-populates 3 seconds after the extension activates, and refreshes automatically 500 ms after any Sesam config file is saved.
+
+#### Opening a diff
+
+- **Modified items** — click or press Enter to open a side-by-side VS Code diff editor (local ↔ node).
+- **Node-only items** — opens the node version read-only with a prompt to download the file locally.
+
+#### Reverting changes
+
+Each **Modified** item has an inline **Revert** button (⊘). Clicking it:
+
+1. Shows a confirmation modal.
+2. Downloads the node version of the config.
+3. Overwrites the local file with the node version (key-ordered and formatted).
+4. Refreshes the sync status view silently.
+
+#### Download guard
+
+Running **Sesam: Download** or **Sesam: Download File** when there are local changes first fetches the sync status (or reuses the cached result) and, if any `Modified` or `Local-only` items are detected, shows a modal:
+
+- **See Local Diffs** — focuses the Sync Status view (and auto-opens the diff if there is exactly one changed file).
+- **Download Anyway** — proceeds with the download without reviewing diffs.
+
+If no local differences are found the download proceeds silently.
+
 ---
 
 ### Credential Management
@@ -612,10 +672,12 @@ my-sesam-project/
 | `Sesam: Run Pipe` | `Ctrl+Shift+R` | Run the active pipe on the connected node |
 | `Sesam: Pipe Status` | — | Open the Node Status panel filtered to the active pipe |
 | `Sesam: Node Status` | — | Open the Node Status panel showing all pipes |
+| `Sesam: System Status` | — | Open the Node Status panel with the Systems tab selected |
 | `Sesam: Upload` | `Ctrl+Shift+U` | Validate and upload all local configs to the node |
 | `Sesam: Download` | `Ctrl+Shift+D` | Download all configs from the node (overwrites local files) |
 | `Sesam: Upload File` | — | Upload only the active config file to the node |
 | `Sesam: Download File` | — | Download only the active pipe/system config from the node |
+| `Sesam: Revert Config` | — | Overwrite local file with the node version (inline button on Modified sync items) |
 | `Sesam: Refresh Pipe DAG` | — | Rescan workspace and refresh Lineage / Dependents / System Pipes sidebars |
 | `DTL: Open Documentation` | — | Open the Sesam DTL docs in a browser |
 | `DTL: New Sesam Config File` | — | Create a new pipe or system config file from a template |
