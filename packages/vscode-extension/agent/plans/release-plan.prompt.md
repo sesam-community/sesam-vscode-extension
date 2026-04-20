@@ -25,10 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **F06**: Status / Diff View — Sesam Sync Status tree view in the Explorer sidebar showing
   which pipes and systems are **Modified**, **Remote Only**, or **Local Only** compared to the
   connected node; inline diff editor (node ↔ local) per item; `sesam.showStatus` command;
-  `sesam.viewDiff` command (palette + inline button); Systems tab in Node Status panel with
-  Type / Pipes In / Pipes Out / Config Status columns; `sesam.systemStatus` command; download
-  commands warn when local changes would be overwritten and offer "See Local Diffs"; sync status
-  auto-refreshes on file save (debounced) and after download
+  `sesam.viewDiff` command (palette + inline button); `sesam.revertConfig` inline button on
+  Modified items (reverts local file to remote node version with confirmation); per-item tooltips
+  describing the state; Systems tab in Node Status panel with Type / Pipes In / Pipes Out /
+  Config Status columns; `sesam.systemStatus` command; download commands warn when local changes
+  would be overwritten and offer "See Local Diffs"; sync status auto-populates 3 s after activation
+  and auto-refreshes on file save (debounced) and after download
 
 ---
 

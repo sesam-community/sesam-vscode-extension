@@ -1,6 +1,6 @@
 # F06: Status / Diff View
 
-> **Status**: `phase 4 implemented` — all planned phases complete; Phase E (gutter decorations) remains future work
+> **Status**: `implemented` — all planned phases complete; Phase F (gutter decorations) remains future work
 > **Rollout Phase**: Phase 2 - Testing & Diff
 > **Tracking**: [README.md](README.md)
 
@@ -33,9 +33,11 @@ Users can see which pipes/systems are locally modified vs the node, and diff or 
 4. Displayed in a `TreeView` (`SyncStatusProvider` in `client/src/status/SyncStatusProvider.ts`):
    - Groups: **Modified**, **Remote Only**, **Local Only**
    - Each group shows the count and is expanded by default.
+   - Each leaf item has a tooltip describing the state, e.g. `pipe 'my-id' exists on the node but has no local file`.
 5. Refresh button (↻) in the view title reruns `sesam.showStatus`.
-6. Auto-refreshes silently after any save of a sesam config file (debounced 500 ms) — even before the user has explicitly run `sesam.showStatus`.
-7. Auto-refreshes silently after `sesam.download` and `sesam.downloadFile` complete.
+6. Auto-populates 3 seconds after extension activation (silent background fetch) — no user action required to see Remote Only items on first open.
+7. Auto-refreshes silently after any save of a sesam config file (debounced 500 ms).
+8. Auto-refreshes silently after `sesam.download` and `sesam.downloadFile` complete.
 
 ### Phase B: Diff Panel ✅
 
@@ -74,7 +76,18 @@ Users can see which pipes/systems are locally modified vs the node, and diff or 
        is exactly one diffable item, opens its diff editor immediately.
    - **No local changes**: proceeds without any dialog.
 
-### Phase E: Gutter Decorations (future)
+### Phase E: Revert to Node ✅
+
+1. Each **Modified** item in the Sync Status tree has an inline $(discard) button → `sesam.revertConfig`.
+2. On invocation:
+   - Shows a confirmation modal: *"Revert 'id' to the remote node version? This will overwrite your local changes."*
+   - Fetches the node config via `getNodeConfig()`.
+   - Formats with `formatSesamJson` and writes directly to `localPath`.
+   - Triggers a silent sync status refresh — the item disappears from the Modified group.
+3. Only available on `modified` items (not Remote Only / Local Only).
+4. Hidden from the command palette (`when: false`).
+
+### Phase F: Gutter Decorations (future)
 
 1. After `sesam.showStatus`, mark files that are `modified` with a gutter indicator using
    `vscode.window.createTextEditorDecorationType`.
@@ -92,11 +105,11 @@ Users can see which pipes/systems are locally modified vs the node, and diff or 
 | `packages/core/src/sync-status.ts` (new) | `getSyncStatus()`, `getNodeConfig()` — pipes and systems |
 | `packages/core/src/types.ts` | Added `SyncState`, `SyncStatusItem`, `SystemSummary` |
 | `packages/core/src/index.ts` | Exported new functions and types |
-| `client/src/status/SyncStatusProvider.ts` (new) | `SyncStatusProvider`, `SesamNodeConfigProvider`, `ConfigStatusItem`, `SESAM_NODE_SCHEME` |
+| `client/src/status/SyncStatusProvider.ts` (new) | `SyncStatusProvider`, `SesamNodeConfigProvider`, `ConfigStatusItem`, `SESAM_NODE_SCHEME`; per-item tooltips with kind + state |
 | `client/src/sesam-runner.ts` | Added `syncStatus()` and `systemSummaries()` methods; imported `NodeClient` |
 | `client/src/node-status/NodeStatusPanel.ts` | Pipes/Systems tab bar; Systems table; `onDiffSystem` static; `initialTab` param; `diffSystem` message |
-| `package.json` | `sesamSyncStatus` view; `sesam.showStatus`, `sesam.viewDiff`, `sesam.systemStatus` commands; menus |
-| `client/src/extension.ts` | Wired all providers, commands, `ensureSyncStatus()`, `refreshSyncStatusSilently()`, `onDiffPipe`, `onDiffSystem`, save-debounce listener, download guards |
+| `package.json` | `sesamSyncStatus` view; `sesam.showStatus`, `sesam.viewDiff`, `sesam.systemStatus`, `sesam.revertConfig` commands; menus (inline diff + revert buttons) |
+| `client/src/extension.ts` | Wired all providers, commands, `ensureSyncStatus()`, `refreshSyncStatusSilently()`, `onDiffPipe`, `onDiffSystem`, save-debounce listener, download guards, on-load 3 s init, `sesam.revertConfig` |
 
 ---
 
