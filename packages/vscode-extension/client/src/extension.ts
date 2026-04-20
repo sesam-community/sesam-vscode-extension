@@ -1025,21 +1025,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           );
 
           if (diffAction === "See Local Diffs") {
-            await vscode.commands.executeCommand("sesam.showStatus");
+            // Data is already loaded — focus the Sync Status tree view and open diffs
+            await vscode.commands.executeCommand("sesamSyncStatus.focus");
+
+            const diffable = syncStatusProvider
+              .getItems()
+              .filter((i) => i.state === "modified" || i.state === "node-only");
+
+            if (diffable.length === 1) {
+              await vscode.commands.executeCommand(
+                "sesam.viewDiff",
+                new ConfigStatusItem(diffable[0]),
+              );
+            }
+
             return;
           }
 
           if (diffAction !== "Download Anyway") {
-            return;
-          }
-        } else {
-          const confirmed = await vscode.window.showWarningMessage(
-            "Sesam: Download will overwrite local pipe and system configs. Continue?",
-            { modal: true },
-            "Download",
-          );
-
-          if (confirmed !== "Download") {
             return;
           }
         }
@@ -1255,16 +1258,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
 
         if (diffAction !== "Download Anyway") {
-          return;
-        }
-      } else {
-        const confirmed = await vscode.window.showWarningMessage(
-          `Sesam: This will overwrite the local file for '${pipeId}'. Continue?`,
-          { modal: true },
-          "Download",
-        );
-
-        if (confirmed !== "Download") {
           return;
         }
       }
