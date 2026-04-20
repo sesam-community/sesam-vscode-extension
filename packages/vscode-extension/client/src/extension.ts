@@ -65,6 +65,7 @@ import {
 import { ValidationFailedError, getNodeConfig } from "@sesam/core";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
+import type { SyncStatusItem } from "@sesam/core";
 
 let client: LanguageClient;
 
@@ -352,6 +353,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // Silently ignore — user did not request the refresh explicitly
       }
     });
+  };
+
+  /**
+   * Fetch sync status and store in the provider. Returns the items, or null on failure.
+   * Uses the cached result if already loaded.
+   */
+  const ensureSyncStatus = async (): Promise<readonly SyncStatusItem[] | null> => {
+    if (syncStatusProvider.isLoaded()) {
+      return syncStatusProvider.getItems();
+    }
+
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const creds = await resolveCredentials();
+
+    if (!workspaceDir || !creds) {
+      return null;
+    }
+
+    try {
+      const runner = new SesamRunner();
+      const items = await runner.syncStatus(
+        { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+        workspaceDir,
+      );
+      syncStatusProvider.setItems(items);
+      return items;
+    } catch {
+      return null;
+    }
   };
 
   // Wire per-row diff from NodeStatusPanel → open diff directly via nodeConfigProvider
@@ -964,14 +994,54 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
 
       if (!opts?.skipConfirm) {
-        const confirmed = await vscode.window.showWarningMessage(
-          "Sesam: Download will overwrite local pipe and system configs. Continue?",
-          { modal: true },
-          "Download",
+        // Fetch sync status (use cache if already loaded, otherwise fetch now)
+        const syncItems = await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Window, title: "Sesam: Checking local diffs…" },
+          () => ensureSyncStatus(),
         );
 
-        if (confirmed !== "Download") {
-          return;
+        const localChanges = (syncItems ?? []).filter(
+          (item) => item.state === "modified" || item.state === "local-only",
+        );
+
+        if (localChanges.length > 0) {
+          const modifiedCount = localChanges.filter((i) => i.state === "modified").length;
+          const localOnlyCount = localChanges.filter((i) => i.state === "local-only").length;
+          const parts: string[] = [];
+
+          if (modifiedCount > 0) {
+            parts.push(`${modifiedCount} modified`);
+          }
+
+          if (localOnlyCount > 0) {
+            parts.push(`${localOnlyCount} local-only`);
+          }
+
+          const diffAction = await vscode.window.showWarningMessage(
+            `Sesam: You have ${parts.join(" and ")} local change${localChanges.length === 1 ? "" : "s"} that will be overwritten by the download.`,
+            { modal: true },
+            "See Local Diffs",
+            "Download Anyway",
+          );
+
+          if (diffAction === "See Local Diffs") {
+            await vscode.commands.executeCommand("sesam.showStatus");
+            return;
+          }
+
+          if (diffAction !== "Download Anyway") {
+            return;
+          }
+        } else {
+          const confirmed = await vscode.window.showWarningMessage(
+            "Sesam: Download will overwrite local pipe and system configs. Continue?",
+            { modal: true },
+            "Download",
+          );
+
+          if (confirmed !== "Download") {
+            return;
+          }
         }
       }
 
@@ -1162,14 +1232,41 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      const confirmed = await vscode.window.showWarningMessage(
-        `Sesam: This will overwrite the local file for '${pipeId}'. Continue?`,
-        { modal: true },
-        "Download",
+      // Check if this specific config has local changes (fetch status if not yet loaded)
+      const syncItems = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: "Sesam: Checking local diffs…" },
+        () => ensureSyncStatus(),
       );
+      const localDiff = (syncItems ?? []).find((item) => item.id === pipeId);
 
-      if (confirmed !== "Download") {
-        return;
+      if (localDiff && (localDiff.state === "modified" || localDiff.state === "local-only")) {
+        const stateLabel =
+          localDiff.state === "modified" ? "local modifications" : "exists only locally";
+        const diffAction = await vscode.window.showWarningMessage(
+          `Sesam: '${pipeId}' has ${stateLabel}. Downloading will overwrite your local version.`,
+          { modal: true },
+          "See Diff",
+          "Download Anyway",
+        );
+
+        if (diffAction === "See Diff") {
+          await vscode.commands.executeCommand("sesam.viewDiff");
+          return;
+        }
+
+        if (diffAction !== "Download Anyway") {
+          return;
+        }
+      } else {
+        const confirmed = await vscode.window.showWarningMessage(
+          `Sesam: This will overwrite the local file for '${pipeId}'. Continue?`,
+          { modal: true },
+          "Download",
+        );
+
+        if (confirmed !== "Download") {
+          return;
+        }
       }
 
       await vscode.window.withProgress(
