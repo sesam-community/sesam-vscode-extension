@@ -121,6 +121,20 @@ export interface PipeStatus {
 }
 
 // ---------------------------------------------------------------------------
+// Sync Status (F06)
+// ---------------------------------------------------------------------------
+
+export type SyncState = "modified" | "node-only" | "local-only";
+
+export interface SyncStatusItem {
+  id: string;
+  kind: "pipe" | "system";
+  state: SyncState;
+  /** Absolute path to the local file (undefined for node-only items). */
+  localPath?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
 

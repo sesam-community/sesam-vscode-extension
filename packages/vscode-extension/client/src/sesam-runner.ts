@@ -13,6 +13,7 @@ import {
   downloadSingleConfig,
   getPipeStatus,
   getStatus,
+  getSyncStatus,
   runAllPipes,
   runPipe,
   uploadConfig,
@@ -30,6 +31,7 @@ import type {
   RunResult,
   SingleDownloadResult,
   SingleUploadResult,
+  SyncStatusItem,
   UploadOptions,
   UploadResult,
   ValidationResult,
@@ -83,6 +85,14 @@ export class SesamRunner {
    */
   async status(creds: NodeCredentials): Promise<PipeStatus[]> {
     return getStatus(creds);
+  }
+
+  /**
+   * Compare local workspace configs against the live node.
+   * Returns items that differ (modified, node-only, or local-only).
+   */
+  async syncStatus(creds: NodeCredentials, workspaceDir: string): Promise<SyncStatusItem[]> {
+    return getSyncStatus(creds, workspaceDir);
   }
 
   /**

@@ -293,6 +293,16 @@
         "command": "sesam.nodeStatus",
         "title": "Sesam: Open Node Status Panel",
         "icon": "$(server)"
+      },
+      {
+        "command": "sesam.showStatus",
+        "title": "Sesam: Show Sync Status",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sesam.viewDiff",
+        "title": "Sesam: View Diff with Node",
+        "icon": "$(diff)"
       }
     ],
     "menus": {
@@ -437,6 +447,10 @@
         {
           "command": "sesam.nodeStatus",
           "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "sesam.showStatus",
+          "when": "workspaceFolderCount > 0"
         }
       ],
       "view/title": [
@@ -464,6 +478,18 @@
           "command": "dtl.refreshDag",
           "when": "view == sesamPipeLineage",
           "group": "navigation@1"
+        },
+        {
+          "command": "sesam.showStatus",
+          "when": "view == sesamSyncStatus",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "sesam.viewDiff",
+          "when": "viewItem == syncItem.modified || viewItem == syncItem.node-only",
+          "group": "inline"
         }
       ],
       "viewsWelcome": []
@@ -496,6 +522,11 @@
     ],
     "views": {
       "explorer": [
+        {
+          "id": "sesamSyncStatus",
+          "name": "Sesam Sync Status",
+          "when": "workspaceFolderCount > 0"
+        },
         {
           "id": "sesamPipeLineage",
           "name": "Pipe Lineage",

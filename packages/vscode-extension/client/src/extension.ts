@@ -56,7 +56,13 @@ import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
 import { NodeStatusPanel } from "./node-status/NodeStatusPanel";
 import { ProfilesPanel } from "./profile-manager/ProfilesPanel";
-import { ValidationFailedError } from "@sesam/core";
+import {
+  SyncStatusProvider,
+  SesamNodeConfigProvider,
+  ConfigStatusItem,
+  SESAM_NODE_SCHEME,
+} from "./status/SyncStatusProvider";
+import { ValidationFailedError, getNodeConfig } from "@sesam/core";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
 
@@ -307,6 +313,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showCollapseAll: true,
   });
   context.subscriptions.push(errorsView);
+
+  // ── Sync Status View (F06) ───────────────────────────────────────────────
+  const syncStatusProvider = new SyncStatusProvider();
+  const nodeConfigProvider = new SesamNodeConfigProvider();
+
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(SESAM_NODE_SCHEME, nodeConfigProvider),
+  );
+
+  const syncStatusView = vscode.window.createTreeView("sesamSyncStatus", {
+    treeDataProvider: syncStatusProvider,
+    showCollapseAll: false,
+  });
+  context.subscriptions.push(syncStatusView);
 
   // Sync active config to all DAG views
   const syncActivePipe = (editor: vscode.TextEditor | undefined): void => {
@@ -1689,6 +1709,106 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await vscode.workspace.fs.delete(targetUri);
       const doc = await vscode.workspace.openTextDocument(newFileUri);
       await vscode.window.showTextDocument(doc);
+    }),
+
+    // ── Sync Status / Diff (F06) ──────────────────────────────────────────
+    vscode.commands.registerCommand("sesam.showStatus", async () => {
+      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+      if (!workspaceDir) {
+        vscode.window.showWarningMessage("Sesam: No workspace folder open.");
+        return;
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+        return;
+      }
+
+      syncStatusProvider.setLoading();
+      await syncStatusView.reveal(undefined as never, { expand: true }).then(
+        () => undefined,
+        () => undefined,
+      );
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Sesam: Fetching sync status…",
+          cancellable: false,
+        },
+        async () => {
+          try {
+            const runner = new SesamRunner();
+            const items = await runner.syncStatus(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+              workspaceDir,
+            );
+            syncStatusProvider.setItems(items);
+          } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            syncStatusProvider.setError(`Error: ${detail}`);
+          }
+        },
+      );
+    }),
+
+    vscode.commands.registerCommand("sesam.viewDiff", async (item: ConfigStatusItem | unknown) => {
+      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+      if (!(item instanceof ConfigStatusItem)) {
+        vscode.window.showWarningMessage("Sesam: Diff must be invoked from the Sync Status view.");
+        return;
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Sesam: Fetching node config for '${item.syncItem.id}'…`,
+          cancellable: false,
+        },
+        async () => {
+          try {
+            const nodeConfig = await getNodeConfig(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+              item.syncItem.id,
+              item.syncItem.kind,
+            );
+            const reorderKeys =
+              vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+            const content = formatSesamJson(nodeConfig, 2, { reorderKeys });
+            const nodeUri = nodeConfigProvider.store(item.syncItem.id, item.syncItem.kind, content);
+
+            if (item.syncItem.state === "modified" && item.syncItem.localPath) {
+              const localUri = vscode.Uri.file(item.syncItem.localPath);
+              await vscode.commands.executeCommand(
+                "vscode.diff",
+                nodeUri,
+                localUri,
+                `${item.syncItem.id}: Node ↔ Local`,
+              );
+            } else {
+              // node-only: open read-only virtual document
+              const doc = await vscode.workspace.openTextDocument(nodeUri);
+              await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+            }
+          } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            vscode.window.showErrorMessage(`Sesam: Failed to fetch node config: ${detail}`);
+          }
+        },
+      );
+
+      void workspaceDir;
     }),
   );
 
