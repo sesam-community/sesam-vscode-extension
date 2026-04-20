@@ -203,6 +203,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Wire the provisioning poller into PreviewPanel and NodeStatusPanel live eval failures
   PreviewPanel.onProvisioningNeeded = startPollerIfNeeded;
   NodeStatusPanel.onProvisioningNeeded = startPollerIfNeeded;
+  NodeStatusPanel.context = context;
 
   // ── Network Status Bar (F23) ──────────────────────────────────────────────
   createNetworkStatusBar(context);

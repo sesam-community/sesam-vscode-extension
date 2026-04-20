@@ -17,7 +17,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { resolveCredentials } from "../credential-resolver";
-import { fetchNodeStatusHint } from "../portal-client";
+import { fetchNodeStatusHint, fetchSupportsLiveUpdates } from "../portal-client";
 import { extractSubscriptionId } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
 import { logLiveUpdate } from "../sesam-channel";
@@ -58,6 +58,10 @@ export class NodeStatusPanel {
   static onDiffPipe: ((pipeId: string) => void) | undefined;
   /** Set by extension.ts to open a diff for a specific system against the node. */
   static onDiffSystem: ((systemId: string) => void) | undefined;
+  /** Set by extension.ts so the panel can persist the live-updates preference. */
+  static context: vscode.ExtensionContext | undefined;
+
+  private static readonly _liveEnabledKey = "sesam.liveUpdates.enabled";
 
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
@@ -73,8 +77,8 @@ export class NodeStatusPanel {
   private _subId = "";
   private _portalUrl = DEFAULT_PORTAL_URL;
   private _jwt = "";
-  /** Whether the user has enabled live updates (default on). */
-  private _liveEnabled = true;
+  /** Whether the user has enabled live updates (default on, persisted in globalState). */
+  private _liveEnabled: boolean;
   /** Becomes false after connect_error or mid-session disconnect. */
   private _liveSupported = true;
   private readonly _liveUpdates: SesamLiveUpdates;
@@ -115,6 +119,9 @@ export class NodeStatusPanel {
     this._panel = panel;
     this._filterPipeId = filterPipeId;
     this._initialTab = initialTab;
+    // Restore user preference; default true
+    this._liveEnabled =
+      NodeStatusPanel.context?.globalState.get<boolean>(NodeStatusPanel._liveEnabledKey) ?? true;
     this._panel.webview.html = this._buildHtml();
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -198,15 +205,20 @@ export class NodeStatusPanel {
 
     if (message.type === "set-live-updates") {
       this._liveEnabled = message.enabled;
+      // Persist preference so it survives panel re-opens
+      void NodeStatusPanel.context?.globalState.update(
+        NodeStatusPanel._liveEnabledKey,
+        message.enabled,
+      );
 
       if (!message.enabled) {
+        // Disable is purely local — just close the socket, send nothing to the server
         this._liveUpdates.disconnect();
         this._panel.webview.postMessage({ type: "connection-state", state: "disabled" });
       } else if (this._liveEnabled && this._nodeUrl && this._jwt) {
-        // User re-enabled — reconnect
+        // User re-enabled — check subscription flag then reconnect
         this._liveSupported = true;
-        logLiveUpdate(`Connecting to ${toWebSocketUrl(this._nodeUrl)}`);
-        this._liveUpdates.connect(this._nodeUrl, this._jwt);
+        void this._connectLive(this._nodeUrl, this._jwt);
       }
 
       return;
@@ -267,8 +279,7 @@ export class NodeStatusPanel {
         // Single-pipe view: live updates not applicable — reveal refresh button
         this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
       } else if (this._liveEnabled && !this._liveUpdates.isConnected) {
-        logLiveUpdate(`Connecting to ${toWebSocketUrl(creds.nodeUrl)}`);
-        this._liveUpdates.connect(creds.nodeUrl, creds.jwt);
+        await this._connectLive(creds.nodeUrl, creds.jwt);
       }
     } catch (err) {
       done(false);
@@ -288,6 +299,25 @@ export class NodeStatusPanel {
 
   // ── Live-update helpers ───────────────────────────────────────────────────
 
+  /**
+   * Check the subscription `supports_live_updates` flag, then connect.
+   * Posts `connection-state: "not-supported"` and returns early when the
+   * subscription does not support live updates.
+   */
+  private async _connectLive(nodeUrl: string, jwt: string): Promise<void> {
+    const supported = await fetchSupportsLiveUpdates(jwt);
+
+    if (!supported) {
+      this._liveSupported = false;
+      logLiveUpdate("Live updates not supported by this subscription");
+      this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+      return;
+    }
+
+    logLiveUpdate(`Connecting to ${toWebSocketUrl(nodeUrl)}`);
+    this._liveUpdates.connect(nodeUrl, jwt);
+  }
+
   private _postDataMessage(): void {
     this._panel.webview.postMessage({
       type: "data",
@@ -298,7 +328,6 @@ export class NodeStatusPanel {
       portalUrl: this._portalUrl,
       filterPipeId: this._filterPipeId ?? null,
       initialTab: this._initialTab ?? null,
-      refreshedAt: new Date().toLocaleTimeString(),
     });
   }
 
@@ -413,12 +442,6 @@ export class NodeStatusPanel {
       max-width: 260px;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .toolbar .refreshed-at {
-      font-size: 11px;
-      opacity: 0.55;
       white-space: nowrap;
     }
 
@@ -728,8 +751,12 @@ export class NodeStatusPanel {
 <div class="toolbar">
   <h2>Sesam Node Status</h2>
   <span class="node-url" id="nodeUrl"></span>
-  <span class="refreshed-at" id="refreshedAt"></span>
-  <button id="refreshBtn" class="secondary" onclick="sendRefresh()">↻ Refresh</button>
+  <span id="liveBadge" class="live-badge" style="display:none"></span>
+  <label id="liveToggleLabel" class="live-toggle" style="display:none">
+    <input type="checkbox" id="liveToggle" checked />
+    Live updates
+  </label>
+  <button id="refreshBtn" class="secondary" onclick="sendRefresh()" style="display:none">↻ Refresh</button>
   <button class="secondary" onclick="syncDiff()" title="Compare local config with node — opens diff editor">⇄ Sync Diff</button>
 </div>
 
@@ -923,7 +950,6 @@ export class NodeStatusPanel {
       currentPortalUrl = msg.portalUrl || ${JSON.stringify(DEFAULT_PORTAL_URL)};
       currentFilterPipeId = msg.filterPipeId || null;
       document.getElementById('nodeUrl').textContent = msg.nodeUrl;
-      document.getElementById('refreshedAt').textContent = 'Updated ' + msg.refreshedAt;
       document.getElementById('refreshBtn').disabled = false;
       if (msg.filterPipeId) {
         document.getElementById('searchBox').value = '"' + msg.filterPipeId + '"';

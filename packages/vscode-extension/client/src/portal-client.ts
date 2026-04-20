@@ -43,6 +43,8 @@ export interface SubscriptionStatus {
   was_hibernated_due_to_idleness?: true;
   /** Array of connections; empty when none are configured. */
   connections?: SubscriptionConnection[];
+  /** Whether this subscription supports real-time Socket.IO push events. */
+  supports_live_updates?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -431,4 +433,21 @@ export const fetchNodeStatusHint = async (nodeUrl: string, jwt: string): Promise
   }
 
   return buildStatusHint(status);
+};
+
+/**
+ * Returns true when the subscription's `supports_live_updates` flag is set.
+ * Returns false if the JWT has no sub-id, the portal is unreachable, or the
+ * flag is absent/false.
+ */
+export const fetchSupportsLiveUpdates = async (jwt: string): Promise<boolean> => {
+  const subId = extractSubscriptionId(jwt);
+
+  if (!subId) {
+    return false;
+  }
+
+  const status = await fetchSubscriptionStatus(jwt, subId);
+
+  return status?.supports_live_updates === true;
 };
