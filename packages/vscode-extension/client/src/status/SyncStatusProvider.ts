@@ -92,6 +92,13 @@ export class ConfigStatusItem extends vscode.TreeItem {
     this.contextValue = `syncItem.${syncItem.state}`;
     this.iconPath = new vscode.ThemeIcon(itemIcons[syncItem.state]);
 
+    const tooltips: Record<SyncState, string> = {
+      modified: `${syncItem.kind} '${syncItem.id}' differs from the version on the node`,
+      "node-only": `${syncItem.kind} '${syncItem.id}' exists on the node but has no local file`,
+      "local-only": `${syncItem.kind} '${syncItem.id}' exists locally but is not on the node`,
+    };
+    this.tooltip = tooltips[syncItem.state];
+
     if (syncItem.localPath) {
       this.resourceUri = vscode.Uri.file(syncItem.localPath);
       this.command = {
