@@ -24,6 +24,10 @@ import { SesamRunner } from "../sesam-runner";
 import { trackRequest } from "../network-status";
 import { getActiveProfileName, resolvePortalUrl } from "../profile-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
+import { SesamLiveUpdates } from "./live-updates";
+
+import type { LiveEventType } from "./live-updates";
+import type { PipeStatus, SystemSummary } from "@sesam/core";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +40,7 @@ type MessageFromWebview =
   | { type: "diffPipe"; pipeId: string }
   | { type: "diffSystem"; systemId: string }
   | { type: "showSyncStatus" }
+  | { type: "set-live-updates"; enabled: boolean }
   | { type: "ready" };
 
 // ---------------------------------------------------------------------------
@@ -58,6 +63,19 @@ export class NodeStatusPanel {
   private _filterPipeId: string | undefined;
   /** When set, the panel opens on this tab instead of the default 'pipes' tab. */
   private _initialTab: "pipes" | "systems" | undefined;
+
+  // ── Live updates state ────────────────────────────────────────────────────
+  private _cachedStatuses: PipeStatus[] = [];
+  private _cachedSystems: SystemSummary[] = [];
+  private _nodeUrl = "";
+  private _subId = "";
+  private _portalUrl = DEFAULT_PORTAL_URL;
+  private _jwt = "";
+  /** Whether the user has enabled live updates (default on). */
+  private _liveEnabled = true;
+  /** Becomes false after connect_error or mid-session disconnect. */
+  private _liveSupported = true;
+  private readonly _liveUpdates: SesamLiveUpdates;
 
   // ── Static factory ────────────────────────────────────────────────────────
 
@@ -106,6 +124,10 @@ export class NodeStatusPanel {
       null,
       this._disposables,
     );
+
+    this._liveUpdates = new SesamLiveUpdates((statuses, eventType, errorMessage) => {
+      this._handleLiveUpdate(statuses, eventType, errorMessage);
+    });
   }
 
   // ── Message handler ───────────────────────────────────────────────────────
@@ -171,6 +193,21 @@ export class NodeStatusPanel {
       await vscode.commands.executeCommand("sesam.showStatus");
       return;
     }
+
+    if (message.type === "set-live-updates") {
+      this._liveEnabled = message.enabled;
+
+      if (!message.enabled) {
+        this._liveUpdates.disconnect();
+        this._panel.webview.postMessage({ type: "connection-state", state: "disabled" });
+      } else if (this._nodeUrl && this._jwt) {
+        // User re-enabled — reconnect
+        this._liveSupported = true;
+        this._liveUpdates.connect(this._nodeUrl, this._jwt);
+      }
+
+      return;
+    }
   }
 
   // ── Data fetch ────────────────────────────────────────────────────────────
@@ -187,6 +224,11 @@ export class NodeStatusPanel {
       });
       return;
     }
+
+    this._nodeUrl = creds.nodeUrl;
+    this._jwt = creds.jwt;
+    this._subId = extractSubscriptionId(creds.jwt) ?? "";
+    this._portalUrl = resolvePortalUrl(getActiveProfileName());
 
     const done = trackRequest(
       "GET",
@@ -214,20 +256,16 @@ export class NodeStatusPanel {
       ]);
       done(true);
 
-      const subId = extractSubscriptionId(creds.jwt) ?? "";
-      const portalUrl = resolvePortalUrl(getActiveProfileName());
+      this._cachedStatuses = statuses;
+      this._cachedSystems = systems;
+      this._postDataMessage();
 
-      this._panel.webview.postMessage({
-        type: "data",
-        statuses,
-        systems,
-        nodeUrl: creds.nodeUrl,
-        subId,
-        portalUrl,
-        filterPipeId: this._filterPipeId ?? null,
-        initialTab: this._initialTab ?? null,
-        refreshedAt: new Date().toLocaleTimeString(),
-      });
+      if (this._filterPipeId) {
+        // Single-pipe view: live updates not applicable — reveal refresh button
+        this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+      } else if (this._liveEnabled && !this._liveUpdates.isConnected) {
+        this._liveUpdates.connect(creds.nodeUrl, creds.jwt);
+      }
     } catch (err) {
       done(false);
       const hint = await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
@@ -244,10 +282,77 @@ export class NodeStatusPanel {
     }
   }
 
+  // ── Live-update helpers ───────────────────────────────────────────────────
+
+  private _postDataMessage(): void {
+    this._panel.webview.postMessage({
+      type: "data",
+      statuses: this._cachedStatuses,
+      systems: this._cachedSystems,
+      nodeUrl: this._nodeUrl,
+      subId: this._subId,
+      portalUrl: this._portalUrl,
+      filterPipeId: this._filterPipeId ?? null,
+      initialTab: this._initialTab ?? null,
+      refreshedAt: new Date().toLocaleTimeString(),
+    });
+  }
+
+  private _handleLiveUpdate(
+    incoming: PipeStatus[],
+    eventType: LiveEventType,
+    errorMessage?: string,
+  ): void {
+    if (eventType === "error") {
+      this._liveSupported = false;
+      this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+
+      const isJwtError = /token|jwt|auth|unauthorized/i.test(errorMessage ?? "");
+
+      if (isJwtError) {
+        void vscode.window.showWarningMessage(
+          "Sesam: JWT expired or invalid — update your profile via 'Sesam: Set JWT Token'.",
+        );
+      } else {
+        NodeStatusPanel.onProvisioningNeeded?.(this._nodeUrl, this._jwt);
+      }
+
+      return;
+    }
+
+    if (eventType === "disconnect") {
+      this._liveSupported = false;
+      this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+      return;
+    }
+
+    if (eventType === "snapshot") {
+      this._cachedStatuses = incoming;
+    } else if (eventType === "updated") {
+      const map = new Map(this._cachedStatuses.map((s) => [s.id, s]));
+      incoming.forEach((s) => map.set(s.id, s));
+      this._cachedStatuses = [...map.values()];
+    } else if (eventType === "added") {
+      const existingIds = new Set(this._cachedStatuses.map((s) => s.id));
+      const toAdd = incoming.filter((s) => !existingIds.has(s.id));
+      this._cachedStatuses = [...this._cachedStatuses, ...toAdd];
+    } else if (eventType === "deleted") {
+      const deletedIds = new Set(incoming.map((s) => s.id));
+      this._cachedStatuses = this._cachedStatuses.filter((s) => !deletedIds.has(s.id));
+    }
+
+    this._postDataMessage();
+
+    if (eventType === "snapshot") {
+      this._panel.webview.postMessage({ type: "connection-state", state: "live" });
+    }
+  }
+
   // ── Dispose ───────────────────────────────────────────────────────────────
 
   dispose(): void {
     NodeStatusPanel.currentPanel = undefined;
+    this._liveUpdates.disconnect();
     this._panel.dispose();
     this._disposables.forEach((d) => d.dispose());
     this._disposables = [];
@@ -583,6 +688,30 @@ export class NodeStatusPanel {
     }
 
     .tab-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ── live updates ── */
+    .live-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    .live-badge.live     { background: rgba(73,185,90,0.18);  color: #4db86a; }
+    .live-badge.disabled { background: rgba(128,128,128,0.15); color: #8a8a8a; }
+    .live-badge.offline  { background: rgba(229,83,75,0.18);  color: #e95b55; }
+
+    .live-toggle {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      opacity: 0.85;
+      user-select: none;
+    }
+
+    .live-toggle input { cursor: pointer; }
   </style>
 </head>
 <body>
@@ -731,6 +860,39 @@ export class NodeStatusPanel {
   window.addEventListener('message', (event) => {
     const msg = event.data;
 
+    if (msg.type === 'connection-state') {
+      const isSinglePipe = !!currentFilterPipeId;
+      const showRefresh = isSinglePipe || msg.state === 'disabled' || msg.state === 'not-supported';
+      document.getElementById('refreshBtn').style.display = showRefresh ? '' : 'none';
+
+      const liveBadge = document.getElementById('liveBadge');
+      const liveToggleLabel = document.getElementById('liveToggleLabel');
+
+      if (msg.state === 'live') {
+        liveBadge.textContent = '\u25CF Live';
+        liveBadge.className = 'live-badge live';
+        liveBadge.style.display = '';
+        if (!isSinglePipe) {
+          liveToggleLabel.style.display = '';
+          document.getElementById('liveToggle').checked = true;
+        }
+      } else if (msg.state === 'disabled') {
+        liveBadge.textContent = '\u25CB Paused';
+        liveBadge.className = 'live-badge disabled';
+        liveBadge.style.display = isSinglePipe ? 'none' : '';
+        if (!isSinglePipe) {
+          liveToggleLabel.style.display = '';
+          document.getElementById('liveToggle').checked = false;
+        }
+      } else if (msg.state === 'not-supported') {
+        liveBadge.textContent = '\u25CB Not supported';
+        liveBadge.className = 'live-badge offline';
+        liveBadge.style.display = isSinglePipe ? 'none' : '';
+        liveToggleLabel.style.display = 'none';
+      }
+      return;
+    }
+
     if (msg.type === 'loading') {
       showOverlay('loading');
       document.getElementById('refreshBtn').disabled = true;
@@ -779,6 +941,11 @@ export class NodeStatusPanel {
 
   // Notify extension that the webview is ready
   vscode.postMessage({ type: 'ready' });
+
+  // Live-updates toggle
+  document.getElementById('liveToggle').addEventListener('change', (e) => {
+    vscode.postMessage({ type: 'set-live-updates', enabled: e.target.checked });
+  });
 
   // ── Tab switching ──────────────────────────────────────────────────────
   function switchTab(tab) {

@@ -1,6 +1,6 @@
 # F24: Live Updates via Socket.IO
 
-> **Status**: `planned`
+> **Status**: `implemented`
 > **Rollout Phase**: Phase 1 (Node Status Panel enhancement)
 > **Tracking**: [README.md](README.md)
 
