@@ -2228,17 +2228,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       );
       event.waitUntil(Promise.resolve([vscode.TextEdit.replace(fullRange, formatted)]));
     }),
-    vscode.workspace.onDidSaveTextDocument((doc) => {
-      if (
-        syncStatusProvider.isLoaded() &&
-        (doc.languageId === "sesam-config" ||
-          doc.fileName.endsWith(".conf.json") ||
-          doc.fileName.endsWith(".conf.pipe") ||
-          doc.fileName.endsWith(".conf.system"))
-      ) {
-        refreshSyncStatusSilently();
-      }
-    }),
+    vscode.workspace.onDidSaveTextDocument(
+      (() => {
+        let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+        return (doc: vscode.TextDocument) => {
+          const isSesamConfig =
+            doc.languageId === "sesam-config" ||
+            doc.fileName.endsWith(".conf.json") ||
+            doc.fileName.endsWith(".conf.pipe") ||
+            doc.fileName.endsWith(".conf.system");
+
+          if (!isSesamConfig) {
+            return;
+          }
+
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => refreshSyncStatusSilently(), 500);
+        };
+      })(),
+    ),
   );
 }
 
