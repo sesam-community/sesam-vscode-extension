@@ -329,6 +329,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   context.subscriptions.push(syncStatusView);
 
+  // Populate sync status in the background shortly after activation so the
+  // tree is ready without the user having to trigger a save or explicit refresh.
+  setTimeout(() => refreshSyncStatusSilently(), 3_000);
+
   /**
    * Re-fetch sync status silently in the background and update the provider.
    * No Explorer focus, no diff auto-open. Safe to call on save / after download.
