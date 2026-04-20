@@ -20,11 +20,13 @@ import { resolveCredentials } from "../credential-resolver";
 import { fetchNodeStatusHint } from "../portal-client";
 import { extractSubscriptionId } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
+import { logLiveUpdate } from "../sesam-channel";
 import { SesamRunner } from "../sesam-runner";
 import { trackRequest } from "../network-status";
 import { getActiveProfileName, resolvePortalUrl } from "../profile-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
 import { SesamLiveUpdates } from "./live-updates";
+import { toWebSocketUrl } from "./live-updates";
 
 import type { LiveEventType } from "./live-updates";
 import type { PipeStatus, SystemSummary } from "@sesam/core";
@@ -200,9 +202,10 @@ export class NodeStatusPanel {
       if (!message.enabled) {
         this._liveUpdates.disconnect();
         this._panel.webview.postMessage({ type: "connection-state", state: "disabled" });
-      } else if (this._nodeUrl && this._jwt) {
+      } else if (this._liveEnabled && this._nodeUrl && this._jwt) {
         // User re-enabled — reconnect
         this._liveSupported = true;
+        logLiveUpdate(`Connecting to ${toWebSocketUrl(this._nodeUrl)}`);
         this._liveUpdates.connect(this._nodeUrl, this._jwt);
       }
 
@@ -264,6 +267,7 @@ export class NodeStatusPanel {
         // Single-pipe view: live updates not applicable — reveal refresh button
         this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
       } else if (this._liveEnabled && !this._liveUpdates.isConnected) {
+        logLiveUpdate(`Connecting to ${toWebSocketUrl(creds.nodeUrl)}`);
         this._liveUpdates.connect(creds.nodeUrl, creds.jwt);
       }
     } catch (err) {
@@ -309,6 +313,8 @@ export class NodeStatusPanel {
 
       const isJwtError = /token|jwt|auth|unauthorized/i.test(errorMessage ?? "");
 
+      logLiveUpdate(`Connection failed${errorMessage ? `: ${errorMessage}` : ""}`);
+
       if (isJwtError) {
         void vscode.window.showWarningMessage(
           "Sesam: JWT expired or invalid — update your profile via 'Sesam: Set JWT Token'.",
@@ -323,6 +329,7 @@ export class NodeStatusPanel {
     if (eventType === "disconnect") {
       this._liveSupported = false;
       this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+      logLiveUpdate("Disconnected");
       return;
     }
 
@@ -344,6 +351,7 @@ export class NodeStatusPanel {
     this._postDataMessage();
 
     if (eventType === "snapshot") {
+      logLiveUpdate(`Connected — live updates active (${this._cachedStatuses.length} pipes)`);
       this._panel.webview.postMessage({ type: "connection-state", state: "live" });
     }
   }

@@ -51,7 +51,7 @@ const pipesDataToStatuses = (data: Record<string, PipeResponse>): PipeStatus[] =
   }));
 
 /** Converts REST API base URL → WebSocket URL (mirrors MS getWebSocketUrlFromApiUrl). */
-const toWebSocketUrl = (nodeUrl: string): string =>
+export const toWebSocketUrl = (nodeUrl: string): string =>
   nodeUrl
     .replace(/^https:/, "wss:")
     .replace(/^http:/, "ws:")
