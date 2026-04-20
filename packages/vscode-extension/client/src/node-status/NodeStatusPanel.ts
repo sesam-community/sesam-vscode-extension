@@ -278,8 +278,19 @@ export class NodeStatusPanel {
       if (this._filterPipeId) {
         // Single-pipe view: live updates not applicable — reveal refresh button
         this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
-      } else if (this._liveEnabled && !this._liveUpdates.isConnected) {
-        await this._connectLive(creds.nodeUrl, creds.jwt);
+      } else {
+        // Always check subscription support for logging, even when user-disabled
+        const supported = await fetchSupportsLiveUpdates(creds.jwt);
+
+        if (!supported) {
+          this._liveSupported = false;
+          logLiveUpdate("Live updates not supported by this subscription");
+          this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+        } else if (this._liveEnabled && !this._liveUpdates.isConnected) {
+          this._doConnect(creds.nodeUrl, creds.jwt);
+        } else if (!this._liveEnabled) {
+          this._panel.webview.postMessage({ type: "connection-state", state: "disabled" });
+        }
       }
     } catch (err) {
       done(false);
@@ -303,6 +314,7 @@ export class NodeStatusPanel {
    * Check the subscription `supports_live_updates` flag, then connect.
    * Posts `connection-state: "not-supported"` and returns early when the
    * subscription does not support live updates.
+   * Used by the toggle re-enable path which has no pre-checked result.
    */
   private async _connectLive(nodeUrl: string, jwt: string): Promise<void> {
     const supported = await fetchSupportsLiveUpdates(jwt);
@@ -314,6 +326,11 @@ export class NodeStatusPanel {
       return;
     }
 
+    this._doConnect(nodeUrl, jwt);
+  }
+
+  /** Open the Socket.IO connection. Caller must have already verified support. */
+  private _doConnect(nodeUrl: string, jwt: string): void {
     logLiveUpdate(`Connecting to ${toWebSocketUrl(nodeUrl)}`);
     this._liveUpdates.connect(nodeUrl, jwt);
   }
@@ -756,7 +773,7 @@ export class NodeStatusPanel {
     <input type="checkbox" id="liveToggle" checked />
     Live updates
   </label>
-  <button id="refreshBtn" class="secondary" onclick="sendRefresh()" style="display:none">↻ Refresh</button>
+  <button id="refreshBtn" class="secondary" onclick="sendRefresh()" style="display:none" title="Fetch the latest pipe statuses from the node">↻ Refresh</button>
   <button class="secondary" onclick="syncDiff()" title="Compare local config with node — opens diff editor">⇄ Sync Diff</button>
 </div>
 
@@ -905,6 +922,7 @@ export class NodeStatusPanel {
 
       if (msg.state === 'live') {
         liveBadge.textContent = '\u25CF Live';
+        liveBadge.title = 'Connected to the Sesam node — pipe statuses update in real time';
         liveBadge.className = 'live-badge live';
         liveBadge.style.display = '';
         if (!isSinglePipe) {
@@ -913,6 +931,7 @@ export class NodeStatusPanel {
         }
       } else if (msg.state === 'disabled') {
         liveBadge.textContent = '\u25CB Paused';
+        liveBadge.title = 'Live updates are disabled — use the toggle to re-enable, or Refresh to reload manually';
         liveBadge.className = 'live-badge disabled';
         liveBadge.style.display = isSinglePipe ? 'none' : '';
         if (!isSinglePipe) {
@@ -921,6 +940,7 @@ export class NodeStatusPanel {
         }
       } else if (msg.state === 'not-supported') {
         liveBadge.textContent = '\u25CB Not supported';
+        liveBadge.title = 'This subscription does not support live updates — use Refresh to reload manually';
         liveBadge.className = 'live-badge offline';
         liveBadge.style.display = isSinglePipe ? 'none' : '';
         liveToggleLabel.style.display = 'none';
