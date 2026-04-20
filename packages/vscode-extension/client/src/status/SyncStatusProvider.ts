@@ -63,7 +63,7 @@ class GroupItem extends vscode.TreeItem {
   ) {
     const labels: Record<SyncState, string> = {
       modified: "Modified",
-      "node-only": "Node Only",
+      "node-only": "Remote Only",
       "local-only": "Local Only",
     };
     const icons: Record<SyncState, string> = {
@@ -121,6 +121,14 @@ export class SyncStatusProvider implements vscode.TreeDataProvider<SyncTreeItem>
     this._items = items;
     this._state = "loaded";
     this._onDidChangeTreeData.fire();
+  }
+
+  getItems(): readonly SyncStatusItem[] {
+    return this._items;
+  }
+
+  isLoaded(): boolean {
+    return this._state === "loaded";
   }
 
   setLoading(): void {

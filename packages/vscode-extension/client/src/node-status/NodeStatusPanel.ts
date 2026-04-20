@@ -33,6 +33,8 @@ type MessageFromWebview =
   | { type: "refresh" }
   | { type: "openLocalFile"; pipeId: string }
   | { type: "openInManagementStudio"; pipeId: string; portalUrl: string; subId: string }
+  | { type: "diffPipe"; pipeId: string }
+  | { type: "showSyncStatus" }
   | { type: "ready" };
 
 // ---------------------------------------------------------------------------
@@ -44,6 +46,8 @@ export class NodeStatusPanel {
   private static readonly viewType = "sesamNodeStatus";
   /** Set by extension.ts to start the provisioning poller when node requests fail. */
   static onProvisioningNeeded: ((nodeUrl: string, jwt: string) => void) | undefined;
+  /** Set by extension.ts to open a diff for a specific pipe against the node. */
+  static onDiffPipe: ((pipeId: string) => void) | undefined;
 
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
@@ -139,6 +143,16 @@ export class NodeStatusPanel {
       const base = message.portalUrl.replace(/\/+$/, "");
       const url = `${base}/subscription/${encodeURIComponent(message.subId)}/pipes/pipe/${encodeURIComponent(message.pipeId)}/edit`;
       await vscode.env.openExternal(vscode.Uri.parse(url));
+      return;
+    }
+
+    if (message.type === "diffPipe") {
+      NodeStatusPanel.onDiffPipe?.(message.pipeId);
+      return;
+    }
+
+    if (message.type === "showSyncStatus") {
+      await vscode.commands.executeCommand("sesam.showStatus");
       return;
     }
   }
@@ -422,6 +436,20 @@ export class NodeStatusPanel {
     tr:hover .pipe-studio-link { opacity: 0.55; }
     .pipe-studio-link:hover   { opacity: 1 !important; }
 
+    .pipe-diff-link {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 4px;
+      opacity: 0;
+      color: var(--vscode-textLink-foreground);
+      cursor: pointer;
+      vertical-align: middle;
+      transition: opacity 0.1s;
+    }
+
+    tr:hover .pipe-diff-link { opacity: 0.55; }
+    .pipe-diff-link:hover     { opacity: 1 !important; }
+
     /* ── state badge ── */
     .badge {
       display: inline-block;
@@ -511,6 +539,7 @@ export class NodeStatusPanel {
   <span class="node-url" id="nodeUrl"></span>
   <span class="refreshed-at" id="refreshedAt"></span>
   <button id="refreshBtn" class="secondary" onclick="sendRefresh()">↻ Refresh</button>
+  <button class="secondary" onclick="syncDiff()" title="Compare local config with node — opens diff editor">⇄ Sync Diff</button>
 </div>
 
 <!-- Filter bar -->
@@ -569,6 +598,18 @@ export class NodeStatusPanel {
   let currentNodeUrl = '';
   let currentSubId   = '';
   let currentPortalUrl = ${JSON.stringify(DEFAULT_PORTAL_URL)};
+  let currentFilterPipeId = null;
+
+  // ── Sync Diff ──────────────────────────────────────────────────────────
+  function syncDiff() {
+    if (currentFilterPipeId) {
+      // Single-pipe view: open the diff for this pipe directly
+      vscode.postMessage({ type: 'diffPipe', pipeId: currentFilterPipeId });
+    } else {
+      // All-pipes view: fetch status and reveal the Sync Status sidebar
+      vscode.postMessage({ type: 'showSyncStatus' });
+    }
+  }
 
   // ── VS Code messaging ──────────────────────────────────────────────────
   function sendRefresh() {
@@ -598,6 +639,7 @@ export class NodeStatusPanel {
       currentNodeUrl   = msg.nodeUrl;
       currentSubId     = msg.subId   || '';
       currentPortalUrl = msg.portalUrl || ${JSON.stringify(DEFAULT_PORTAL_URL)};
+      currentFilterPipeId = msg.filterPipeId || null;
       document.getElementById('nodeUrl').textContent = msg.nodeUrl;
       document.getElementById('refreshedAt').textContent = 'Updated ' + msg.refreshedAt;
       document.getElementById('refreshBtn').disabled = false;
@@ -724,6 +766,11 @@ export class NodeStatusPanel {
               '<path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM5.78 8.75a9.64 9.64 0 0 0 1.363 4.177c.255.426.542.832.857 1.215.245-.296.551-.705.857-1.215A9.64 9.64 0 0 0 10.22 8.75Zm4.44-1.5a9.64 9.64 0 0 0-1.363-4.177c-.306-.51-.612-.919-.857-1.215a9.927 9.927 0 0 0-.857 1.215A9.64 9.64 0 0 0 5.78 7.25Zm-5.944 1.5H1.543a6.507 6.507 0 0 0 4.666 5.5A11.13 11.13 0 0 1 4.276 9.75Zm-2.733-1.5h2.733A11.13 11.13 0 0 1 6.209 2.75 6.507 6.507 0 0 0 1.543 8.25Zm10.214 1.5a11.13 11.13 0 0 1-1.933 5.5 6.506 6.506 0 0 0 4.666-5.5Zm1.733-1.5a6.506 6.506 0 0 0-4.666-5.5 11.13 11.13 0 0 1 1.933 5.5Z"/>' +
             '</svg>' +
           '</span>' +
+          '<span class="pipe-diff-link" data-action="diff-pipe" data-pipe-id="' + safeId + '" title="View diff with node config">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="12" height="12" fill="currentColor">' +
+              '<path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h11A1.5 1.5 0 0 1 15 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5ZM5.25 5.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5a.75.75 0 0 1 .75-.75Zm5.5 0a.75.75 0 0 1 .75.75v1.25h1.25a.75.75 0 0 1 0 1.5H11.5v1.25a.75.75 0 0 1-1.5 0V9h-1.25a.75.75 0 0 1 0-1.5H10V6.25a.75.75 0 0 1 .75-.75Z"/>' +
+            '</svg>' +
+          '</span>' +
         '</td>' +
         '<td><span class="badge ' + badge + '">' + escHtml(s.state) + '</span></td>' +
         '<td class="count-cell"><span class="ok-count">' + s.successCount + '</span></td>' +
@@ -742,6 +789,7 @@ export class NodeStatusPanel {
     const action = el.dataset.action;
     if (action === 'open-local')  vscode.postMessage({ type: 'openLocalFile', pipeId });
     if (action === 'open-studio') vscode.postMessage({ type: 'openInManagementStudio', pipeId, portalUrl: currentPortalUrl, subId: currentSubId });
+    if (action === 'diff-pipe')   vscode.postMessage({ type: 'diffPipe', pipeId });
   });
 
   // ── Helpers ────────────────────────────────────────────────────────────
