@@ -18,8 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   config properties across pipe, system, and global configs
 - **F24**: Live Updates via Socket.IO — `NodeStatusPanel` connects to the Sesam node over
   Socket.IO (`socket.io-client`) for real-time `pipes_updated` / `pipes_added` / `pipes_deleted`
-  push events; replaces 30 s polling; falls back to poll on connection failure; live/polling/offline
-  badge in the Node Status WebView
+  push events; 30 s `setInterval` polling removed entirely; **no polling fallback** — when live
+  updates are unavailable the Refresh button is shown instead; green **● Live** / grey **○ Paused** /
+  red **○ Not supported** connection badge in the toolbar; user toggle to pause/resume the
+  connection; JWT/auth errors surface a VS Code warning notification; provisioning poller triggered
+  on `connect_error` when the node is sleeping; filter pills are now client-side only (no network
+  request on click)
 - **F25**: Credential Safety — node hostname shown in the status bar; destructive commands
   (upload, wipe, sync) blocked with a confirmation modal when targeting a production node
 - **F06**: Status / Diff View — Sesam Sync Status tree view in the Explorer sidebar showing

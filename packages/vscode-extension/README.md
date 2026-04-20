@@ -393,10 +393,15 @@ Open from the **editor title bar** or the **Explorer toolbar** (always available
 | Last run | Human-readable timestamp |
 
 **Controls:**
-- **Filter pills** — All · Running · Failed · OK · Disabled — each fetches fresh data from the node.
+- **Filter pills** — All · Running · Failed · OK · Disabled — filter the current data client-side; no network request.
 - **Search box** — type to filter by pipe ID (substring). Wrap in double-quotes for an exact match: `"my-pipe"` shows only that pipe.
 - **Column headers** — click to sort ascending/descending.
-- **Auto-refresh** — panel refreshes automatically every 30 seconds.
+- **Live updates** — the panel connects to the node over Socket.IO and receives real-time `pipes_updated` / `pipes_added` / `pipes_deleted` push events. A connection badge in the toolbar shows the current state:
+  - **● Live** (green) — Socket.IO connected; data updates in real time
+  - **○ Paused** (grey) — user has disabled live updates via the toggle; use **Refresh** to reload
+  - **○ Not supported** (red) — connection failed or was lost; use **Refresh** to reload
+- **Live updates toggle** — checkbox in the toolbar to pause or resume the Socket.IO connection. Hidden when the connection is not supported.
+- **Refresh button** — visible only when live updates are paused or not supported.
 - **Summary bar** — shows total pipe count with running / failure / disabled breakdowns.
 
 **Pipe ID links:**
