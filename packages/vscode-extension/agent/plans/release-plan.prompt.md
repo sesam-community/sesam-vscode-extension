@@ -70,7 +70,7 @@ what is live on the node before deciding what to push.
 
 ---
 
-## [0.1.0] — 2026-04-16
+## [0.1.0] — 2026-04-22
 
 The foundation release. The goal was simple: open VS Code, open a pipe, and never touch a
 terminal again. All sesam-py operations are available from the Command Palette, credentials
