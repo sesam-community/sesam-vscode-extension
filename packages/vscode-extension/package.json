@@ -295,6 +295,11 @@
         "icon": "$(server)"
       },
       {
+        "command": "sesam.systemStatus",
+        "title": "Sesam: Open System Status",
+        "icon": "$(database)"
+      },
+      {
         "command": "sesam.showStatus",
         "title": "Sesam: Show Sync Status",
         "icon": "$(refresh)"
@@ -449,6 +454,10 @@
           "when": "workspaceFolderCount > 0"
         },
         {
+          "command": "sesam.systemStatus",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
           "command": "sesam.showStatus",
           "when": "workspaceFolderCount > 0"
         }
@@ -473,6 +482,11 @@
           "command": "sesam.nodeStatus",
           "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
           "group": "navigation@12"
+        },
+        {
+          "command": "sesam.systemStatus",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@13"
         },
         {
           "command": "dtl.refreshDag",

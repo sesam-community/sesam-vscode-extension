@@ -56,15 +56,18 @@ export class NodeStatusPanel {
   private _disposables: vscode.Disposable[] = [];
   /** When set, the panel focuses on a single pipe (pre-fills search box). */
   private _filterPipeId: string | undefined;
+  /** When set, the panel opens on this tab instead of the default 'pipes' tab. */
+  private _initialTab: "pipes" | "systems" | undefined;
 
   // ── Static factory ────────────────────────────────────────────────────────
 
-  static createOrShow(filterPipeId?: string): void {
+  static createOrShow(filterPipeId?: string, initialTab?: "pipes" | "systems"): void {
     const column = vscode.ViewColumn.Beside;
 
     if (NodeStatusPanel.currentPanel) {
       NodeStatusPanel.currentPanel._panel.reveal(column);
       NodeStatusPanel.currentPanel._filterPipeId = filterPipeId;
+      NodeStatusPanel.currentPanel._initialTab = initialTab;
       void NodeStatusPanel.currentPanel._loadAndSend();
       return;
     }
@@ -79,14 +82,19 @@ export class NodeStatusPanel {
       },
     );
 
-    NodeStatusPanel.currentPanel = new NodeStatusPanel(panel, filterPipeId);
+    NodeStatusPanel.currentPanel = new NodeStatusPanel(panel, filterPipeId, initialTab);
   }
 
   // ── Constructor ───────────────────────────────────────────────────────────
 
-  private constructor(panel: vscode.WebviewPanel, filterPipeId?: string) {
+  private constructor(
+    panel: vscode.WebviewPanel,
+    filterPipeId?: string,
+    initialTab?: "pipes" | "systems",
+  ) {
     this._panel = panel;
     this._filterPipeId = filterPipeId;
+    this._initialTab = initialTab;
     this._panel.webview.html = this._buildHtml();
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -217,6 +225,7 @@ export class NodeStatusPanel {
         subId,
         portalUrl,
         filterPipeId: this._filterPipeId ?? null,
+        initialTab: this._initialTab ?? null,
         refreshedAt: new Date().toLocaleTimeString(),
       });
     } catch (err) {
@@ -755,6 +764,7 @@ export class NodeStatusPanel {
       renderSummary();
       renderTable();
       renderSysTable();
+      if (msg.initialTab) switchTab(msg.initialTab);
     }
 
     if (msg.type === 'syncStatus') {

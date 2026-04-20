@@ -1229,6 +1229,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       NodeStatusPanel.createOrShow();
     }),
 
+    vscode.commands.registerCommand("sesam.systemStatus", () => {
+      NodeStatusPanel.createOrShow(undefined, "systems");
+    }),
+
     vscode.commands.registerCommand("sesam.fixWithCopilot", async () => {
       const editor = vscode.window.activeTextEditor;
 
