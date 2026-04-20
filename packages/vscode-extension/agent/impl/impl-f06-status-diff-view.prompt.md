@@ -1,6 +1,6 @@
 # F06: Status / Diff View
 
-> **Status**: `in progress` — Phases A and B implemented
+> **Status**: `phase 4 implemented` — all planned phases complete; Phase E (gutter decorations) remains future work
 > **Rollout Phase**: Phase 2 - Testing & Diff
 > **Tracking**: [README.md](README.md)
 
@@ -31,13 +31,15 @@ Users can see which pipes/systems are locally modified vs the node, and diff or 
    - `state`: `"modified"` | `"node-only"` | `"local-only"`
    - `localPath`: absolute path to the local file (when it exists)
 4. Displayed in a `TreeView` (`SyncStatusProvider` in `client/src/status/SyncStatusProvider.ts`):
-   - Groups: **Modified**, **Node Only**, **Local Only**
+   - Groups: **Modified**, **Remote Only**, **Local Only**
    - Each group shows the count and is expanded by default.
 5. Refresh button (↻) in the view title reruns `sesam.showStatus`.
+6. Auto-refreshes silently after any save of a sesam config file (debounced 500 ms) — even before the user has explicitly run `sesam.showStatus`.
+7. Auto-refreshes silently after `sesam.download` and `sesam.downloadFile` complete.
 
 ### Phase B: Diff Panel ✅
 
-1. Each Modified / Node Only item has an inline $(diff) button → `sesam.viewDiff`.
+1. Each Modified / Remote Only item has an inline $(diff) button → `sesam.viewDiff`.
 2. `sesam.viewDiff` also works from the command palette: shows a quickpick of all diffable items
    from the last loaded status (prompts to run `sesam.showStatus` first if none are loaded).
 3. On invocation:
@@ -45,18 +47,34 @@ Users can see which pipes/systems are locally modified vs the node, and diff or 
    - Formats it with `formatSesamJson` and stores it in an in-memory `SesamNodeConfigProvider`
      under the `sesam-node://` URI scheme.
    - **Modified**: opens VS Code's native diff editor — node version on the left, local file on the right.
-   - **Node Only**: opens the node version as a read-only virtual document.
+   - **Remote Only** (e.g. after `_id` rename): shows a quickpick of all local configs of the same
+     kind so the user can manually pair them; escape falls back to read-only view of the node version.
 
-### Phase C: Push / Pull CodeLens
+### Phase C: System Status Table ✅
 
-1. Add CodeLens to pipe/system config files:
-   - "↑ Upload to node" (if the file's `_id` appears as `modified` or `local-only` in the last status)
-   - "↓ Download from node" (if `modified` or `node-only`)
-2. Implement via a `vscode.CodeLensProvider` in `client/src/status/SyncStatusCodeLens.ts`.
-3. Driven by the cached `SyncStatusProvider` state — no extra network call on file open.
-4. Refresh CodeLens after any `sesam.upload` / `sesam.download` / `sesam.showStatus` completes.
+1. `sesam.nodeStatus` panel now has **Pipes** and **Systems** tabs.
+2. Systems tab shows a table with columns: **System ID**, **Type**, **Pipes In**, **Pipes Out**, **Config Status**.
+   - No run/state/last-run columns (systems are not pumped).
+   - **Config Status** badge reflects **Modified** / **Remote Only** / **Local Only** from the cached sync status.
+3. Per-row diff icon (same style as pipes) triggers `sesam.viewDiff` for that system.
+4. New command `sesam.systemStatus` opens the Node Status panel with the Systems tab pre-selected.
+5. `SyncStatusProvider` covers both pipes and systems — `getSyncStatus` already fetches both.
+6. `SesamRunner.systemSummaries(creds)` computes `pipesIn` / `pipesOut` from the live node.
+7. `NodeStatusPanel.onDiffSystem` static callback wired in `extension.ts` — same pattern as `onDiffPipe`.
 
-### Phase D: Gutter Decorations
+### Phase D: Download Guard ✅
+
+1. `sesam.download` (download all) and `sesam.downloadFile` (download single) both check for local
+   changes before proceeding:
+   - Calls `ensureSyncStatus()` — uses the cached result if loaded, otherwise fetches on-demand
+     (shows a status-bar progress indicator "Checking local diffs…").
+   - **With local changes**: modal warning listing count of modified / local-only items, with buttons
+     **See Local Diffs** and **Download Anyway**.
+     - "See Local Diffs" focuses the `sesamSyncStatus` tree view (already populated) and, if there
+       is exactly one diffable item, opens its diff editor immediately.
+   - **No local changes**: proceeds without any dialog.
+
+### Phase E: Gutter Decorations (future)
 
 1. After `sesam.showStatus`, mark files that are `modified` with a gutter indicator using
    `vscode.window.createTextEditorDecorationType`.
@@ -71,17 +89,18 @@ Users can see which pipes/systems are locally modified vs the node, and diff or 
 
 | File | Change |
 |---|---|
-| `packages/core/src/sync-status.ts` (new) | `getSyncStatus()` + `getNodeConfig()` |
-| `packages/core/src/types.ts` | Added `SyncState`, `SyncStatusItem` |
+| `packages/core/src/sync-status.ts` (new) | `getSyncStatus()`, `getNodeConfig()` — pipes and systems |
+| `packages/core/src/types.ts` | Added `SyncState`, `SyncStatusItem`, `SystemSummary` |
 | `packages/core/src/index.ts` | Exported new functions and types |
-| `client/src/status/SyncStatusProvider.ts` (new) | `SyncStatusProvider`, `SesamNodeConfigProvider`, `ConfigStatusItem` |
-| `client/src/sesam-runner.ts` | Added `syncStatus()` method |
-| `package.json` | `sesamSyncStatus` view, `sesam.showStatus` + `sesam.viewDiff` commands, menus |
-| `client/src/extension.ts` | Wired provider, tree view, and both commands |
+| `client/src/status/SyncStatusProvider.ts` (new) | `SyncStatusProvider`, `SesamNodeConfigProvider`, `ConfigStatusItem`, `SESAM_NODE_SCHEME` |
+| `client/src/sesam-runner.ts` | Added `syncStatus()` and `systemSummaries()` methods; imported `NodeClient` |
+| `client/src/node-status/NodeStatusPanel.ts` | Pipes/Systems tab bar; Systems table; `onDiffSystem` static; `initialTab` param; `diffSystem` message |
+| `package.json` | `sesamSyncStatus` view; `sesam.showStatus`, `sesam.viewDiff`, `sesam.systemStatus` commands; menus |
+| `client/src/extension.ts` | Wired all providers, commands, `ensureSyncStatus()`, `refreshSyncStatusSilently()`, `onDiffPipe`, `onDiffSystem`, save-debounce listener, download guards |
 
 ---
 
 ## Dependencies
 
-- **F00** — `@sesam/core` REST client (`NodeClient.getPipes`, `getSystems`, `getPipe`, `getSystem`)
+- **F00** — `@sesam/core` REST client (`NodeClient.getPipes`, `NodeClient.getSystems`, `getNodeConfig`)
 - **F05** — diff view pattern reused from test result webview
