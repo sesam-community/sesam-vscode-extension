@@ -39,7 +39,7 @@
 | F25 | Credential Safety (status bar hostname + destructive-command guard) | Phase 1 | `implemented` | [credential-safety.prompt.md](../plans/credential-safety.prompt.md) |
 | F26 | Safe Profile Switching (unsaved-file + git guard + node teardown) | Phase 1 | `implemented` | [impl-f26-switch-profile.prompt.md](impl-f26-switch-profile.prompt.md) |
 | F05 | Test Management (Testing API) | Phase 2 | `phase 3 implemented` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
-| F06 | Status / Diff View | Phase 2 | `planned` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
+| F06 | Status / Diff View | Phase 2 | `implemented` | [impl-f06-status-diff-view.prompt.md](impl-f06-status-diff-view.prompt.md) |
 | F04 | Node-Connected Live Preview | Phase 3 | `implemented` | [impl-f04-node-preview.prompt.md](impl-f04-node-preview.prompt.md) |
 | F10 | Inline Output & Diagnostics from Node | Phase 3 | `planned` | [impl-f10-inline-diagnostics.prompt.md](impl-f10-inline-diagnostics.prompt.md) |
 | F09 | Copilot Agent Participant (@sesam) | Phase 4 | `implemented` | [impl-f09-copilot-agent.prompt.md](impl-f09-copilot-agent.prompt.md) |

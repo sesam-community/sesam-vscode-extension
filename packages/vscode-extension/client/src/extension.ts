@@ -56,9 +56,16 @@ import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
 import { NodeStatusPanel } from "./node-status/NodeStatusPanel";
 import { ProfilesPanel } from "./profile-manager/ProfilesPanel";
-import { ValidationFailedError } from "@sesam/core";
+import {
+  SyncStatusProvider,
+  SesamNodeConfigProvider,
+  ConfigStatusItem,
+  SESAM_NODE_SCHEME,
+} from "./status/SyncStatusProvider";
+import { ValidationFailedError, getNodeConfig } from "@sesam/core";
 
 import type { DagIndex, FullPipeInfo, SystemEntry } from "./graph/pipe-dag-builder";
+import type { SyncStatusItem } from "@sesam/core";
 
 let client: LanguageClient;
 
@@ -307,6 +314,223 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showCollapseAll: true,
   });
   context.subscriptions.push(errorsView);
+
+  // ── Sync Status View (F06) ───────────────────────────────────────────────
+  const syncStatusProvider = new SyncStatusProvider();
+  const nodeConfigProvider = new SesamNodeConfigProvider();
+
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(SESAM_NODE_SCHEME, nodeConfigProvider),
+  );
+
+  const syncStatusView = vscode.window.createTreeView("sesamSyncStatus", {
+    treeDataProvider: syncStatusProvider,
+    showCollapseAll: false,
+  });
+  context.subscriptions.push(syncStatusView);
+
+  // Populate sync status in the background shortly after activation so the
+  // tree is ready without the user having to trigger a save or explicit refresh.
+  setTimeout(() => refreshSyncStatusSilently(), 3_000);
+
+  /**
+   * Re-fetch sync status silently in the background and update the provider.
+   * No Explorer focus, no diff auto-open. Safe to call on save / after download.
+   */
+  const refreshSyncStatusSilently = (): void => {
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceDir) {
+      return;
+    }
+    void resolveCredentials().then(async (creds) => {
+      if (!creds) {
+        return;
+      }
+      try {
+        const runner = new SesamRunner();
+        const items = await runner.syncStatus(
+          { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+          workspaceDir,
+        );
+        syncStatusProvider.setItems(items);
+      } catch {
+        // Silently ignore — user did not request the refresh explicitly
+      }
+    });
+  };
+
+  /**
+   * Fetch sync status and store in the provider. Returns the items, or null on failure.
+   * Uses the cached result if already loaded.
+   */
+  const ensureSyncStatus = async (): Promise<readonly SyncStatusItem[] | null> => {
+    if (syncStatusProvider.isLoaded()) {
+      return syncStatusProvider.getItems();
+    }
+
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const creds = await resolveCredentials();
+
+    if (!workspaceDir || !creds) {
+      return null;
+    }
+
+    try {
+      const runner = new SesamRunner();
+      const items = await runner.syncStatus(
+        { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+        workspaceDir,
+      );
+      syncStatusProvider.setItems(items);
+      return items;
+    } catch {
+      return null;
+    }
+  };
+
+  // Wire per-row diff from NodeStatusPanel → open diff directly via nodeConfigProvider
+  NodeStatusPanel.onDiffPipe = async (pipeId: string) => {
+    const creds = await resolveCredentials();
+
+    if (!creds) {
+      vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+      return;
+    }
+
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Sesam: Fetching node config for '${pipeId}'…`,
+        cancellable: false,
+      },
+      async () => {
+        try {
+          const nodeConfig = await getNodeConfig(
+            { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+            pipeId,
+            "pipe",
+          );
+          const reorderKeys =
+            vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+          const content = formatSesamJson(nodeConfig, 2, { reorderKeys });
+          const nodeUri = nodeConfigProvider.store(pipeId, "pipe", content);
+
+          // Find local file
+          const all = await vscode.workspace.findFiles(
+            "**/{pipes,systems}/**",
+            "**/node_modules/**",
+          );
+          const CONFIG_EXTS = [".conf.json", ".conf.pipe", ".conf.system", ".json"];
+          const localMatch = all.find((uri) => {
+            const base = uri.fsPath.split("/").at(-1) ?? "";
+            return CONFIG_EXTS.some((ext) => base === `${pipeId}${ext}`);
+          });
+
+          if (localMatch) {
+            await vscode.commands.executeCommand(
+              "vscode.diff",
+              nodeUri,
+              localMatch,
+              `${pipeId}: Node ↔ Local`,
+            );
+          } else {
+            // No local file — open node version read-only
+            const doc = await vscode.workspace.openTextDocument(nodeUri);
+            await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+
+            if (workspaceDir) {
+              vscode.window
+                .showInformationMessage(
+                  `'${pipeId}' exists on the node but has no local file. Download it to compare.`,
+                  "Download",
+                )
+                .then((action) => {
+                  if (action === "Download") {
+                    void vscode.commands.executeCommand("sesam.downloadFile");
+                  }
+                });
+            }
+          }
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(`Sesam: Failed to fetch node config: ${detail}`);
+        }
+      },
+    );
+  };
+
+  // Wire per-row diff from NodeStatusPanel (systems) → open diff directly via nodeConfigProvider
+  NodeStatusPanel.onDiffSystem = async (systemId: string) => {
+    const creds = await resolveCredentials();
+
+    if (!creds) {
+      vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+      return;
+    }
+
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Sesam: Fetching node config for '${systemId}'…`,
+        cancellable: false,
+      },
+      async () => {
+        try {
+          const nodeConfig = await getNodeConfig(
+            { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+            systemId,
+            "system",
+          );
+          const reorderKeys =
+            vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+          const content = formatSesamJson(nodeConfig, 2, { reorderKeys });
+          const nodeUri = nodeConfigProvider.store(systemId, "system", content);
+
+          const all = await vscode.workspace.findFiles(
+            "**/{pipes,systems}/**",
+            "**/node_modules/**",
+          );
+          const CONFIG_EXTS = [".conf.json", ".conf.system", ".json"];
+          const localMatch = all.find((uri) => {
+            const base = uri.fsPath.split("/").at(-1) ?? "";
+            return CONFIG_EXTS.some((ext) => base === `${systemId}${ext}`);
+          });
+
+          if (localMatch) {
+            await vscode.commands.executeCommand(
+              "vscode.diff",
+              nodeUri,
+              localMatch,
+              `${systemId}: Node ↔ Local`,
+            );
+          } else {
+            const doc = await vscode.workspace.openTextDocument(nodeUri);
+            await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+
+            if (workspaceDir) {
+              vscode.window
+                .showInformationMessage(
+                  `'${systemId}' exists on the node but has no local file. Download it to compare.`,
+                  "Download",
+                )
+                .then((action) => {
+                  if (action === "Download") {
+                    void vscode.commands.executeCommand("sesam.downloadFile");
+                  }
+                });
+            }
+          }
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(`Sesam: Failed to fetch node config: ${detail}`);
+        }
+      },
+    );
+  };
 
   // Sync active config to all DAG views
   const syncActivePipe = (editor: vscode.TextEditor | undefined): void => {
@@ -774,14 +998,57 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
 
       if (!opts?.skipConfirm) {
-        const confirmed = await vscode.window.showWarningMessage(
-          "Sesam: Download will overwrite local pipe and system configs. Continue?",
-          { modal: true },
-          "Download",
+        // Fetch sync status (use cache if already loaded, otherwise fetch now)
+        const syncItems = await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Window, title: "Sesam: Checking local diffs…" },
+          () => ensureSyncStatus(),
         );
 
-        if (confirmed !== "Download") {
-          return;
+        const localChanges = (syncItems ?? []).filter(
+          (item) => item.state === "modified" || item.state === "local-only",
+        );
+
+        if (localChanges.length > 0) {
+          const modifiedCount = localChanges.filter((i) => i.state === "modified").length;
+          const localOnlyCount = localChanges.filter((i) => i.state === "local-only").length;
+          const parts: string[] = [];
+
+          if (modifiedCount > 0) {
+            parts.push(`${modifiedCount} modified`);
+          }
+
+          if (localOnlyCount > 0) {
+            parts.push(`${localOnlyCount} local-only`);
+          }
+
+          const diffAction = await vscode.window.showWarningMessage(
+            `Sesam: You have ${parts.join(" and ")} local change${localChanges.length === 1 ? "" : "s"} that will be overwritten by the download.`,
+            { modal: true },
+            "See Local Diffs",
+            "Download Anyway",
+          );
+
+          if (diffAction === "See Local Diffs") {
+            // Data is already loaded — focus the Sync Status tree view and open diffs
+            await vscode.commands.executeCommand("sesamSyncStatus.focus");
+
+            const diffable = syncStatusProvider
+              .getItems()
+              .filter((i) => i.state === "modified" || i.state === "node-only");
+
+            if (diffable.length === 1) {
+              await vscode.commands.executeCommand(
+                "sesam.viewDiff",
+                new ConfigStatusItem(diffable[0]),
+              );
+            }
+
+            return;
+          }
+
+          if (diffAction !== "Download Anyway") {
+            return;
+          }
         }
       }
 
@@ -807,6 +1074,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             vscode.window.showInformationMessage(
               `Sesam: Download complete — ${result.pipesWritten} pipes, ${result.systemsWritten} systems.`,
             );
+            if (syncStatusProvider.isLoaded()) {
+              refreshSyncStatusSilently();
+            }
           } catch (err) {
             done(false);
             vscode.window.showErrorMessage(
@@ -969,14 +1239,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      const confirmed = await vscode.window.showWarningMessage(
-        `Sesam: This will overwrite the local file for '${pipeId}'. Continue?`,
-        { modal: true },
-        "Download",
+      // Check if this specific config has local changes (fetch status if not yet loaded)
+      const syncItems = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: "Sesam: Checking local diffs…" },
+        () => ensureSyncStatus(),
       );
+      const localDiff = (syncItems ?? []).find((item) => item.id === pipeId);
 
-      if (confirmed !== "Download") {
-        return;
+      if (localDiff && (localDiff.state === "modified" || localDiff.state === "local-only")) {
+        const stateLabel =
+          localDiff.state === "modified" ? "local modifications" : "exists only locally";
+        const diffAction = await vscode.window.showWarningMessage(
+          `Sesam: '${pipeId}' has ${stateLabel}. Downloading will overwrite your local version.`,
+          { modal: true },
+          "See Diff",
+          "Download Anyway",
+        );
+
+        if (diffAction === "See Diff") {
+          await vscode.commands.executeCommand("sesam.viewDiff");
+          return;
+        }
+
+        if (diffAction !== "Download Anyway") {
+          return;
+        }
       }
 
       await vscode.window.withProgress(
@@ -1003,6 +1290,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             vscode.window.showInformationMessage(
               `Sesam: '${pipeId}' downloaded to ${result.filePath.replace(workspaceDir + "/", "")}.`,
             );
+            if (syncStatusProvider.isLoaded()) {
+              refreshSyncStatusSilently();
+            }
           } catch (err) {
             done(false);
             vscode.window.showErrorMessage(
@@ -1031,6 +1321,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.commands.registerCommand("sesam.nodeStatus", () => {
       NodeStatusPanel.createOrShow();
+    }),
+
+    vscode.commands.registerCommand("sesam.systemStatus", () => {
+      NodeStatusPanel.createOrShow(undefined, "systems");
     }),
 
     vscode.commands.registerCommand("sesam.fixWithCopilot", async () => {
@@ -1690,6 +1984,270 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const doc = await vscode.workspace.openTextDocument(newFileUri);
       await vscode.window.showTextDocument(doc);
     }),
+
+    // ── Sync Status / Diff (F06) ──────────────────────────────────────────
+    vscode.commands.registerCommand("sesam.showStatus", async () => {
+      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+      if (!workspaceDir) {
+        vscode.window.showWarningMessage("Sesam: No workspace folder open.");
+        return;
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+        return;
+      }
+
+      syncStatusProvider.setLoading();
+
+      // Ensure the Explorer sidebar + Sync Status view is visible before results arrive
+      await vscode.commands.executeCommand("workbench.view.explorer");
+      await syncStatusView.reveal(undefined as never, { expand: true }).then(
+        () => undefined,
+        () => undefined,
+      );
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Sesam: Fetching sync status…",
+          cancellable: false,
+        },
+        async () => {
+          try {
+            const runner = new SesamRunner();
+            const items = await runner.syncStatus(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+              workspaceDir,
+            );
+            syncStatusProvider.setItems(items);
+
+            const diffable = items.filter((i) => i.state === "modified" || i.state === "node-only");
+
+            if (diffable.length === 1) {
+              // Single diffable item — open it directly
+              await vscode.commands.executeCommand(
+                "sesam.viewDiff",
+                new ConfigStatusItem(diffable[0]),
+              );
+            } else if (diffable.length === 0 && items.length === 0) {
+              vscode.window.showInformationMessage("Sesam: All configs are in sync with the node.");
+            }
+          } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            syncStatusProvider.setError(`Error: ${detail}`);
+          }
+        },
+      );
+    }),
+
+    vscode.commands.registerCommand("sesam.viewDiff", async (item: ConfigStatusItem | unknown) => {
+      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+      // When invoked from the command palette (no argument), let the user pick
+      // from the currently loaded sync-status items.
+      let resolved: ConfigStatusItem | undefined;
+
+      if (item instanceof ConfigStatusItem) {
+        resolved = item;
+      } else {
+        const available = syncStatusProvider
+          .getItems()
+          .filter((i) => i.state === "modified" || i.state === "node-only");
+
+        if (available.length === 0) {
+          vscode.window.showInformationMessage(
+            'Sesam: Run "Sesam: Show Sync Status" first to load differences.',
+          );
+          return;
+        }
+
+        const stateLabels: Record<string, string> = {
+          modified: "Modified",
+          "node-only": "Remote Only",
+          "local-only": "Local Only",
+        };
+
+        const pick = await vscode.window.showQuickPick(
+          available.map((i) => ({
+            label: i.id,
+            description: `${i.kind} · ${stateLabels[i.state] ?? i.state}`,
+            syncItem: i,
+          })),
+          { placeHolder: "Select a config to diff against the node" },
+        );
+
+        if (!pick) {
+          return;
+        }
+
+        resolved = new ConfigStatusItem(pick.syncItem);
+      }
+
+      const creds = await resolveCredentials();
+
+      if (!creds) {
+        vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Sesam: Fetching node config for '${resolved.syncItem.id}'…`,
+          cancellable: false,
+        },
+        async () => {
+          try {
+            const nodeConfig = await getNodeConfig(
+              { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+              resolved!.syncItem.id,
+              resolved!.syncItem.kind,
+            );
+            const reorderKeys =
+              vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
+            const content = formatSesamJson(nodeConfig, 2, { reorderKeys });
+            const nodeUri = nodeConfigProvider.store(
+              resolved!.syncItem.id,
+              resolved!.syncItem.kind,
+              content,
+            );
+
+            if (resolved!.syncItem.state === "modified" && resolved!.syncItem.localPath) {
+              const localUri = vscode.Uri.file(resolved!.syncItem.localPath);
+              await vscode.commands.executeCommand(
+                "vscode.diff",
+                nodeUri,
+                localUri,
+                `${resolved!.syncItem.id}: Node ↔ Local`,
+              );
+            } else {
+              // node-only: no local file with this exact _id.
+              // Let the user pick a local config file to diff against (e.g. after a rename).
+              const subdir = resolved!.syncItem.kind === "system" ? "systems" : "pipes";
+              const localFiles = await vscode.workspace.findFiles(
+                `**/${subdir}/**`,
+                "**/node_modules/**",
+              );
+              const CONFIG_EXTS = [".conf.json", ".conf.pipe", ".conf.system", ".json"];
+              const candidates = localFiles
+                .filter((u) => CONFIG_EXTS.some((ext) => u.fsPath.endsWith(ext)))
+                .map((u) => {
+                  const base = u.fsPath.split("/").at(-1) ?? u.fsPath;
+                  const label = CONFIG_EXTS.reduce(
+                    (s, ext) => s.replace(new RegExp(`${ext}$`), ""),
+                    base,
+                  );
+                  return {
+                    label,
+                    description: u.fsPath.replace((workspaceDir ?? "") + "/", ""),
+                    uri: u,
+                  };
+                })
+                .sort((a, b) => a.label.localeCompare(b.label));
+
+              if (candidates.length === 0) {
+                // No local files at all — just open the node version read-only
+                const doc = await vscode.workspace.openTextDocument(nodeUri);
+                await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+                return;
+              }
+
+              const pick = await vscode.window.showQuickPick(candidates, {
+                placeHolder: `'${resolved!.syncItem.id}' only exists on the node. Pick a local file to diff against (e.g. after a rename), or press Escape to view it alone.`,
+                matchOnDescription: true,
+              });
+
+              if (pick) {
+                await vscode.commands.executeCommand(
+                  "vscode.diff",
+                  nodeUri,
+                  pick.uri,
+                  `${resolved!.syncItem.id} (node) ↔ ${pick.label} (local)`,
+                );
+              } else {
+                // User dismissed — open node version read-only
+                const doc = await vscode.workspace.openTextDocument(nodeUri);
+                await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+              }
+            }
+          } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            vscode.window.showErrorMessage(`Sesam: Failed to fetch node config: ${detail}`);
+          }
+        },
+      );
+
+      void workspaceDir;
+    }),
+
+    vscode.commands.registerCommand(
+      "sesam.revertConfig",
+      async (item: ConfigStatusItem | unknown) => {
+        const resolved = item instanceof ConfigStatusItem ? item : undefined;
+
+        if (!resolved || resolved.syncItem.state !== "modified" || !resolved.syncItem.localPath) {
+          vscode.window.showWarningMessage(
+            "Sesam: Revert must be invoked from a Modified item in the Sync Status view.",
+          );
+          return;
+        }
+
+        const { id, kind, localPath } = resolved.syncItem;
+
+        const answer = await vscode.window.showWarningMessage(
+          `Sesam: Revert '${id}' to the remote node version? This will overwrite your local changes.`,
+          { modal: true },
+          "Revert",
+        );
+
+        if (answer !== "Revert") {
+          return;
+        }
+
+        const creds = await resolveCredentials();
+
+        if (!creds) {
+          vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+          return;
+        }
+
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Sesam: Reverting '${id}' to node version…`,
+            cancellable: false,
+          },
+          async () => {
+            try {
+              const nodeConfig = await getNodeConfig(
+                { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
+                id,
+                kind,
+              );
+              const reorderKeys =
+                vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ??
+                false;
+              const content = formatSesamJson(nodeConfig, 2, { reorderKeys });
+              await vscode.workspace.fs.writeFile(
+                vscode.Uri.file(localPath),
+                Buffer.from(content, "utf-8"),
+              );
+              vscode.window.showInformationMessage(
+                `Sesam: '${id}' reverted to remote node version.`,
+              );
+              refreshSyncStatusSilently();
+            } catch (err) {
+              const detail = err instanceof Error ? err.message : String(err);
+              vscode.window.showErrorMessage(`Sesam: Revert failed: ${detail}`);
+            }
+          },
+        );
+      },
+    ),
   );
 
   // Keep the PreviewPanel updated when the active document changes.
@@ -1739,6 +2297,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       );
       event.waitUntil(Promise.resolve([vscode.TextEdit.replace(fullRange, formatted)]));
     }),
+    vscode.workspace.onDidSaveTextDocument(
+      (() => {
+        let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+        return (doc: vscode.TextDocument) => {
+          const isSesamConfig =
+            doc.languageId === "sesam-config" ||
+            doc.fileName.endsWith(".conf.json") ||
+            doc.fileName.endsWith(".conf.pipe") ||
+            doc.fileName.endsWith(".conf.system");
+
+          if (!isSesamConfig) {
+            return;
+          }
+
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => refreshSyncStatusSilently(), 500);
+        };
+      })(),
+    ),
   );
 }
 

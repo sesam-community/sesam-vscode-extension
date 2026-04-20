@@ -13,12 +13,14 @@ import {
   downloadSingleConfig,
   getPipeStatus,
   getStatus,
+  getSyncStatus,
   runAllPipes,
   runPipe,
   uploadConfig,
   uploadSingleConfig,
   validateWorkspace,
 } from "@sesam/core";
+import { NodeClient } from "@sesam/core";
 
 import type {
   DownloadOptions,
@@ -30,6 +32,8 @@ import type {
   RunResult,
   SingleDownloadResult,
   SingleUploadResult,
+  SyncStatusItem,
+  SystemSummary,
   UploadOptions,
   UploadResult,
   ValidationResult,
@@ -83,6 +87,53 @@ export class SesamRunner {
    */
   async status(creds: NodeCredentials): Promise<PipeStatus[]> {
     return getStatus(creds);
+  }
+
+  /**
+   * Compare local workspace configs against the live node.
+   * Returns items that differ (modified, node-only, or local-only).
+   */
+  async syncStatus(creds: NodeCredentials, workspaceDir: string): Promise<SyncStatusItem[]> {
+    return getSyncStatus(creds, workspaceDir);
+  }
+
+  /**
+   * Fetch all systems from the node and compute pipe-in / pipe-out counts.
+   */
+  async systemSummaries(creds: NodeCredentials): Promise<SystemSummary[]> {
+    const client = new NodeClient(creds);
+    const [systems, pipes] = await Promise.all([client.getSystems(), client.getPipes()]);
+
+    return systems.map((s) => {
+      const systemType =
+        typeof (s.config?.["original"] as Record<string, unknown> | undefined)?.["type"] ===
+        "string"
+          ? ((s.config?.["original"] as Record<string, unknown>)["type"] as string)
+          : typeof s.config?.["type"] === "string"
+            ? (s.config["type"] as string)
+            : "unknown";
+
+      const pipesIn = pipes.filter((p) =>
+        (p.config?.["original"] as Record<string, unknown> | undefined)?.["source"] !== undefined
+          ? (
+              (p.config?.["original"] as Record<string, unknown>)["source"] as Record<
+                string,
+                unknown
+              >
+            )?.["system"] === s._id
+          : (p.config?.["source"] as Record<string, unknown> | undefined)?.["system"] === s._id,
+      ).length;
+
+      const pipesOut = pipes.filter((p) =>
+        (p.config?.["original"] as Record<string, unknown> | undefined)?.["sink"] !== undefined
+          ? (
+              (p.config?.["original"] as Record<string, unknown>)["sink"] as Record<string, unknown>
+            )?.["system"] === s._id
+          : (p.config?.["sink"] as Record<string, unknown> | undefined)?.["system"] === s._id,
+      ).length;
+
+      return { id: s._id, systemType, pipesIn, pipesOut };
+    });
   }
 
   /**

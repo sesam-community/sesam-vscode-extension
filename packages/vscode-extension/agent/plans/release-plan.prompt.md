@@ -20,10 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Socket.IO (`socket.io-client`) for real-time `pipes_updated` / `pipes_added` / `pipes_deleted`
   push events; replaces 30 s polling; falls back to poll on connection failure; live/polling/offline
   badge in the Node Status WebView
-- **F25**: Credential Safety — node hostname shown in the status bar (Option A); `.sesamprofile`
-  lockfile read on workspace open to validate the active profile targets the expected node URL
-  (Option C); destructive commands (upload, wipe, sync) blocked with a confirmation modal when
-  a mismatch is detected (Option B)
+- **F25**: Credential Safety — node hostname shown in the status bar; destructive commands
+  (upload, wipe, sync) blocked with a confirmation modal when targeting a production node
+- **F06**: Status / Diff View — Sesam Sync Status tree view in the Explorer sidebar showing
+  which pipes and systems are **Modified**, **Remote Only**, or **Local Only** compared to the
+  connected node; inline diff editor (node ↔ local) per item; `sesam.showStatus` command;
+  `sesam.viewDiff` command (palette + inline button); `sesam.revertConfig` inline button on
+  Modified items (reverts local file to remote node version with confirmation); per-item tooltips
+  describing the state; Systems tab in Node Status panel with Type / Pipes In / Pipes Out /
+  Config Status columns; `sesam.systemStatus` command; download commands warn when local changes
+  would be overwritten and offer "See Local Diffs"; sync status auto-populates 3 s after activation
+  and auto-refreshes on file save (debounced) and after download
 
 ---
 
@@ -66,7 +73,8 @@ what is live on the node before deciding what to push.
 - **F05**: Test Management — first-class test runner integration via the VS Code Testing API;
   run, debug, and view results for Sesam pipe tests without leaving the editor
 - **F06**: Status / Diff View — side-by-side diff between local configs and what is deployed
-  on the connected Sesam node, with one-click upload/revert per config
+  on the connected Sesam node, with one-click diff per config; systems status table; download
+  guard that warns on local changes
 
 ---
 

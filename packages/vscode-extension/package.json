@@ -293,6 +293,26 @@
         "command": "sesam.nodeStatus",
         "title": "Sesam: Open Node Status Panel",
         "icon": "$(server)"
+      },
+      {
+        "command": "sesam.systemStatus",
+        "title": "Sesam: Open System Status",
+        "icon": "$(database)"
+      },
+      {
+        "command": "sesam.showStatus",
+        "title": "Sesam: Show Sync Status",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sesam.viewDiff",
+        "title": "Sesam: View Diff with Node",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "sesam.revertConfig",
+        "title": "Sesam: Revert to Remote Node Version",
+        "icon": "$(discard)"
       }
     ],
     "menus": {
@@ -437,6 +457,18 @@
         {
           "command": "sesam.nodeStatus",
           "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "sesam.systemStatus",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "sesam.showStatus",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "sesam.revertConfig",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -461,9 +493,31 @@
           "group": "navigation@12"
         },
         {
+          "command": "sesam.systemStatus",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "group": "navigation@13"
+        },
+        {
           "command": "dtl.refreshDag",
           "when": "view == sesamPipeLineage",
           "group": "navigation@1"
+        },
+        {
+          "command": "sesam.showStatus",
+          "when": "view == sesamSyncStatus",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "sesam.viewDiff",
+          "when": "viewItem == syncItem.modified || viewItem == syncItem.node-only",
+          "group": "inline@1"
+        },
+        {
+          "command": "sesam.revertConfig",
+          "when": "viewItem == syncItem.modified",
+          "group": "inline@2"
         }
       ],
       "viewsWelcome": []
@@ -496,6 +550,11 @@
     ],
     "views": {
       "explorer": [
+        {
+          "id": "sesamSyncStatus",
+          "name": "Sesam Sync Status",
+          "when": "workspaceFolderCount > 0"
+        },
         {
           "id": "sesamPipeLineage",
           "name": "Pipe Lineage",

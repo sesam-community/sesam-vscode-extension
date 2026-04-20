@@ -21,6 +21,7 @@ export { uploadConfig, uploadSingleConfig } from "./upload.js";
 export { downloadConfig, downloadSingleConfig } from "./download.js";
 export { runPipe, runAllPipes } from "./run-pipes.js";
 export { getStatus, getPipeStatus } from "./status.js";
+export { getSyncStatus, getNodeConfig } from "./sync-status.js";
 export { validateWorkspace } from "./validate.js";
 
 // Test management (F05)
