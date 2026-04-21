@@ -489,13 +489,50 @@ Format:
 const handleFix = async (
   request: vscode.ChatRequest,
   stream: vscode.ChatResponseStream,
+  client: LanguageClient,
   token: vscode.CancellationToken,
 ): Promise<vscode.ChatResult> => {
   stream.progress("Analysing and fixing validation errors…");
 
+  const refContent = await extractReferencedContent(request.references);
+  const activeFile = refContent === undefined ? await getActiveFileContent() : undefined;
+  const fileContent = refContent ?? activeFile?.content;
+
+  if (!fileContent) {
+    stream.markdown(
+      "No file found. Open a Sesam config file in the editor or drag it into the chat, then try again.",
+    );
+    return {};
+  }
+
+  const filename = activeFile?.filename ?? "config";
+
+  // Collect lint diagnostics to give the model precise error context
+  let diagContext = "";
+
+  try {
+    const lintResult = await client.sendRequest<LintContentResponse>("sesam/lintContent", {
+      content: fileContent,
+    } satisfies LintContentRequest);
+
+    if (lintResult.diagnostics.length > 0) {
+      diagContext =
+        "\n\nValidation errors in this file:\n" +
+        lintResult.diagnostics
+          .map((d) => `- Line ${d.range.start.line + 1}: [${d.code ?? "?"}] ${d.message}`)
+          .join("\n");
+    }
+  } catch {
+    // Lint unavailable — model will infer errors from the content
+  }
+
+  const userMessage =
+    `Fix the following Sesam config file (${filename}):${diagContext}\n\n` +
+    `\`\`\`json filename=${filename}\n${fileContent}\n\`\`\``;
+
   const messages = [
     vscode.LanguageModelChatMessage.User(FIX_SYSTEM_PROMPT),
-    vscode.LanguageModelChatMessage.User(request.prompt),
+    vscode.LanguageModelChatMessage.User(userMessage),
   ];
 
   const response = await request.model.sendRequest(messages, {}, token);
@@ -555,6 +592,10 @@ const handleFix = async (
     stream.markdown(
       `\n\n---\n✓ Applied fixes to ${applied.length} file${applied.length === 1 ? "" : "s"}: ${applied.map((p) => `\`${p}\``).join(", ")}`,
     );
+  }
+
+  if (activeFile) {
+    stream.reference(activeFile.uri);
   }
 
   return {};
@@ -651,7 +692,7 @@ const makeHandler =
       case "cli":
         return handleCliGuidance(request, stream, token);
       case "fix":
-        return handleFix(request, stream, token);
+        return handleFix(request, stream, client, token);
       default:
         return handleDefaultQA(request, context, stream, token);
     }
