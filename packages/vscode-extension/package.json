@@ -1,6 +1,6 @@
 {
   "name": "dtl-language-support",
-  "displayName": "DTL Language Support",
+  "displayName": "Sesam",
   "description": "Data Transformation Language (DTL) support for Sesam pipe configurations",
   "version": "0.1.0",
   "publisher": "bouvet",

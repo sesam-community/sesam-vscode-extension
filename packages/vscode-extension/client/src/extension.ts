@@ -867,7 +867,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const editor = vscode.window.activeTextEditor;
 
       if (!editor) {
-        vscode.window.showWarningMessage("Pipe preview: No active editor.");
+        vscode.window.showWarningMessage("Sesam: No active editor.");
         return;
       }
 
@@ -877,7 +877,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       if (errors.length > 0) {
         vscode.window.showWarningMessage(
-          `Pipe preview blocked: ${errors.length} error${errors.length === 1 ? "" : "s"} in this file. Fix all errors before previewing.`,
+          `Sesam: Pipe preview blocked — ${errors.length} error${errors.length === 1 ? "" : "s"} in this file. Fix all errors before previewing.`,
         );
         return;
       }
