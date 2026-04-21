@@ -433,8 +433,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         showNodeStatus("connected");
       } else {
         showNodeStatus("hibernated");
-        // Don't start the poller automatically on load — just show the state.
-        // The user can trigger wake-up via upload/download/run commands.
+        startPollerIfNeeded(creds.nodeUrl, creds.jwt);
       }
     });
   }, 4_000);
@@ -788,6 +787,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
+      const runReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+      if (!runReady) {
+        return;
+      }
+
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -818,30 +823,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             if (result.success) {
               vscode.window.showInformationMessage(`Sesam: Pipe '${pipeId}' started successfully.`);
             } else {
-              const hint = await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
               const detail = result.message ?? "unknown error";
-              vscode.window.showErrorMessage(
-                `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
-              );
-
-              if (hint) {
-                startPollerIfNeeded(creds.nodeUrl, creds.jwt);
-              }
+              vscode.window.showErrorMessage(`Sesam: Failed to run '${pipeId}': ${detail}`);
             }
           } catch (err) {
-            const isAuth =
-              typeof err === "object" &&
-              err !== null &&
-              (err as Record<string, unknown>)["kind"] === "auth";
             const detail = err instanceof Error ? err.message : String(err);
-            const hint = isAuth ? null : await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
-            vscode.window.showErrorMessage(
-              `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
-            );
-
-            if (hint) {
-              startPollerIfNeeded(creds.nodeUrl, creds.jwt);
-            }
+            vscode.window.showErrorMessage(`Sesam: Failed to run '${pipeId}': ${detail}`);
           } finally {
             void vscode.commands.executeCommand("setContext", "sesam.pipeRunning", false);
           }
@@ -2107,6 +2094,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
+      const statusReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+      if (!statusReady) {
+        return;
+      }
+
       syncStatusProvider.setLoading();
 
       // Ensure the Explorer sidebar + Sync Status view is visible before results arrive
@@ -2197,6 +2190,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       if (!creds) {
         vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+        return;
+      }
+
+      const diffReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+      if (!diffReady) {
         return;
       }
 
@@ -2318,6 +2317,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         if (!creds) {
           vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+          return;
+        }
+
+        const revertReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+        if (!revertReady) {
           return;
         }
 
