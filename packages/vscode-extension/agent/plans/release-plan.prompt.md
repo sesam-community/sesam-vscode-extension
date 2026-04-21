@@ -14,8 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **F02**: Config File Intelligence — schema-aware validation and completions for all top-level
-  config properties across pipe, system, and global configs
 - **F24**: Live Updates via Socket.IO — `NodeStatusPanel` connects to the Sesam node over
   Socket.IO (`socket.io-client`) for real-time `pipes_updated` / `pipes_added` / `pipes_deleted`
   push events; 30 s `setInterval` polling removed entirely; **no polling fallback** — when live
@@ -138,11 +136,11 @@ and the full pipe graph sidebar shipped ahead of schedule alongside the core MVP
 
 | Version | Phase | Key theme | Planned features |
 |---|---|---|---|
-| 0.1.0 | Phase 1 + 3 + 4 | Initial release | F00–F04, F09, F12–F25 |
+| 0.1.0 | Phase 1 + 3 + 4 | Initial release | F00–F01, F03–F04, F09, F12–F26 |
 | 0.2.0 | Phase 2 | Testing & Diff | F05, F06 |
 | 0.3.0 | Phase 3 | Node Diagnostics | F10 |
 | 0.4.0 | Phase 4 | Visual & AI Polish | F07/F15, F08 |
-| 1.0.0 | Phase 5 | Management Studio | F02 (completed) + F11 |
+| 1.0.0 | Phase 5 | Management Studio | F02 + F11 |
 
 > **Phase 5 (v1.0.0)**: Management Studio Functionalities (F11) — full in-editor replacement
 > for the Sesam Management Studio web UI, including subscription management, secret management,

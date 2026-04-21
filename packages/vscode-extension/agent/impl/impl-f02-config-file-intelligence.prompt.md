@@ -1,7 +1,7 @@
 # F02: Config File Intelligence
 
 > **Status**: `planned`
-> **Rollout Phase**: Phase 1 - MVP
+> **Rollout Phase**: Phase 5
 > **Tracking**: [README.md](README.md)
 
 ---
