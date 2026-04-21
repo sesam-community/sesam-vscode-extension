@@ -33,6 +33,19 @@ const ACTIVE_PROFILE_KEY = "sesam.activeProfile"; // workspaceState key — neve
 let _context: vscode.ExtensionContext | undefined;
 let _statusBarItem: vscode.StatusBarItem | undefined;
 
+/** Tracks whether the Sesam node is currently confirmed reachable. */
+let _nodeConnected = false;
+
+/**
+ * Update the node-connected state and re-render the profile status bar.
+ * Call with `true` when `NodeStatusStage` reaches "connected",
+ * and `false` for any other stage (checking, hibernated, provisioning, …).
+ */
+export const setNodeConnected = (connected: boolean): void => {
+  _nodeConnected = connected;
+  void _refreshStatusBar();
+};
+
 export const initProfileManager = (context: vscode.ExtensionContext): void => {
   _context = context;
 
@@ -166,12 +179,18 @@ const _refreshStatusBar = async (): Promise<void> => {
     _statusBarItem.text = hostname
       ? `$(lock) PROD · ${active} · ${hostname}`
       : `$(lock) PROD · ${active}`;
-  } else {
+  } else if (_nodeConnected) {
     _statusBarItem.backgroundColor = undefined;
     _statusBarItem.color = new vscode.ThemeColor("testing.iconPassed");
     _statusBarItem.text = hostname
       ? `$(check) ${active} · ${hostname}`
       : `$(check) Sesam: [${active}]`;
+  } else {
+    _statusBarItem.backgroundColor = undefined;
+    _statusBarItem.color = undefined;
+    _statusBarItem.text = hostname
+      ? `$(circle-outline) ${active} · ${hostname}`
+      : `$(circle-outline) Sesam: [${active}]`;
   }
 
   _statusBarItem.show();

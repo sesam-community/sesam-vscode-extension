@@ -38,6 +38,7 @@ import {
   runListProfiles,
   runSwitchProfile,
   confirmIfProduction,
+  setNodeConnected,
 } from "./profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
@@ -124,6 +125,8 @@ const showNodeStatus = (stage: NodeStatusStage): void => {
     clearTimeout(_nodeStatusBarHideTimer);
     _nodeStatusBarHideTimer = null;
   }
+
+  setNodeConnected(stage === "connected");
 
   if (stage === "hidden") {
     _nodeStatusBar?.hide();
@@ -414,6 +417,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Populate sync status in the background shortly after activation so the
   // tree is ready without the user having to trigger a save or explicit refresh.
   setTimeout(() => refreshSyncStatusSilently(), 3_000);
+
+  // Silently check node reachability on load so the status bar lifecycle is
+  // visible immediately without the user having to open the Node Status panel.
+  setTimeout(() => {
+    void resolveCredentials().then(async (creds) => {
+      if (!creds || _provisioningPoller) {
+        return;
+      }
+
+      showNodeStatus("checking");
+      const hint = await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
+
+      if (!hint) {
+        showNodeStatus("connected");
+      } else {
+        showNodeStatus("hibernated");
+        // Don't start the poller automatically on load — just show the state.
+        // The user can trigger wake-up via upload/download/run commands.
+      }
+    });
+  }, 4_000);
 
   /**
    * Re-fetch sync status silently in the background and update the provider.
