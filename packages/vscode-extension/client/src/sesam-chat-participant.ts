@@ -5,7 +5,12 @@ import type { LanguageClient } from "vscode-languageclient/node";
 
 import { getAllFunctions, DTL_VARIABLES } from "../../src/shared/dtl-registry";
 
-import type { LintContentRequest, LintContentResponse } from "../../types/lint.types";
+import type {
+  LintContentRequest,
+  LintContentResponse,
+  LintWorkspaceRequest,
+  LintWorkspaceResponse,
+} from "../../types/lint.types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -256,6 +261,40 @@ const extractReferencedContent = async (
   return undefined;
 };
 
+const extractAllReferencedFiles = async (
+  references: readonly vscode.ChatPromptReference[],
+): Promise<Array<{ content: string; filename: string; uri: vscode.Uri }>> => {
+  const results: Array<{ content: string; filename: string; uri: vscode.Uri }> = [];
+
+  for (const ref of references) {
+    if (ref.value instanceof vscode.Uri) {
+      try {
+        const bytes = await vscode.workspace.fs.readFile(ref.value);
+        results.push({
+          content: Buffer.from(bytes).toString("utf8"),
+          filename: path.basename(ref.value.fsPath),
+          uri: ref.value,
+        });
+      } catch {
+        // skip unreadable ref
+      }
+    } else if (ref.value instanceof vscode.Location) {
+      try {
+        const doc = await vscode.workspace.openTextDocument(ref.value.uri);
+        results.push({
+          content: doc.getText(ref.value.range),
+          filename: path.basename(ref.value.uri.fsPath),
+          uri: ref.value.uri,
+        });
+      } catch {
+        // skip unreadable ref
+      }
+    }
+  }
+
+  return results;
+};
+
 const extractFirstCodeBlock = (text: string): string | undefined => {
   const match = text.match(/```(?:json)?\n([\s\S]*?)```/);
   return match?.[1]?.trim();
@@ -486,6 +525,30 @@ Format:
 \`\`\`
 `.trim();
 
+// ---------------------------------------------------------------------------
+// Fix helpers
+// ---------------------------------------------------------------------------
+
+interface FileToFix {
+  uri: vscode.Uri;
+  filename: string;
+  content: string;
+  diagContext: string;
+}
+
+const buildDiagContext = (diagnostics: LintContentResponse["diagnostics"]): string => {
+  if (diagnostics.length === 0) {
+    return "";
+  }
+
+  return (
+    "\n\nValidation errors:\n" +
+    diagnostics
+      .map((d) => `- Line ${d.range.start.line + 1}: [${d.code ?? "?"}] ${d.message}`)
+      .join("\n")
+  );
+};
+
 const handleFix = async (
   request: vscode.ChatRequest,
   stream: vscode.ChatResponseStream,
@@ -494,41 +557,85 @@ const handleFix = async (
 ): Promise<vscode.ChatResult> => {
   stream.progress("Analysing and fixing validation errors…");
 
-  const refContent = await extractReferencedContent(request.references);
-  const activeFile = refContent === undefined ? await getActiveFileContent() : undefined;
-  const fileContent = refContent ?? activeFile?.content;
+  const refFiles = await extractAllReferencedFiles(request.references);
+  const activeFile = refFiles.length === 0 ? await getActiveFileContent() : undefined;
 
-  if (!fileContent) {
-    stream.markdown(
-      "No file found. Open a Sesam config file in the editor or drag it into the chat, then try again.",
-    );
-    return {};
-  }
+  // ── Collect files to fix ────────────────────────────────────────────────
+  const filesToFix: FileToFix[] = [];
 
-  const filename = activeFile?.filename ?? "config";
+  if (refFiles.length > 0 || activeFile) {
+    // Explicit: one or more files were referenced, or there is an active editor
+    const sources =
+      refFiles.length > 0
+        ? refFiles
+        : [{ content: activeFile!.content, filename: activeFile!.filename, uri: activeFile!.uri }];
 
-  // Collect lint diagnostics to give the model precise error context
-  let diagContext = "";
+    for (const src of sources) {
+      let diagContext = "";
 
-  try {
-    const lintResult = await client.sendRequest<LintContentResponse>("sesam/lintContent", {
-      content: fileContent,
-    } satisfies LintContentRequest);
+      try {
+        const lintResult = await client.sendRequest<LintContentResponse>("sesam/lintContent", {
+          content: src.content,
+        } satisfies LintContentRequest);
+        diagContext = buildDiagContext(lintResult.diagnostics);
+      } catch {
+        // Lint unavailable — model will infer errors from content
+      }
 
-    if (lintResult.diagnostics.length > 0) {
-      diagContext =
-        "\n\nValidation errors in this file:\n" +
-        lintResult.diagnostics
-          .map((d) => `- Line ${d.range.start.line + 1}: [${d.code ?? "?"}] ${d.message}`)
-          .join("\n");
+      filesToFix.push({ uri: src.uri, filename: src.filename, content: src.content, diagContext });
     }
-  } catch {
-    // Lint unavailable — model will infer errors from the content
+  } else {
+    // No explicit file — scan the whole workspace for files with errors
+    stream.progress("Scanning workspace for errors…");
+
+    try {
+      const wsResult = await client.sendRequest<LintWorkspaceResponse>("sesam/lintWorkspace", {
+        maxProblems: 200,
+        minSeverity: 1, // errors only
+      } satisfies LintWorkspaceRequest);
+
+      const errored = wsResult.results.filter((r) => r.diagnostics.some((d) => d.severity === 1));
+
+      if (errored.length === 0) {
+        stream.markdown("No errors found in the workspace. Nothing to fix.");
+        return {};
+      }
+
+      stream.markdown(
+        `Found **${errored.length}** file${errored.length === 1 ? "" : "s"} with errors. Fixing…\n\n`,
+      );
+
+      for (const r of errored) {
+        const fileUri = vscode.Uri.parse(r.uri);
+        const bytes = await vscode.workspace.fs.readFile(fileUri);
+        const content = Buffer.from(bytes).toString("utf-8");
+        filesToFix.push({
+          uri: fileUri,
+          filename: r.fileLabel,
+          content,
+          diagContext: buildDiagContext(r.diagnostics),
+        });
+      }
+    } catch {
+      stream.markdown(
+        "No file found. Open a Sesam config file in the editor or drag it into the chat, then try again.",
+      );
+      return {};
+    }
   }
 
-  const userMessage =
-    `Fix the following Sesam config file (${filename}):${diagContext}\n\n` +
-    `\`\`\`json filename=${filename}\n${fileContent}\n\`\`\``;
+  // ── Build prompt ────────────────────────────────────────────────────────
+  // Use a stable key (the filename) so the model echoes it back in the fenced
+  // block and we can resolve it back to the original URI.
+  const uriByFilename = new Map<string, vscode.Uri>(filesToFix.map((f) => [f.filename, f.uri]));
+
+  const userMessage = filesToFix
+    .map(
+      (f) =>
+        `Fix the following Sesam config file (${f.filename}):${f.diagContext}\n\n` +
+        `\`\`\`json filename=${f.filename}\n${f.content}\n\`\`\``,
+    )
+    .join("\n\n---\n\n");
 
   const messages = [
     vscode.LanguageModelChatMessage.User(FIX_SYSTEM_PROMPT),
@@ -547,45 +654,58 @@ const handleFix = async (
     stream.markdown(chunk);
   }
 
-  // Extract and apply each fenced block: ```json filename=<path>\n<content>\n```
+  // Extract and apply each fenced block: ```json filename=<name>\n<content>\n```
   const blockRe = /```(?:json)?\s+filename=([^\n]+)\n([\s\S]*?)```/g;
   let match: RegExpExecArray | null;
   const applied: string[] = [];
 
   while ((match = blockRe.exec(full)) !== null) {
-    const relPath = match[1].trim();
+    const filenameKey = match[1].trim();
     const content = match[2].trim();
-    const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
 
-    if (!wsFolder) {
-      continue;
+    // Resolve to the original URI; fall back to joinPath for workspace-scan paths
+    let fileUri = uriByFilename.get(filenameKey);
+
+    if (!fileUri) {
+      const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+
+      if (!wsFolder) {
+        continue;
+      }
+
+      fileUri = vscode.Uri.joinPath(wsFolder, filenameKey);
     }
 
-    const fileUri = vscode.Uri.joinPath(wsFolder, relPath);
+    // Open (or reuse) the document and replace its full content via WorkspaceEdit
+    // so the editor buffer stays in sync. Never write externally with fs.writeFile
+    // because that causes a "content is newer" conflict when the file is open.
+    const doc = await vscode.workspace.openTextDocument(fileUri);
+    const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
+    const replaceEdit = new vscode.WorkspaceEdit();
+    replaceEdit.replace(fileUri, fullRange, content + "\n");
+    await vscode.workspace.applyEdit(replaceEdit);
 
-    await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content + "\n", "utf-8"));
-
-    // Format via the LSP formatter (same path as on-save formatting)
+    // Format via the LSP formatter then save
     try {
-      const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
+      const formatEdits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
         "vscode.executeFormatDocumentProvider",
         fileUri,
         { tabSize: 2, insertSpaces: true },
       );
 
-      if (edits && edits.length > 0) {
-        const wsEdit = new vscode.WorkspaceEdit();
-        wsEdit.set(fileUri, edits);
-        await vscode.workspace.applyEdit(wsEdit);
-        const doc = await vscode.workspace.openTextDocument(fileUri);
-        await doc.save();
+      if (formatEdits && formatEdits.length > 0) {
+        const formatWsEdit = new vscode.WorkspaceEdit();
+        formatWsEdit.set(fileUri, formatEdits);
+        await vscode.workspace.applyEdit(formatWsEdit);
       }
     } catch {
-      // LSP formatter unavailable — file already written correctly
+      // LSP formatter unavailable — content already replaced correctly
     }
 
+    await doc.save();
+
     stream.reference(fileUri);
-    applied.push(relPath);
+    applied.push(filenameKey);
   }
 
   if (applied.length > 0) {
@@ -594,8 +714,8 @@ const handleFix = async (
     );
   }
 
-  if (activeFile) {
-    stream.reference(activeFile.uri);
+  for (const f of filesToFix) {
+    stream.reference(f.uri);
   }
 
   return {};
