@@ -14,12 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **F02**: Config File Intelligence — schema-aware validation and completions for all top-level
-  config properties across pipe, system, and global configs
 - **F24**: Live Updates via Socket.IO — `NodeStatusPanel` connects to the Sesam node over
   Socket.IO (`socket.io-client`) for real-time `pipes_updated` / `pipes_added` / `pipes_deleted`
-  push events; replaces 30 s polling; falls back to poll on connection failure; live/polling/offline
-  badge in the Node Status WebView
+  push events; 30 s `setInterval` polling removed entirely; **no polling fallback** — when live
+  updates are unavailable the Refresh button is shown instead; green **● Live** / grey **○ Paused** /
+  connection badge with per-state tooltip in the toolbar; user toggle to pause/resume the
+  connection; JWT/auth errors surface a VS Code warning notification; provisioning poller triggered
+  on `connect_error` when the node is sleeping; filter pills are now client-side only (no network
+  request on click); shared node status bar item shows **Checking node → Node hibernated →
+  Starting provisioning → Trying to connect → Connected** lifecycle with amber warning background
+  on in-progress stages and per-stage hover tooltips
 - **F25**: Credential Safety — node hostname shown in the status bar; destructive commands
   (upload, wipe, sync) blocked with a confirmation modal when targeting a production node
 - **F06**: Status / Diff View — Sesam Sync Status tree view in the Explorer sidebar showing
@@ -132,11 +136,11 @@ and the full pipe graph sidebar shipped ahead of schedule alongside the core MVP
 
 | Version | Phase | Key theme | Planned features |
 |---|---|---|---|
-| 0.1.0 | Phase 1 + 3 + 4 | Initial release | F00–F04, F09, F12–F25 |
+| 0.1.0 | Phase 1 + 3 + 4 | Initial release | F00–F01, F03–F04, F09, F12–F26 |
 | 0.2.0 | Phase 2 | Testing & Diff | F05, F06 |
 | 0.3.0 | Phase 3 | Node Diagnostics | F10 |
 | 0.4.0 | Phase 4 | Visual & AI Polish | F07/F15, F08 |
-| 1.0.0 | Phase 5 | Management Studio | F02 (completed) + F11 |
+| 1.0.0 | Phase 5 | Management Studio | F02 + F11 |
 
 > **Phase 5 (v1.0.0)**: Management Studio Functionalities (F11) — full in-editor replacement
 > for the Sesam Management Studio web UI, including subscription management, secret management,

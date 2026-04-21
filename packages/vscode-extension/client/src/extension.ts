@@ -38,6 +38,8 @@ import {
   runListProfiles,
   runSwitchProfile,
   confirmIfProduction,
+  setNodeConnected,
+  profileSwitchHooks,
 } from "./profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
@@ -76,6 +78,89 @@ let client: LanguageClient;
 /** Active provisioning poller — at most one at a time. */
 let _provisioningPoller: { stop: () => void } | null = null;
 
+// ---------------------------------------------------------------------------
+// Shared node status bar
+// ---------------------------------------------------------------------------
+
+/** Single status bar item shared across all node-status / provisioning flows. */
+let _nodeStatusBar: vscode.StatusBarItem | null = null;
+let _nodeStatusBarHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+const getNodeStatusBar = (): vscode.StatusBarItem => {
+  if (!_nodeStatusBar) {
+    _nodeStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+    _nodeStatusBar.tooltip = "Sesam node status";
+  }
+
+  return _nodeStatusBar;
+};
+
+type NodeStatusStage =
+  | "checking"
+  | "hibernated"
+  | "provisioning"
+  | "connecting"
+  | "connected"
+  | "hidden";
+
+const NODE_STATUS_MESSAGES: Record<NodeStatusStage, string> = {
+  checking: "$(sync~spin) Sesam: Checking node…",
+  hibernated: "$(warning) Sesam: Node hibernated",
+  provisioning: "$(sync~spin) Sesam: Starting provisioning…",
+  connecting: "$(sync~spin) Sesam: Trying to connect…",
+  connected: "$(check) Sesam: Connected",
+  hidden: "",
+};
+
+const NODE_STATUS_TOOLTIPS: Record<NodeStatusStage, string> = {
+  checking: "Verifying whether the Sesam node is reachable",
+  hibernated: "The node is hibernated or not yet provisioned. Wake it up to run pipes.",
+  provisioning: "The node is starting up — this may take a few minutes",
+  connecting: "Provisioning complete — waiting for the node to accept connections",
+  connected: "Sesam node is ready",
+  hidden: "",
+};
+
+const showNodeStatus = (stage: NodeStatusStage): void => {
+  if (_nodeStatusBarHideTimer !== null) {
+    clearTimeout(_nodeStatusBarHideTimer);
+    _nodeStatusBarHideTimer = null;
+  }
+
+  setNodeConnected(stage === "connected");
+
+  if (stage === "connected") {
+    // Authoritative "node is ready" signal — always clear provisioning state so
+    // the file-explorer icon when-clauses (!sesam.nodeProvisioning) become visible.
+    void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
+    PreviewPanel.currentPanel?.setNodeProvisioning(false);
+
+    if (_provisioningPoller) {
+      _provisioningPoller.stop();
+      _provisioningPoller = null;
+    }
+  }
+
+  if (stage === "hidden") {
+    _nodeStatusBar?.hide();
+    return;
+  }
+
+  const bar = getNodeStatusBar();
+  bar.text = NODE_STATUS_MESSAGES[stage];
+  bar.tooltip = NODE_STATUS_TOOLTIPS[stage];
+  bar.backgroundColor =
+    stage === "connected" ? undefined : new vscode.ThemeColor("statusBarItem.warningBackground");
+  bar.show();
+
+  if (stage === "connected") {
+    _nodeStatusBarHideTimer = setTimeout(() => {
+      _nodeStatusBar?.hide();
+      _nodeStatusBarHideTimer = null;
+    }, 2_500);
+  }
+};
+
 /**
  * Last text editor that held a sesam-config or JSON pipe/system file.
  * Updated whenever focus moves to a qualifying editor so commands like
@@ -103,22 +188,21 @@ const startPollerIfNeeded = (nodeUrl: string, jwt: string): void => {
   void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", true);
   PreviewPanel.currentPanel?.setNodeProvisioning(true);
 
-  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
-  statusBarItem.text = "$(sync~spin) Sesam: node provisioning…";
-  statusBarItem.tooltip = "Waiting for Sesam node to become available";
-  statusBarItem.show();
+  showNodeStatus("provisioning");
 
   _provisioningPoller = startProvisioningPoller(
     jwt,
     subId,
     nodeUrl,
     (hint) => {
-      statusBarItem.text = `$(sync~spin) Sesam: ${hint}`;
+      const lower = hint.toLowerCase();
+      const stage: NodeStatusStage = lower.includes("connect") ? "connecting" : "provisioning";
+      showNodeStatus(stage);
     },
     () => {
       _provisioningPoller = null;
       clearWakeUpSent(subId);
-      statusBarItem.dispose();
+      showNodeStatus("connected");
       void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
       PreviewPanel.currentPanel?.setNodeProvisioning(false);
       void vscode.window.showInformationMessage(
@@ -134,11 +218,15 @@ const startPollerIfNeeded = (nodeUrl: string, jwt: string): void => {
  * is (or became) ready, `false` if the user cancelled.
  */
 const ensureNodeReady = async (nodeUrl: string, jwt: string): Promise<boolean> => {
+  showNodeStatus("checking");
   const hint = await fetchNodeStatusHint(nodeUrl, jwt);
 
   if (!hint) {
+    showNodeStatus("connected");
     return true; // node already reachable
   }
+
+  showNodeStatus("hibernated");
 
   // Node is hibernated / provisioning — inform the user and wait.
   const answer = await vscode.window.showWarningMessage(
@@ -148,6 +236,7 @@ const ensureNodeReady = async (nodeUrl: string, jwt: string): Promise<boolean> =
   );
 
   if (answer !== "Wake up & wait") {
+    showNodeStatus("hidden");
     return false;
   }
 
@@ -155,6 +244,7 @@ const ensureNodeReady = async (nodeUrl: string, jwt: string): Promise<boolean> =
     const subId = extractSubscriptionId(jwt);
 
     if (!subId) {
+      showNodeStatus("hidden");
       resolve(false);
       return;
     }
@@ -175,22 +265,21 @@ const ensureNodeReady = async (nodeUrl: string, jwt: string): Promise<boolean> =
     void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", true);
     PreviewPanel.currentPanel?.setNodeProvisioning(true);
 
-    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
-    statusBarItem.text = "$(sync~spin) Sesam: node provisioning…";
-    statusBarItem.tooltip = "Waiting for Sesam node to become available";
-    statusBarItem.show();
+    showNodeStatus("provisioning");
 
     _provisioningPoller = startProvisioningPoller(
       jwt,
       subId,
       nodeUrl,
       (statusHint) => {
-        statusBarItem.text = `$(sync~spin) Sesam: ${statusHint}`;
+        const lower = statusHint.toLowerCase();
+        const stage: NodeStatusStage = lower.includes("connect") ? "connecting" : "provisioning";
+        showNodeStatus(stage);
       },
       () => {
         _provisioningPoller = null;
         clearWakeUpSent(subId);
-        statusBarItem.dispose();
+        showNodeStatus("connected");
         void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
         PreviewPanel.currentPanel?.setNodeProvisioning(false);
         resolve(true);
@@ -203,6 +292,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Wire the provisioning poller into PreviewPanel and NodeStatusPanel live eval failures
   PreviewPanel.onProvisioningNeeded = startPollerIfNeeded;
   NodeStatusPanel.onProvisioningNeeded = startPollerIfNeeded;
+  NodeStatusPanel.context = context;
+  NodeStatusPanel.onNodeCheckStart = () => showNodeStatus("checking");
+  NodeStatusPanel.onNodeCheckSuccess = () => showNodeStatus("connected");
+
+  // Reset all node state when the user switches profiles so the old poller
+  // doesn't linger and sesam.nodeProvisioning is cleared for the new profile.
+  profileSwitchHooks.onSwitch = () => {
+    if (_provisioningPoller) {
+      _provisioningPoller.stop();
+      _provisioningPoller = null;
+    }
+
+    void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
+    PreviewPanel.currentPanel?.setNodeProvisioning(false);
+    setNodeConnected(false);
+    showNodeStatus("checking");
+  };
 
   // ── Network Status Bar (F23) ──────────────────────────────────────────────
   createNetworkStatusBar(context);
@@ -210,6 +316,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // ── Sesam Output Channel ──────────────────────────────────────────────────
   // Write an initial line so the channel appears in the Output dropdown immediately.
   context.subscriptions.push({ dispose: disposeSesamChannel });
+  context.subscriptions.push({
+    dispose: () => {
+      _nodeStatusBar?.dispose();
+      _nodeStatusBar = null;
+    },
+  });
   getSesamChannel().appendLine("Sesam extension activated.");
 
   // ── Credential & Profile Managers (F03) ──────────────────────────────────
@@ -332,6 +444,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Populate sync status in the background shortly after activation so the
   // tree is ready without the user having to trigger a save or explicit refresh.
   setTimeout(() => refreshSyncStatusSilently(), 3_000);
+
+  // Silently check node reachability on load so the status bar lifecycle is
+  // visible immediately without the user having to open the Node Status panel.
+  setTimeout(() => {
+    void resolveCredentials().then(async (creds) => {
+      if (!creds || _provisioningPoller) {
+        return;
+      }
+
+      showNodeStatus("checking");
+      const hint = await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
+
+      if (!hint) {
+        showNodeStatus("connected");
+      } else {
+        showNodeStatus("hibernated");
+        startPollerIfNeeded(creds.nodeUrl, creds.jwt);
+      }
+    });
+  }, 4_000);
 
   /**
    * Re-fetch sync status silently in the background and update the provider.
@@ -682,6 +814,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
+      const runReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+      if (!runReady) {
+        return;
+      }
+
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -712,30 +850,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             if (result.success) {
               vscode.window.showInformationMessage(`Sesam: Pipe '${pipeId}' started successfully.`);
             } else {
-              const hint = await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
               const detail = result.message ?? "unknown error";
-              vscode.window.showErrorMessage(
-                `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
-              );
-
-              if (hint) {
-                startPollerIfNeeded(creds.nodeUrl, creds.jwt);
-              }
+              vscode.window.showErrorMessage(`Sesam: Failed to run '${pipeId}': ${detail}`);
             }
           } catch (err) {
-            const isAuth =
-              typeof err === "object" &&
-              err !== null &&
-              (err as Record<string, unknown>)["kind"] === "auth";
             const detail = err instanceof Error ? err.message : String(err);
-            const hint = isAuth ? null : await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
-            vscode.window.showErrorMessage(
-              `Sesam: Failed to run '${pipeId}': ${detail}${hint ? `\n\n${hint}` : ""}`,
-            );
-
-            if (hint) {
-              startPollerIfNeeded(creds.nodeUrl, creds.jwt);
-            }
+            vscode.window.showErrorMessage(`Sesam: Failed to run '${pipeId}': ${detail}`);
           } finally {
             void vscode.commands.executeCommand("setContext", "sesam.pipeRunning", false);
           }
@@ -2001,6 +2121,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
+      const statusReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+      if (!statusReady) {
+        return;
+      }
+
       syncStatusProvider.setLoading();
 
       // Ensure the Explorer sidebar + Sync Status view is visible before results arrive
@@ -2091,6 +2217,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       if (!creds) {
         vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+        return;
+      }
+
+      const diffReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+      if (!diffReady) {
         return;
       }
 
@@ -2212,6 +2344,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         if (!creds) {
           vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+          return;
+        }
+
+        const revertReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+        if (!revertReady) {
           return;
         }
 

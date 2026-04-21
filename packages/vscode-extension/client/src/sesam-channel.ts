@@ -44,6 +44,12 @@ export const logNodeRequest = (entry: NodeRequestLogEntry): void => {
  * Log a portal HTTP request line to the Sesam output channel.
  * Used by portal-client.ts to avoid duplicating timestamp + formatting logic.
  */
+/** Log a Socket.IO live-updates lifecycle event to the Sesam output channel. */
+export const logLiveUpdate = (message: string): void => {
+  const ch = getSesamChannel();
+  ch.appendLine(`[${timestamp()}] [WS] ${message}`);
+};
+
 export const logPortalRequest = (
   method: string,
   url: string,

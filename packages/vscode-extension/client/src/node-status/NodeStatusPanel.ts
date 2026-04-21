@@ -17,13 +17,19 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { resolveCredentials } from "../credential-resolver";
-import { fetchNodeStatusHint } from "../portal-client";
+import { fetchNodeStatusHint, fetchSupportsLiveUpdates } from "../portal-client";
 import { extractSubscriptionId } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
+import { logLiveUpdate } from "../sesam-channel";
 import { SesamRunner } from "../sesam-runner";
 import { trackRequest } from "../network-status";
 import { getActiveProfileName, resolvePortalUrl } from "../profile-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
+import { SesamLiveUpdates } from "./live-updates";
+import { toWebSocketUrl } from "./live-updates";
+
+import type { LiveEventType } from "./live-updates";
+import type { PipeStatus, SystemSummary } from "@sesam/core";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +42,7 @@ type MessageFromWebview =
   | { type: "diffPipe"; pipeId: string }
   | { type: "diffSystem"; systemId: string }
   | { type: "showSyncStatus" }
+  | { type: "set-live-updates"; enabled: boolean }
   | { type: "ready" };
 
 // ---------------------------------------------------------------------------
@@ -51,6 +58,14 @@ export class NodeStatusPanel {
   static onDiffPipe: ((pipeId: string) => void) | undefined;
   /** Set by extension.ts to open a diff for a specific system against the node. */
   static onDiffSystem: ((systemId: string) => void) | undefined;
+  /** Set by extension.ts so the panel can persist the live-updates preference. */
+  static context: vscode.ExtensionContext | undefined;
+  /** Called when a node REST request is about to start. */
+  static onNodeCheckStart: (() => void) | undefined;
+  /** Called when a node REST request succeeds (node is reachable). */
+  static onNodeCheckSuccess: (() => void) | undefined;
+
+  private static readonly _liveEnabledKey = "sesam.liveUpdates.enabled";
 
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
@@ -58,6 +73,19 @@ export class NodeStatusPanel {
   private _filterPipeId: string | undefined;
   /** When set, the panel opens on this tab instead of the default 'pipes' tab. */
   private _initialTab: "pipes" | "systems" | undefined;
+
+  // ── Live updates state ────────────────────────────────────────────────────
+  private _cachedStatuses: PipeStatus[] = [];
+  private _cachedSystems: SystemSummary[] = [];
+  private _nodeUrl = "";
+  private _subId = "";
+  private _portalUrl = DEFAULT_PORTAL_URL;
+  private _jwt = "";
+  /** Whether the user has enabled live updates (default on, persisted in globalState). */
+  private _liveEnabled: boolean;
+  /** Becomes false after connect_error or mid-session disconnect. */
+  private _liveSupported = true;
+  private readonly _liveUpdates: SesamLiveUpdates;
 
   // ── Static factory ────────────────────────────────────────────────────────
 
@@ -95,6 +123,9 @@ export class NodeStatusPanel {
     this._panel = panel;
     this._filterPipeId = filterPipeId;
     this._initialTab = initialTab;
+    // Restore user preference; default true
+    this._liveEnabled =
+      NodeStatusPanel.context?.globalState.get<boolean>(NodeStatusPanel._liveEnabledKey) ?? true;
     this._panel.webview.html = this._buildHtml();
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -106,6 +137,10 @@ export class NodeStatusPanel {
       null,
       this._disposables,
     );
+
+    this._liveUpdates = new SesamLiveUpdates((statuses, eventType, errorMessage) => {
+      this._handleLiveUpdate(statuses, eventType, errorMessage);
+    });
   }
 
   // ── Message handler ───────────────────────────────────────────────────────
@@ -171,6 +206,27 @@ export class NodeStatusPanel {
       await vscode.commands.executeCommand("sesam.showStatus");
       return;
     }
+
+    if (message.type === "set-live-updates") {
+      this._liveEnabled = message.enabled;
+      // Persist preference so it survives panel re-opens
+      void NodeStatusPanel.context?.globalState.update(
+        NodeStatusPanel._liveEnabledKey,
+        message.enabled,
+      );
+
+      if (!message.enabled) {
+        // Disable is purely local — just close the socket, send nothing to the server
+        this._liveUpdates.disconnect();
+        this._panel.webview.postMessage({ type: "connection-state", state: "disabled" });
+      } else if (this._liveEnabled && this._nodeUrl && this._jwt) {
+        // User re-enabled — check subscription flag then reconnect
+        this._liveSupported = true;
+        void this._connectLive(this._nodeUrl, this._jwt);
+      }
+
+      return;
+    }
   }
 
   // ── Data fetch ────────────────────────────────────────────────────────────
@@ -187,6 +243,13 @@ export class NodeStatusPanel {
       });
       return;
     }
+
+    this._nodeUrl = creds.nodeUrl;
+    this._jwt = creds.jwt;
+    this._subId = extractSubscriptionId(creds.jwt) ?? "";
+    this._portalUrl = resolvePortalUrl(getActiveProfileName());
+
+    NodeStatusPanel.onNodeCheckStart?.();
 
     const done = trackRequest(
       "GET",
@@ -214,20 +277,29 @@ export class NodeStatusPanel {
       ]);
       done(true);
 
-      const subId = extractSubscriptionId(creds.jwt) ?? "";
-      const portalUrl = resolvePortalUrl(getActiveProfileName());
+      this._cachedStatuses = statuses;
+      this._cachedSystems = systems;
+      this._postDataMessage();
 
-      this._panel.webview.postMessage({
-        type: "data",
-        statuses,
-        systems,
-        nodeUrl: creds.nodeUrl,
-        subId,
-        portalUrl,
-        filterPipeId: this._filterPipeId ?? null,
-        initialTab: this._initialTab ?? null,
-        refreshedAt: new Date().toLocaleTimeString(),
-      });
+      NodeStatusPanel.onNodeCheckSuccess?.();
+
+      if (this._filterPipeId) {
+        // Single-pipe view: live updates not applicable — reveal refresh button
+        this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+      } else {
+        // Always check subscription support for logging, even when user-disabled
+        const supported = await fetchSupportsLiveUpdates(creds.jwt);
+
+        if (!supported) {
+          this._liveSupported = false;
+          logLiveUpdate("Live updates not supported by this subscription");
+          this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+        } else if (this._liveEnabled && !this._liveUpdates.isConnected) {
+          this._doConnect(creds.nodeUrl, creds.jwt);
+        } else if (!this._liveEnabled) {
+          this._panel.webview.postMessage({ type: "connection-state", state: "disabled" });
+        }
+      }
     } catch (err) {
       done(false);
       const hint = await fetchNodeStatusHint(creds.nodeUrl, creds.jwt);
@@ -244,10 +316,105 @@ export class NodeStatusPanel {
     }
   }
 
+  // ── Live-update helpers ───────────────────────────────────────────────────
+
+  /**
+   * Check the subscription `supports_live_updates` flag, then connect.
+   * Posts `connection-state: "not-supported"` and returns early when the
+   * subscription does not support live updates.
+   * Used by the toggle re-enable path which has no pre-checked result.
+   */
+  private async _connectLive(nodeUrl: string, jwt: string): Promise<void> {
+    const supported = await fetchSupportsLiveUpdates(jwt);
+
+    if (!supported) {
+      this._liveSupported = false;
+      logLiveUpdate("Live updates not supported by this subscription");
+      this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+      return;
+    }
+
+    this._doConnect(nodeUrl, jwt);
+  }
+
+  /** Open the Socket.IO connection. Caller must have already verified support. */
+  private _doConnect(nodeUrl: string, jwt: string): void {
+    logLiveUpdate(`Connecting to ${toWebSocketUrl(nodeUrl)}`);
+    this._liveUpdates.connect(nodeUrl, jwt);
+  }
+
+  private _postDataMessage(): void {
+    this._panel.webview.postMessage({
+      type: "data",
+      statuses: this._cachedStatuses,
+      systems: this._cachedSystems,
+      nodeUrl: this._nodeUrl,
+      subId: this._subId,
+      portalUrl: this._portalUrl,
+      filterPipeId: this._filterPipeId ?? null,
+      initialTab: this._initialTab ?? null,
+    });
+  }
+
+  private _handleLiveUpdate(
+    incoming: PipeStatus[],
+    eventType: LiveEventType,
+    errorMessage?: string,
+  ): void {
+    if (eventType === "error") {
+      this._liveSupported = false;
+      this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+
+      const isJwtError = /token|jwt|auth|unauthorized/i.test(errorMessage ?? "");
+
+      logLiveUpdate(`Connection failed${errorMessage ? `: ${errorMessage}` : ""}`);
+
+      if (isJwtError) {
+        void vscode.window.showWarningMessage(
+          "Sesam: JWT expired or invalid — update your profile via 'Sesam: Set JWT Token'.",
+        );
+      } else {
+        NodeStatusPanel.onProvisioningNeeded?.(this._nodeUrl, this._jwt);
+      }
+
+      return;
+    }
+
+    if (eventType === "disconnect") {
+      this._liveSupported = false;
+      this._panel.webview.postMessage({ type: "connection-state", state: "not-supported" });
+      logLiveUpdate("Disconnected");
+      return;
+    }
+
+    if (eventType === "snapshot") {
+      this._cachedStatuses = incoming;
+    } else if (eventType === "updated") {
+      const map = new Map(this._cachedStatuses.map((s) => [s.id, s]));
+      incoming.forEach((s) => map.set(s.id, s));
+      this._cachedStatuses = [...map.values()];
+    } else if (eventType === "added") {
+      const existingIds = new Set(this._cachedStatuses.map((s) => s.id));
+      const toAdd = incoming.filter((s) => !existingIds.has(s.id));
+      this._cachedStatuses = [...this._cachedStatuses, ...toAdd];
+    } else if (eventType === "deleted") {
+      const deletedIds = new Set(incoming.map((s) => s.id));
+      this._cachedStatuses = this._cachedStatuses.filter((s) => !deletedIds.has(s.id));
+    }
+
+    this._postDataMessage();
+
+    if (eventType === "snapshot") {
+      logLiveUpdate(`Connected — live updates active (${this._cachedStatuses.length} pipes)`);
+      this._panel.webview.postMessage({ type: "connection-state", state: "live" });
+    }
+  }
+
   // ── Dispose ───────────────────────────────────────────────────────────────
 
   dispose(): void {
     NodeStatusPanel.currentPanel = undefined;
+    this._liveUpdates.disconnect();
     this._panel.dispose();
     this._disposables.forEach((d) => d.dispose());
     this._disposables = [];
@@ -300,12 +467,6 @@ export class NodeStatusPanel {
       max-width: 260px;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .toolbar .refreshed-at {
-      font-size: 11px;
-      opacity: 0.55;
       white-space: nowrap;
     }
 
@@ -583,6 +744,30 @@ export class NodeStatusPanel {
     }
 
     .tab-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ── live updates ── */
+    .live-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    .live-badge.live     { background: rgba(73,185,90,0.18);  color: #4db86a; }
+    .live-badge.disabled { background: rgba(128,128,128,0.15); color: #8a8a8a; }
+    .live-badge.offline  { background: rgba(229,83,75,0.18);  color: #e95b55; }
+
+    .live-toggle {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      opacity: 0.85;
+      user-select: none;
+    }
+
+    .live-toggle input { cursor: pointer; }
   </style>
 </head>
 <body>
@@ -591,8 +776,12 @@ export class NodeStatusPanel {
 <div class="toolbar">
   <h2>Sesam Node Status</h2>
   <span class="node-url" id="nodeUrl"></span>
-  <span class="refreshed-at" id="refreshedAt"></span>
-  <button id="refreshBtn" class="secondary" onclick="sendRefresh()">↻ Refresh</button>
+  <span id="liveBadge" class="live-badge" style="display:none"></span>
+  <label id="liveToggleLabel" class="live-toggle" style="display:none">
+    <input type="checkbox" id="liveToggle" checked />
+    Live updates
+  </label>
+  <button id="refreshBtn" class="secondary" onclick="sendRefresh()" style="display:none" title="Fetch the latest pipe statuses from the node">↻ Refresh</button>
   <button class="secondary" onclick="syncDiff()" title="Compare local config with node — opens diff editor">⇄ Sync Diff</button>
 </div>
 
@@ -731,6 +920,42 @@ export class NodeStatusPanel {
   window.addEventListener('message', (event) => {
     const msg = event.data;
 
+    if (msg.type === 'connection-state') {
+      const isSinglePipe = !!currentFilterPipeId;
+      const showRefresh = isSinglePipe || msg.state === 'disabled' || msg.state === 'not-supported';
+      document.getElementById('refreshBtn').style.display = showRefresh ? '' : 'none';
+
+      const liveBadge = document.getElementById('liveBadge');
+      const liveToggleLabel = document.getElementById('liveToggleLabel');
+
+      if (msg.state === 'live') {
+        liveBadge.textContent = '\u25CF Live';
+        liveBadge.title = 'Connected to the Sesam node — pipe statuses update in real time';
+        liveBadge.className = 'live-badge live';
+        liveBadge.style.display = '';
+        if (!isSinglePipe) {
+          liveToggleLabel.style.display = '';
+          document.getElementById('liveToggle').checked = true;
+        }
+      } else if (msg.state === 'disabled') {
+        liveBadge.textContent = '\u25CB Paused';
+        liveBadge.title = 'Live updates are disabled — use the toggle to re-enable, or Refresh to reload manually';
+        liveBadge.className = 'live-badge disabled';
+        liveBadge.style.display = isSinglePipe ? 'none' : '';
+        if (!isSinglePipe) {
+          liveToggleLabel.style.display = '';
+          document.getElementById('liveToggle').checked = false;
+        }
+      } else if (msg.state === 'not-supported') {
+        liveBadge.textContent = '\u25CB Not supported';
+        liveBadge.title = 'This subscription does not support live updates — use Refresh to reload manually';
+        liveBadge.className = 'live-badge offline';
+        liveBadge.style.display = isSinglePipe ? 'none' : '';
+        liveToggleLabel.style.display = 'none';
+      }
+      return;
+    }
+
     if (msg.type === 'loading') {
       showOverlay('loading');
       document.getElementById('refreshBtn').disabled = true;
@@ -753,7 +978,6 @@ export class NodeStatusPanel {
       currentPortalUrl = msg.portalUrl || ${JSON.stringify(DEFAULT_PORTAL_URL)};
       currentFilterPipeId = msg.filterPipeId || null;
       document.getElementById('nodeUrl').textContent = msg.nodeUrl;
-      document.getElementById('refreshedAt').textContent = 'Updated ' + msg.refreshedAt;
       document.getElementById('refreshBtn').disabled = false;
       if (msg.filterPipeId) {
         document.getElementById('searchBox').value = '"' + msg.filterPipeId + '"';
@@ -779,6 +1003,11 @@ export class NodeStatusPanel {
 
   // Notify extension that the webview is ready
   vscode.postMessage({ type: 'ready' });
+
+  // Live-updates toggle
+  document.getElementById('liveToggle').addEventListener('change', (e) => {
+    vscode.postMessage({ type: 'set-live-updates', enabled: e.target.checked });
+  });
 
   // ── Tab switching ──────────────────────────────────────────────────────
   function switchTab(tab) {

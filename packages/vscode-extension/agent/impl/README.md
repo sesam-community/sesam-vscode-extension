@@ -21,7 +21,7 @@
 |---|---|---|---|---|
 | F00 | Bundle sesam-py (TS rewrite + npm bundle) | Phase 1 | `implemented` | [impl-f00-bundle-sesam-py.prompt.md](impl-f00-bundle-sesam-py.prompt.md) |
 | F01 | sesam-py Command Integration | Phase 1 | `implemented` | [impl-f01-sesam-commands.prompt.md](impl-f01-sesam-commands.prompt.md) |
-| F02 | Config File Intelligence | Phase 1 | `planned` | [impl-f02-config-file-intelligence.prompt.md](impl-f02-config-file-intelligence.prompt.md) |
+| F02 | Config File Intelligence | Phase 5 | `planned` | [impl-f02-config-file-intelligence.prompt.md](impl-f02-config-file-intelligence.prompt.md) |
 | F03 | Secure Credential Management | Phase 1 | `implemented` | [impl-f03-credential-management.prompt.md](impl-f03-credential-management.prompt.md) |
 | F12 | Sesam Config File Extensions & Formatter | Phase 1 | `implemented` | [impl-f12-conf-json-formatter.prompt.md](impl-f12-conf-json-formatter.prompt.md) |
 | F13 | Go to Rule Definition + Find All References + Rename Rule | — | `implemented` | [go-to-rule-definition.prompt.md](../plans/go-to-rule-definition.prompt.md) |
@@ -35,7 +35,7 @@
 | F21 | Config Property Completions | Phase 1 | `implemented` | [impl-f21-config-prop-completions.prompt.md](impl-f21-config-prop-completions.prompt.md) |
 | F22 | Sesam Panel (Errors / Warnings View) | Phase 1 | `implemented` | — |
 | F23 | Centralized Network Status Bar | Phase 1 | `implemented` | [impl-f23-network-status.prompt.md](impl-f23-network-status.prompt.md) |
-| F24 | Live Updates via Socket.IO | Phase 1 | `planned` | [impl-f24-live-updates.prompt.md](impl-f24-live-updates.prompt.md) |
+| F24 | Live Updates via Socket.IO | Phase 1 | `implemented` | [impl-f24-live-updates.prompt.md](impl-f24-live-updates.prompt.md) |
 | F25 | Credential Safety (status bar hostname + destructive-command guard) | Phase 1 | `implemented` | [credential-safety.prompt.md](../plans/credential-safety.prompt.md) |
 | F26 | Safe Profile Switching (unsaved-file + git guard + node teardown) | Phase 1 | `implemented` | [impl-f26-switch-profile.prompt.md](impl-f26-switch-profile.prompt.md) |
 | F05 | Test Management (Testing API) | Phase 2 | `phase 3 implemented` | [impl-f05-test-management.prompt.md](impl-f05-test-management.prompt.md) |
@@ -64,7 +64,6 @@
 |---|---|
 | F00: Bundle sesam-py | `implemented` |
 | F01: sesam-py Command Integration | `implemented` |
-| F02: Config File Intelligence | `planned` |
 | F03: Secure Credential Management | `implemented` |
 | F12: conf.json Support & Full-File Sesam Formatter | `implemented` |
 | F13: Go to Rule Definition | `implemented` |
