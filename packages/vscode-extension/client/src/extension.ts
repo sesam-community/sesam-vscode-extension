@@ -39,6 +39,7 @@ import {
   runSwitchProfile,
   confirmIfProduction,
   setNodeConnected,
+  profileSwitchHooks,
 } from "./profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
@@ -127,6 +128,18 @@ const showNodeStatus = (stage: NodeStatusStage): void => {
   }
 
   setNodeConnected(stage === "connected");
+
+  if (stage === "connected") {
+    // Authoritative "node is ready" signal — always clear provisioning state so
+    // the file-explorer icon when-clauses (!sesam.nodeProvisioning) become visible.
+    void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
+    PreviewPanel.currentPanel?.setNodeProvisioning(false);
+
+    if (_provisioningPoller) {
+      _provisioningPoller.stop();
+      _provisioningPoller = null;
+    }
+  }
 
   if (stage === "hidden") {
     _nodeStatusBar?.hide();
@@ -282,6 +295,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   NodeStatusPanel.context = context;
   NodeStatusPanel.onNodeCheckStart = () => showNodeStatus("checking");
   NodeStatusPanel.onNodeCheckSuccess = () => showNodeStatus("connected");
+
+  // Reset all node state when the user switches profiles so the old poller
+  // doesn't linger and sesam.nodeProvisioning is cleared for the new profile.
+  profileSwitchHooks.onSwitch = () => {
+    if (_provisioningPoller) {
+      _provisioningPoller.stop();
+      _provisioningPoller = null;
+    }
+
+    void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
+    PreviewPanel.currentPanel?.setNodeProvisioning(false);
+    setNodeConnected(false);
+    showNodeStatus("checking");
+  };
 
   // ── Network Status Bar (F23) ──────────────────────────────────────────────
   createNetworkStatusBar(context);

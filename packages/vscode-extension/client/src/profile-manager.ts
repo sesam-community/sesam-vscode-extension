@@ -37,6 +37,13 @@ let _statusBarItem: vscode.StatusBarItem | undefined;
 let _nodeConnected = false;
 
 /**
+ * Hook invoked when the user confirms a profile switch, before any teardown.
+ * Wire this in extension.ts to stop the active provisioning poller and reset
+ * node state for the incoming profile.
+ */
+export const profileSwitchHooks: { onSwitch?: () => void } = {};
+
+/**
  * Update the node-connected state and re-render the profile status bar.
  * Call with `true` when `NodeStatusStage` reaches "connected",
  * and `false` for any other stage (checking, hibernated, provisioning, …).
@@ -345,6 +352,8 @@ export const runSwitchProfile = async (targetProfile?: string): Promise<void> =>
   if (confirmed !== "Switch & Download") {
     return;
   }
+
+  profileSwitchHooks.onSwitch?.();
 
   await setActiveProfileName(selectedProfile);
   void _refreshStatusBar();
