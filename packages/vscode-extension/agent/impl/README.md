@@ -76,8 +76,8 @@
 | F21: Config Property Completions (all phases) | `implemented` |
 | F22: Sesam Panel (Errors / Warnings View) | `implemented` |
 | F23: Centralized Network Status Bar | `implemented` |
-| F24: Live Updates via Socket.IO | `planned` |
-| F25: Credential Safety | `planned` |
+| F24: Live Updates via Socket.IO | `implemented` |
+| F25: Credential Safety | `implemented` |
 | F26: Safe Profile Switching | `implemented` |
 
 ### Phase 2: Testing & Diff Loop
