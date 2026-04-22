@@ -190,6 +190,7 @@ export const testPipes = async (
         spec,
         passed: compare.passed,
         diff: compare.diff,
+        actualSerialized: compare.actualSerialized,
       };
       results.push(result);
       opts?.onResult?.(result);

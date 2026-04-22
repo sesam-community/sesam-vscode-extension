@@ -218,6 +218,8 @@ export interface TestResult {
   passed: boolean;
   diff?: string;
   error?: string;
+  /** Serialised actual output — present on diff failures, used for snapshot updates. */
+  actualSerialized?: string;
 }
 
 /** Options for the test orchestration (upload → run → verify). */

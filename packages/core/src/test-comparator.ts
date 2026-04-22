@@ -25,6 +25,8 @@ export interface TestCompareResult {
   diff?: string;
   /** Set when both sides have different entity counts. */
   lengthMismatch?: { actual: number; expected: number };
+  /** Fully serialised actual output (same format as the expected file). */
+  actualSerialized?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,5 +114,5 @@ export const compareTestOutput = (
     { context: 3 },
   );
 
-  return { passed: false, diff, lengthMismatch };
+  return { passed: false, diff, lengthMismatch, actualSerialized: actualStr };
 };

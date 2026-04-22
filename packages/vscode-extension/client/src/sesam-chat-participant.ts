@@ -4,8 +4,14 @@ import * as vscode from "vscode";
 import type { LanguageClient } from "vscode-languageclient/node";
 
 import { getAllFunctions, DTL_VARIABLES } from "../../src/shared/dtl-registry";
+import { getLastFailedTestResults, extractActual } from "./testing/sesam-test-controller";
 
-import type { LintContentRequest, LintContentResponse } from "../../types/lint.types";
+import type {
+  LintContentRequest,
+  LintContentResponse,
+  LintWorkspaceRequest,
+  LintWorkspaceResponse,
+} from "../../types/lint.types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -256,6 +262,40 @@ const extractReferencedContent = async (
   return undefined;
 };
 
+const extractAllReferencedFiles = async (
+  references: readonly vscode.ChatPromptReference[],
+): Promise<Array<{ content: string; filename: string; uri: vscode.Uri }>> => {
+  const results: Array<{ content: string; filename: string; uri: vscode.Uri }> = [];
+
+  for (const ref of references) {
+    if (ref.value instanceof vscode.Uri) {
+      try {
+        const bytes = await vscode.workspace.fs.readFile(ref.value);
+        results.push({
+          content: Buffer.from(bytes).toString("utf8"),
+          filename: path.basename(ref.value.fsPath),
+          uri: ref.value,
+        });
+      } catch {
+        // skip unreadable ref
+      }
+    } else if (ref.value instanceof vscode.Location) {
+      try {
+        const doc = await vscode.workspace.openTextDocument(ref.value.uri);
+        results.push({
+          content: doc.getText(ref.value.range),
+          filename: path.basename(ref.value.uri.fsPath),
+          uri: ref.value.uri,
+        });
+      } catch {
+        // skip unreadable ref
+      }
+    }
+  }
+
+  return results;
+};
+
 const extractFirstCodeBlock = (text: string): string | undefined => {
   const match = text.match(/```(?:json)?\n([\s\S]*?)```/);
   return match?.[1]?.trim();
@@ -486,75 +526,298 @@ Format:
 \`\`\`
 `.trim();
 
+const FIX_TEST_SYSTEM_PROMPT = `
+You are an expert in Sesam DTL (Data Transformation Language) pipe configurations.
+The user will provide one or more failing pipe tests. Each test includes:
+- The pipe config (the transform logic under test)
+- The expected output (what the test asserts)
+- The actual output (what the pipe currently produces)
+
+Your task is to fix the pipe config so that running it produces output matching the expected file.
+Do NOT modify the expected file — only the pipe config.
+
+For each pipe, output ONLY a fenced JSON code block with the pipe filename as the info string, containing the complete corrected pipe config. No prose before the blocks.
+The output will be auto-formatted, so do not worry about indentation or key order.
+Format:
+\`\`\`json filename=<pipe-filename>
+{ corrected pipe config }
+\`\`\`
+`.trim();
+
+// ---------------------------------------------------------------------------
+// Fix helpers
+// ---------------------------------------------------------------------------
+
+interface FileToFix {
+  uri: vscode.Uri;
+  filename: string;
+  content: string;
+  diagContext: string;
+  kind: "config" | "test";
+}
+
+const buildDiagContext = (diagnostics: LintContentResponse["diagnostics"]): string => {
+  if (diagnostics.length === 0) {
+    return "";
+  }
+
+  return (
+    "\n\nValidation errors:\n" +
+    diagnostics
+      .map((d) => `- Line ${d.range.start.line + 1}: [${d.code ?? "?"}] ${d.message}`)
+      .join("\n")
+  );
+};
+
 const handleFix = async (
   request: vscode.ChatRequest,
   stream: vscode.ChatResponseStream,
+  client: LanguageClient,
   token: vscode.CancellationToken,
 ): Promise<vscode.ChatResult> => {
   stream.progress("Analysing and fixing validation errors…");
 
-  const messages = [
-    vscode.LanguageModelChatMessage.User(FIX_SYSTEM_PROMPT),
-    vscode.LanguageModelChatMessage.User(request.prompt),
-  ];
+  const refFiles = await extractAllReferencedFiles(request.references);
+  const activeFile = refFiles.length === 0 ? await getActiveFileContent() : undefined;
 
-  const response = await request.model.sendRequest(messages, {}, token);
+  // ── Collect files to fix ────────────────────────────────────────────────
+  const filesToFix: FileToFix[] = [];
+
+  if (refFiles.length > 0 || activeFile) {
+    // Explicit: one or more files were referenced, or there is an active editor
+    const sources =
+      refFiles.length > 0
+        ? refFiles
+        : [{ content: activeFile!.content, filename: activeFile!.filename, uri: activeFile!.uri }];
+
+    for (const src of sources) {
+      let diagContext = "";
+
+      try {
+        const lintResult = await client.sendRequest<LintContentResponse>("sesam/lintContent", {
+          content: src.content,
+        } satisfies LintContentRequest);
+        diagContext = buildDiagContext(lintResult.diagnostics);
+      } catch {
+        // Lint unavailable — model will infer errors from content
+      }
+
+      filesToFix.push({
+        uri: src.uri,
+        filename: src.filename,
+        content: src.content,
+        diagContext,
+        kind: "config",
+      });
+    }
+  } else {
+    // No explicit file — scan workspace for config errors, then test failures
+    stream.progress("Scanning workspace for errors…");
+
+    try {
+      const wsResult = await client.sendRequest<LintWorkspaceResponse>("sesam/lintWorkspace", {
+        maxProblems: 200,
+        minSeverity: 1, // errors only
+      } satisfies LintWorkspaceRequest);
+
+      const errored = wsResult.results.filter((r) => r.diagnostics.some((d) => d.severity === 1));
+
+      for (const r of errored) {
+        const fileUri = vscode.Uri.parse(r.uri);
+        const bytes = await vscode.workspace.fs.readFile(fileUri);
+        const content = Buffer.from(bytes).toString("utf-8");
+        filesToFix.push({
+          uri: fileUri,
+          filename: r.fileLabel,
+          content,
+          diagContext: buildDiagContext(r.diagnostics),
+          kind: "config",
+        });
+      }
+    } catch {
+      // Lint server unavailable — continue to test failures below
+    }
+
+    // Also collect failing tests from the last test run
+    const { results: failedTests, workspaceRoot } = getLastFailedTestResults();
+    const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const testRoot = workspaceRoot ? vscode.Uri.file(workspaceRoot) : wsFolder;
+
+    if (failedTests.length > 0 && testRoot) {
+      for (const result of failedTests) {
+        if (!result.diff && !result.error) {
+          continue;
+        }
+
+        const pipeId = result.spec.pipe;
+
+        // Locate the pipe config — try .conf.pipe then .conf.json
+        const [pipeUri] =
+          (await vscode.workspace.findFiles(`**/pipes/${pipeId}.conf.pipe`, null, 1)).length > 0
+            ? await vscode.workspace.findFiles(`**/pipes/${pipeId}.conf.pipe`, null, 1)
+            : await vscode.workspace.findFiles(`**/pipes/${pipeId}.conf.json`, null, 1);
+
+        if (!pipeUri) {
+          continue;
+        }
+
+        const pipeBytes = await vscode.workspace.fs.readFile(pipeUri);
+        const pipeContent = Buffer.from(pipeBytes).toString("utf-8");
+
+        // Read the expected output file
+        let expectedContent = "";
+
+        try {
+          const expectedUri = vscode.Uri.joinPath(testRoot, "expected", result.spec.file);
+          const expBytes = await vscode.workspace.fs.readFile(expectedUri);
+          expectedContent = Buffer.from(expBytes).toString("utf-8");
+        } catch {
+          // Expected file missing — use diff only
+        }
+
+        const actualContent = result.diff ? extractActual(result.diff) : "";
+        const diagCtx =
+          `\n\nTest failure for pipe "${pipeId}":` +
+          (expectedContent ? `\n\nExpected output:\n\`\`\`json\n${expectedContent}\n\`\`\`` : "") +
+          (actualContent ? `\n\nActual output:\n\`\`\`json\n${actualContent}\n\`\`\`` : "") +
+          (result.error ? `\n\nError: ${result.error}` : "");
+
+        filesToFix.push({
+          uri: pipeUri,
+          filename: path.basename(pipeUri.fsPath),
+          content: pipeContent,
+          diagContext: diagCtx,
+          kind: "test",
+        });
+      }
+    }
+
+    if (filesToFix.length === 0) {
+      stream.markdown(
+        "No config errors or failing tests found. Nothing to fix.\n\n" +
+          "Run the tests first (`@sesam /run-tests`) to populate failing test results.",
+      );
+      return {};
+    }
+
+    if (filesToFix.length > 0) {
+      stream.markdown(
+        `Found **${filesToFix.length}** item${filesToFix.length === 1 ? "" : "s"} to fix. Fixing…\n\n`,
+      );
+    }
+  }
+
+  // ── Build prompt ────────────────────────────────────────────────────────
+  // Use a stable key (the filename) so the model echoes it back in the fenced
+  // block and we can resolve it back to the original URI.
+  const uriByFilename = new Map<string, vscode.Uri>(filesToFix.map((f) => [f.filename, f.uri]));
+
+  // Split into config-error fixes and test fixes; send as separate LLM requests
+  // with the appropriate system prompt, then concatenate the outputs.
+  const configFiles = filesToFix.filter((f) => f.kind === "config");
+  const testFiles = filesToFix.filter((f) => f.kind === "test");
+
+  const buildUserBlock = (f: FileToFix): string =>
+    `Fix the following Sesam config file (${f.filename}):${f.diagContext}\n\n` +
+    `\`\`\`json filename=${f.filename}\n${f.content}\n\`\`\``;
+
+  const messageGroups: Array<vscode.LanguageModelChatMessage[]> = [];
+
+  if (configFiles.length > 0) {
+    messageGroups.push([
+      vscode.LanguageModelChatMessage.User(FIX_SYSTEM_PROMPT),
+      vscode.LanguageModelChatMessage.User(configFiles.map(buildUserBlock).join("\n\n---\n\n")),
+    ]);
+  }
+
+  if (testFiles.length > 0) {
+    messageGroups.push([
+      vscode.LanguageModelChatMessage.User(FIX_TEST_SYSTEM_PROMPT),
+      vscode.LanguageModelChatMessage.User(testFiles.map(buildUserBlock).join("\n\n---\n\n")),
+    ]);
+  }
+
   let full = "";
 
-  for await (const chunk of response.text) {
+  for (const messages of messageGroups) {
+    const response = await request.model.sendRequest(messages, {}, token);
+
+    for await (const chunk of response.text) {
+      if (token.isCancellationRequested) {
+        break;
+      }
+
+      full += chunk;
+      stream.markdown(chunk);
+    }
+
     if (token.isCancellationRequested) {
       break;
     }
-
-    full += chunk;
-    stream.markdown(chunk);
   }
 
-  // Extract and apply each fenced block: ```json filename=<path>\n<content>\n```
+  // Extract and apply each fenced block: ```json filename=<name>\n<content>\n```
   const blockRe = /```(?:json)?\s+filename=([^\n]+)\n([\s\S]*?)```/g;
   let match: RegExpExecArray | null;
   const applied: string[] = [];
 
   while ((match = blockRe.exec(full)) !== null) {
-    const relPath = match[1].trim();
+    const filenameKey = match[1].trim();
     const content = match[2].trim();
-    const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
 
-    if (!wsFolder) {
-      continue;
+    // Resolve to the original URI; fall back to joinPath for workspace-scan paths
+    let fileUri = uriByFilename.get(filenameKey);
+
+    if (!fileUri) {
+      const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+
+      if (!wsFolder) {
+        continue;
+      }
+
+      fileUri = vscode.Uri.joinPath(wsFolder, filenameKey);
     }
 
-    const fileUri = vscode.Uri.joinPath(wsFolder, relPath);
+    // Open (or reuse) the document and replace its full content via WorkspaceEdit
+    // so the editor buffer stays in sync. Never write externally with fs.writeFile
+    // because that causes a "content is newer" conflict when the file is open.
+    const doc = await vscode.workspace.openTextDocument(fileUri);
+    const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
+    const replaceEdit = new vscode.WorkspaceEdit();
+    replaceEdit.replace(fileUri, fullRange, content + "\n");
+    await vscode.workspace.applyEdit(replaceEdit);
 
-    await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content + "\n", "utf-8"));
-
-    // Format via the LSP formatter (same path as on-save formatting)
+    // Format via the LSP formatter then save
     try {
-      const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
+      const formatEdits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
         "vscode.executeFormatDocumentProvider",
         fileUri,
         { tabSize: 2, insertSpaces: true },
       );
 
-      if (edits && edits.length > 0) {
-        const wsEdit = new vscode.WorkspaceEdit();
-        wsEdit.set(fileUri, edits);
-        await vscode.workspace.applyEdit(wsEdit);
-        const doc = await vscode.workspace.openTextDocument(fileUri);
-        await doc.save();
+      if (formatEdits && formatEdits.length > 0) {
+        const formatWsEdit = new vscode.WorkspaceEdit();
+        formatWsEdit.set(fileUri, formatEdits);
+        await vscode.workspace.applyEdit(formatWsEdit);
       }
     } catch {
-      // LSP formatter unavailable — file already written correctly
+      // LSP formatter unavailable — content already replaced correctly
     }
 
+    await doc.save();
+
     stream.reference(fileUri);
-    applied.push(relPath);
+    applied.push(filenameKey);
   }
 
   if (applied.length > 0) {
     stream.markdown(
       `\n\n---\n✓ Applied fixes to ${applied.length} file${applied.length === 1 ? "" : "s"}: ${applied.map((p) => `\`${p}\``).join(", ")}`,
     );
+  }
+
+  for (const f of filesToFix) {
+    stream.reference(f.uri);
   }
 
   return {};
@@ -651,7 +914,7 @@ const makeHandler =
       case "cli":
         return handleCliGuidance(request, stream, token);
       case "fix":
-        return handleFix(request, stream, token);
+        return handleFix(request, stream, client, token);
       default:
         return handleDefaultQA(request, context, stream, token);
     }

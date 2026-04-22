@@ -8,6 +8,7 @@
 - [Auto-Completion](#auto-completion)
 - [Hover Documentation](#hover-documentation)
 - [Diagnostics (Linting)](#diagnostics-linting)
+- [Quick Fixes](#quick-fixes)
 - [Formatter](#formatter)
 - [Code Snippets](#code-snippets)
 - [Go to Rule Definition](#go-to-rule-definition)
@@ -123,6 +124,23 @@ The extension validates the overall structure of every `*.conf.pipe`, `*.conf.sy
 | `metadata.conf.json` (`"type": "metadata"`) — no rules applied | — |
 
 All diagnostics are shown as **squiggly underlines** in the editor, as **file badges** (red/yellow) in the Explorer, and in the **Sesam panel** (see below). They do not appear in the Problems view.
+
+---
+
+### Quick Fixes
+
+Hover over any squiggly underline produced by the config structure validator and press **Ctrl+.** (or click the blue lightbulb that appears in the gutter) to open the quick-fix menu.
+
+| Diagnostic | Fix offered |
+|---|---|
+| Missing `_id` | Add `"_id": ""` at the top of the config object |
+| Missing `type` | Add `"type": "pipe"` **or** `"type": "system:rest"` |
+| Missing `source` | Add a skeleton `source` block with `"type": "dataset"` |
+| Missing `source.type` | Add `"type": "dataset"` inside the existing source object |
+| Missing required source property | Add the specific property (e.g. `"dataset"`, `"system"`) inside source |
+| Missing `default` rule | Add `"default": [["copy", "_S"]]` inside the rules object |
+
+> **Note:** VS Code displays a **blue** autofix lightbulb (not yellow) for code actions attached to diagnostics. This is standard VS Code behaviour — the yellow lightbulb is reserved for refactoring suggestions that are unrelated to errors.
 
 ---
 

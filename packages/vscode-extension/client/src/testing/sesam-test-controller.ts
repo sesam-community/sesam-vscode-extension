@@ -24,8 +24,18 @@ import type { TestResult } from "@sesam/core";
 // ---------------------------------------------------------------------------
 
 let _isRunning = false;
+let _lastFailedResults: TestResult[] = [];
+let _lastWorkspaceRoot: string | undefined;
 
 export const isSesamTestRunning = (): boolean => _isRunning;
+
+export const getLastFailedTestResults = (): {
+  results: TestResult[];
+  workspaceRoot: string | undefined;
+} => ({
+  results: _lastFailedResults,
+  workspaceRoot: _lastWorkspaceRoot,
+});
 
 const setRunning = (value: boolean): void => {
   _isRunning = value;
@@ -48,6 +58,40 @@ const pipeIdFromUri = (uri: vscode.Uri): string => path.basename(uri.fsPath, ".t
 export const registerSesamTestController = (context: vscode.ExtensionContext): void => {
   const ctrl = vscode.tests.createTestController("sesam-pipes", "Sesam Pipes");
   context.subscriptions.push(ctrl);
+
+  // ── Update snapshot command ───────────────────────────────────────────────
+  // Writes the actual output from a failed test back to the expected file,
+  // mirroring Jest's --updateSnapshot behaviour for a single test at a time.
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "sesam.updateSnapshot",
+      async (workspaceRoot: string, specFile: string, actualSerialized: string) => {
+        const expectedPath = path.join(workspaceRoot, "expected", specFile);
+        const expectedUri = vscode.Uri.file(expectedPath);
+
+        const confirmed = await vscode.window.showWarningMessage(
+          `Update snapshot for "${specFile}"? The expected file will be overwritten with the actual output.`,
+          { modal: true },
+          "Update Snapshot",
+        );
+
+        if (confirmed !== "Update Snapshot") {
+          return;
+        }
+
+        const doc = await vscode.workspace.openTextDocument(expectedUri);
+        const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(expectedUri, fullRange, actualSerialized + "\n");
+        await vscode.workspace.applyEdit(edit);
+        await doc.save();
+
+        void vscode.window.showInformationMessage(
+          `Sesam: Snapshot updated for "${path.basename(specFile, ".json")}".`,
+        );
+      },
+    ),
+  );
 
   // ── Discovery ────────────────────────────────────────────────────────────
 
@@ -159,6 +203,8 @@ export const registerSesamTestController = (context: vscode.ExtensionContext): v
         );
 
         const failedResults: TestResult[] = [];
+        _lastFailedResults = failedResults;
+        _lastWorkspaceRoot = workspaceRoot;
 
         await testPipes(
           { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
@@ -223,7 +269,18 @@ export const registerSesamTestController = (context: vscode.ExtensionContext): v
                       extractActual(result.diff),
                     )
                   : new vscode.TestMessage(`${result.spec.pipe}: output does not match`);
-                run.failed(item, msg);
+
+                // Attach an "Update Snapshot" message when actual output is available
+                const messages: vscode.TestMessage[] = [msg];
+
+                if (result.actualSerialized) {
+                  const updateMsg = new vscode.TestMessage(
+                    `[Update Snapshot](command:sesam.updateSnapshot?${encodeURIComponent(JSON.stringify([workspaceRoot, result.spec.file, result.actualSerialized]))}) — overwrite \`expected/${result.spec.file}\` with actual output`,
+                  );
+                  messages.push(updateMsg);
+                }
+
+                run.failed(item, messages);
                 failedResults.push(result);
               }
             },
@@ -323,7 +380,7 @@ const extractExpected = (diff: string): string => {
     .join("\n");
 };
 
-const extractActual = (diff: string): string => {
+export const extractActual = (diff: string): string => {
   const lines = diff.split("\n");
   return lines
     .filter((l) => l.startsWith("+") && !l.startsWith("+++"))

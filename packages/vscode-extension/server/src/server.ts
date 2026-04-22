@@ -36,6 +36,9 @@ import {
   WorkspaceEdit,
   RenameFile,
   TextDocumentEdit,
+  CodeAction,
+  CodeActionKind,
+  CodeActionParams,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
@@ -102,6 +105,7 @@ import {
   offsetRangeToLsp,
 } from "./utils/alias-rename.utils";
 import { findAddPropertyAtOffset, findAllAddPropertyDefinitions } from "./utils/dtl-property.utils";
+import { buildCodeActionsForDiagnostics } from "./utils/code-actions.utils";
 
 import type { DtlSettings } from "./server.types";
 import type { ValidatorOptions } from "../../types/dtl-validator.types";
@@ -145,6 +149,9 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
       documentSymbolProvider: true,
       documentLinkProvider: { resolveProvider: false },
       renameProvider: { prepareProvider: true },
+      codeActionProvider: {
+        codeActionKinds: [CodeActionKind.QuickFix],
+      },
     },
   };
 });
@@ -487,6 +494,24 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
   }
 
   return null;
+});
+
+// ---------------------------------------------------------------------------
+// Code Actions (Quick Fixes)
+// ---------------------------------------------------------------------------
+connection.onCodeAction((params: CodeActionParams): CodeAction[] => {
+  const document = documents.get(params.textDocument.uri);
+
+  if (!document) {
+    return [];
+  }
+
+  return buildCodeActionsForDiagnostics(
+    document.getText(),
+    document,
+    params.context.diagnostics,
+    params.textDocument.uri,
+  );
 });
 
 // ---------------------------------------------------------------------------
