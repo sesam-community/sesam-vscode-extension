@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import type { LanguageClient } from "vscode-languageclient/node";
 
 import { getAllFunctions, DTL_VARIABLES } from "../../src/shared/dtl-registry";
+import { getLastFailedTestResults, extractActual } from "./testing/sesam-test-controller";
 
 import type {
   LintContentRequest,
@@ -525,6 +526,24 @@ Format:
 \`\`\`
 `.trim();
 
+const FIX_TEST_SYSTEM_PROMPT = `
+You are an expert in Sesam DTL (Data Transformation Language) pipe configurations.
+The user will provide one or more failing pipe tests. Each test includes:
+- The pipe config (the transform logic under test)
+- The expected output (what the test asserts)
+- The actual output (what the pipe currently produces)
+
+Your task is to fix the pipe config so that running it produces output matching the expected file.
+Do NOT modify the expected file — only the pipe config.
+
+For each pipe, output ONLY a fenced JSON code block with the pipe filename as the info string, containing the complete corrected pipe config. No prose before the blocks.
+The output will be auto-formatted, so do not worry about indentation or key order.
+Format:
+\`\`\`json filename=<pipe-filename>
+{ corrected pipe config }
+\`\`\`
+`.trim();
+
 // ---------------------------------------------------------------------------
 // Fix helpers
 // ---------------------------------------------------------------------------
@@ -534,6 +553,7 @@ interface FileToFix {
   filename: string;
   content: string;
   diagContext: string;
+  kind: "config" | "test";
 }
 
 const buildDiagContext = (diagnostics: LintContentResponse["diagnostics"]): string => {
@@ -582,10 +602,16 @@ const handleFix = async (
         // Lint unavailable — model will infer errors from content
       }
 
-      filesToFix.push({ uri: src.uri, filename: src.filename, content: src.content, diagContext });
+      filesToFix.push({
+        uri: src.uri,
+        filename: src.filename,
+        content: src.content,
+        diagContext,
+        kind: "config",
+      });
     }
   } else {
-    // No explicit file — scan the whole workspace for files with errors
+    // No explicit file — scan workspace for config errors, then test failures
     stream.progress("Scanning workspace for errors…");
 
     try {
@@ -596,15 +622,6 @@ const handleFix = async (
 
       const errored = wsResult.results.filter((r) => r.diagnostics.some((d) => d.severity === 1));
 
-      if (errored.length === 0) {
-        stream.markdown("No errors found in the workspace. Nothing to fix.");
-        return {};
-      }
-
-      stream.markdown(
-        `Found **${errored.length}** file${errored.length === 1 ? "" : "s"} with errors. Fixing…\n\n`,
-      );
-
       for (const r of errored) {
         const fileUri = vscode.Uri.parse(r.uri);
         const bytes = await vscode.workspace.fs.readFile(fileUri);
@@ -614,13 +631,79 @@ const handleFix = async (
           filename: r.fileLabel,
           content,
           diagContext: buildDiagContext(r.diagnostics),
+          kind: "config",
         });
       }
     } catch {
+      // Lint server unavailable — continue to test failures below
+    }
+
+    // Also collect failing tests from the last test run
+    const { results: failedTests, workspaceRoot } = getLastFailedTestResults();
+    const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const testRoot = workspaceRoot ? vscode.Uri.file(workspaceRoot) : wsFolder;
+
+    if (failedTests.length > 0 && testRoot) {
+      for (const result of failedTests) {
+        if (!result.diff && !result.error) {
+          continue;
+        }
+
+        const pipeId = result.spec.pipe;
+
+        // Locate the pipe config — try .conf.pipe then .conf.json
+        const [pipeUri] =
+          (await vscode.workspace.findFiles(`**/pipes/${pipeId}.conf.pipe`, null, 1)).length > 0
+            ? await vscode.workspace.findFiles(`**/pipes/${pipeId}.conf.pipe`, null, 1)
+            : await vscode.workspace.findFiles(`**/pipes/${pipeId}.conf.json`, null, 1);
+
+        if (!pipeUri) {
+          continue;
+        }
+
+        const pipeBytes = await vscode.workspace.fs.readFile(pipeUri);
+        const pipeContent = Buffer.from(pipeBytes).toString("utf-8");
+
+        // Read the expected output file
+        let expectedContent = "";
+
+        try {
+          const expectedUri = vscode.Uri.joinPath(testRoot, "expected", result.spec.file);
+          const expBytes = await vscode.workspace.fs.readFile(expectedUri);
+          expectedContent = Buffer.from(expBytes).toString("utf-8");
+        } catch {
+          // Expected file missing — use diff only
+        }
+
+        const actualContent = result.diff ? extractActual(result.diff) : "";
+        const diagCtx =
+          `\n\nTest failure for pipe "${pipeId}":` +
+          (expectedContent ? `\n\nExpected output:\n\`\`\`json\n${expectedContent}\n\`\`\`` : "") +
+          (actualContent ? `\n\nActual output:\n\`\`\`json\n${actualContent}\n\`\`\`` : "") +
+          (result.error ? `\n\nError: ${result.error}` : "");
+
+        filesToFix.push({
+          uri: pipeUri,
+          filename: path.basename(pipeUri.fsPath),
+          content: pipeContent,
+          diagContext: diagCtx,
+          kind: "test",
+        });
+      }
+    }
+
+    if (filesToFix.length === 0) {
       stream.markdown(
-        "No file found. Open a Sesam config file in the editor or drag it into the chat, then try again.",
+        "No config errors or failing tests found. Nothing to fix.\n\n" +
+          "Run the tests first (`@sesam /run-tests`) to populate failing test results.",
       );
       return {};
+    }
+
+    if (filesToFix.length > 0) {
+      stream.markdown(
+        `Found **${filesToFix.length}** item${filesToFix.length === 1 ? "" : "s"} to fix. Fixing…\n\n`,
+      );
     }
   }
 
@@ -629,29 +712,48 @@ const handleFix = async (
   // block and we can resolve it back to the original URI.
   const uriByFilename = new Map<string, vscode.Uri>(filesToFix.map((f) => [f.filename, f.uri]));
 
-  const userMessage = filesToFix
-    .map(
-      (f) =>
-        `Fix the following Sesam config file (${f.filename}):${f.diagContext}\n\n` +
-        `\`\`\`json filename=${f.filename}\n${f.content}\n\`\`\``,
-    )
-    .join("\n\n---\n\n");
+  // Split into config-error fixes and test fixes; send as separate LLM requests
+  // with the appropriate system prompt, then concatenate the outputs.
+  const configFiles = filesToFix.filter((f) => f.kind === "config");
+  const testFiles = filesToFix.filter((f) => f.kind === "test");
 
-  const messages = [
-    vscode.LanguageModelChatMessage.User(FIX_SYSTEM_PROMPT),
-    vscode.LanguageModelChatMessage.User(userMessage),
-  ];
+  const buildUserBlock = (f: FileToFix): string =>
+    `Fix the following Sesam config file (${f.filename}):${f.diagContext}\n\n` +
+    `\`\`\`json filename=${f.filename}\n${f.content}\n\`\`\``;
 
-  const response = await request.model.sendRequest(messages, {}, token);
+  const messageGroups: Array<vscode.LanguageModelChatMessage[]> = [];
+
+  if (configFiles.length > 0) {
+    messageGroups.push([
+      vscode.LanguageModelChatMessage.User(FIX_SYSTEM_PROMPT),
+      vscode.LanguageModelChatMessage.User(configFiles.map(buildUserBlock).join("\n\n---\n\n")),
+    ]);
+  }
+
+  if (testFiles.length > 0) {
+    messageGroups.push([
+      vscode.LanguageModelChatMessage.User(FIX_TEST_SYSTEM_PROMPT),
+      vscode.LanguageModelChatMessage.User(testFiles.map(buildUserBlock).join("\n\n---\n\n")),
+    ]);
+  }
+
   let full = "";
 
-  for await (const chunk of response.text) {
+  for (const messages of messageGroups) {
+    const response = await request.model.sendRequest(messages, {}, token);
+
+    for await (const chunk of response.text) {
+      if (token.isCancellationRequested) {
+        break;
+      }
+
+      full += chunk;
+      stream.markdown(chunk);
+    }
+
     if (token.isCancellationRequested) {
       break;
     }
-
-    full += chunk;
-    stream.markdown(chunk);
   }
 
   // Extract and apply each fenced block: ```json filename=<name>\n<content>\n```

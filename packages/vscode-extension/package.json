@@ -226,6 +226,10 @@
         }
       },
       {
+        "command": "sesam.updateSnapshot",
+        "title": "Sesam: Update Test Snapshot"
+      },
+      {
         "command": "sesam.download",
         "title": "Sesam: Download from Node",
         "icon": {
