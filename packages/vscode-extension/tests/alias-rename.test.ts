@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 
+import { TextDocument } from "vscode-languageserver-textdocument";
+
 import {
   findAliasAtOffset,
   findAliasUsageAtOffset,
   collectAliasRanges,
+  offsetRangeToLsp,
 } from "../server/src/utils/alias-rename.utils";
 
 // ---------------------------------------------------------------------------
@@ -183,5 +186,43 @@ describe("collectAliasRanges", () => {
     const ranges = collectAliasRanges(PIPE, "od");
     // Declaration "other-dataset od" + usage "od.name"
     expect(ranges.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// offsetRangeToLsp
+// ---------------------------------------------------------------------------
+
+describe("offsetRangeToLsp", () => {
+  const makeDoc = (content: string) =>
+    TextDocument.create("file:///test.json", "sesam-config", 1, content);
+
+  it("converts a zero-offset range to line 0, char 0", () => {
+    const doc = makeDoc("hello world");
+    const range = offsetRangeToLsp(doc, { start: 0, end: 0 });
+    expect(range.start).toEqual({ line: 0, character: 0 });
+    expect(range.end).toEqual({ line: 0, character: 0 });
+  });
+
+  it("converts a single-line range to the correct characters", () => {
+    const doc = makeDoc("hello world");
+    const range = offsetRangeToLsp(doc, { start: 6, end: 11 });
+    expect(range.start).toEqual({ line: 0, character: 6 });
+    expect(range.end).toEqual({ line: 0, character: 11 });
+  });
+
+  it("handles multi-line documents correctly", () => {
+    const doc = makeDoc("line1\nline2\nline3");
+    // offset 6 = start of 'line2'
+    const range = offsetRangeToLsp(doc, { start: 6, end: 11 });
+    expect(range.start).toEqual({ line: 1, character: 0 });
+    expect(range.end).toEqual({ line: 1, character: 5 });
+  });
+
+  it("start and end on different lines", () => {
+    const doc = makeDoc("abc\nxyz");
+    const range = offsetRangeToLsp(doc, { start: 0, end: 7 });
+    expect(range.start.line).toBe(0);
+    expect(range.end.line).toBe(1);
   });
 });
