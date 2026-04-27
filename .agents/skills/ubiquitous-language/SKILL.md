@@ -6,8 +6,7 @@ disable-model-invocation: true
 
 # Ubiquitous Language
 
-Extract and formalize domain terminology from the current conversation into a
-consistent glossary, saved to a local file.
+Extract and formalize domain terminology from the current conversation into a consistent glossary, saved to a local file.
 
 ## Process
 
@@ -29,10 +28,10 @@ Write a `UBIQUITOUS_LANGUAGE.md` file with this structure:
 
 ## Order lifecycle
 
-| Term        | Definition                                               | Aliases to avoid      |
-| ----------- | -------------------------------------------------------- | --------------------- |
-| **Order**   | A customer's request to purchase one or more items       | Purchase, transaction |
-| **Invoice** | A request for payment sent to a customer after delivery  | Bill, payment request |
+| Term        | Definition                                              | Aliases to avoid      |
+| ----------- | ------------------------------------------------------- | --------------------- |
+| **Order**   | A customer's request to purchase one or more items      | Purchase, transaction |
+| **Invoice** | A request for payment sent to a customer after delivery | Bill, payment request |
 
 ## People
 
