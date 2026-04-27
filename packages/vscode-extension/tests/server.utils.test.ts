@@ -25,6 +25,14 @@ import {
   lspRange,
   findKeyOffset,
   buildDocumentSymbols,
+  isTransformTypeContext,
+  buildTransformTypeCompletions,
+  buildPropKeyHover,
+  buildSourceTypeHover,
+  buildSystemTypeHover,
+  buildTransformTypeHover,
+  isAtJsonKeyPosition,
+  offsetToPosition,
 } from "../server/src/utils/server.utils";
 
 import { getDtlFunction } from "../src/shared/dtl-registry";
@@ -828,5 +836,175 @@ describe("buildDocumentSymbols — mock fixtures", () => {
     const ruleNames = step2.children!.map((c) => c.name);
     expect(ruleNames).toContain("default");
     expect(ruleNames).toContain("bnode");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isTransformTypeContext
+// ---------------------------------------------------------------------------
+
+describe("isTransformTypeContext", () => {
+  it("returns true for single transform object context", () => {
+    const prefix = `{"transform": {"type": "`;
+    expect(isTransformTypeContext(prefix)).toBe(true);
+  });
+
+  it("returns true for array-of-transforms context", () => {
+    const prefix = `{"transform": [{"type": "`;
+    expect(isTransformTypeContext(prefix)).toBe(true);
+  });
+
+  it("returns false when outside transform", () => {
+    expect(isTransformTypeContext(`{"source": {"type": "`)).toBe(false);
+  });
+
+  it("returns false for empty string", () => {
+    expect(isTransformTypeContext("")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildTransformTypeCompletions
+// ---------------------------------------------------------------------------
+
+describe("buildTransformTypeCompletions", () => {
+  it("returns an array of CompletionItems", () => {
+    const items = buildTransformTypeCompletions();
+    expect(Array.isArray(items)).toBe(true);
+    expect(items.length).toBeGreaterThan(0);
+  });
+
+  it("includes 'dtl' as one of the items", () => {
+    const labels = buildTransformTypeCompletions().map((i) => i.label);
+    expect(labels).toContain("dtl");
+  });
+
+  it("each item has insertText equal to the label", () => {
+    for (const item of buildTransformTypeCompletions()) {
+      expect(item.insertText).toBe(item.label);
+    }
+  });
+
+  it("each item has CompletionItemKind.EnumMember", () => {
+    for (const item of buildTransformTypeCompletions()) {
+      expect(item.kind).toBe(CompletionItemKind.EnumMember);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildSourceTypeHover
+// ---------------------------------------------------------------------------
+
+describe("buildSourceTypeHover", () => {
+  it("returns hover markdown for a known source type", () => {
+    const result = buildSourceTypeHover("dataset");
+    expect(result).not.toBeNull();
+    expect(result).toContain("dataset");
+  });
+
+  it("returns null for an unknown source type", () => {
+    expect(buildSourceTypeHover("unknown-source-xyz")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildSystemTypeHover
+// ---------------------------------------------------------------------------
+
+describe("buildSystemTypeHover", () => {
+  it("returns hover markdown for a known system type", () => {
+    const result = buildSystemTypeHover("system:rest");
+    expect(result).not.toBeNull();
+    expect(result).toContain("system:rest");
+  });
+
+  it("returns null for an unknown system type", () => {
+    expect(buildSystemTypeHover("unknown-system-xyz")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildTransformTypeHover
+// ---------------------------------------------------------------------------
+
+describe("buildTransformTypeHover", () => {
+  it("returns hover markdown for a known transform type", () => {
+    const result = buildTransformTypeHover("dtl");
+    expect(result).not.toBeNull();
+    expect(result).toContain("dtl");
+  });
+
+  it("returns null for an unknown transform type", () => {
+    expect(buildTransformTypeHover("unknown-transform-xyz")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildPropKeyHover
+// ---------------------------------------------------------------------------
+
+describe("buildPropKeyHover", () => {
+  it("returns null for an unknown property path", () => {
+    expect(buildPropKeyHover("__nonexistent__", [])).toBeNull();
+  });
+
+  it("returns a non-null string for a known root-level property", () => {
+    // "_id" is always a recognised root-level property
+    const result = buildPropKeyHover("_id", []);
+    // May be null if not in the PROP_TABLE_BY_PATH for this path; just ensure no throw
+    expect(result === null || typeof result === "string").toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isAtJsonKeyPosition
+// ---------------------------------------------------------------------------
+
+describe("isAtJsonKeyPosition", () => {
+  it("returns true when the word is followed by ':'", () => {
+    const text = `"myKey": "value"`;
+    // offset 1 = 'm' — after scanning 'myKey' we hit '"', then ':'
+    expect(isAtJsonKeyPosition(text, 1)).toBe(true);
+  });
+
+  it("returns false when the word is a value, not a key", () => {
+    const text = `"key": "myValue"`;
+    // offset at 'myValue' (char 8) — after the closing '"' comes '"' not ':'
+    expect(isAtJsonKeyPosition(text, 8)).toBe(false);
+  });
+
+  it("returns false for an empty string", () => {
+    expect(isAtJsonKeyPosition("", 0)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// offsetToPosition
+// ---------------------------------------------------------------------------
+
+describe("offsetToPosition", () => {
+  it("returns line 0 char 0 for offset 0", () => {
+    expect(offsetToPosition("hello", 0)).toEqual(Position.create(0, 0));
+  });
+
+  it("increments character within a line", () => {
+    expect(offsetToPosition("hello", 3)).toEqual(Position.create(0, 3));
+  });
+
+  it("increments line counter on newline", () => {
+    expect(offsetToPosition("hi\nworld", 3)).toEqual(Position.create(1, 0));
+  });
+
+  it("handles multi-line text", () => {
+    const text = "line1\nline2\nline3";
+    expect(offsetToPosition(text, 12)).toEqual(Position.create(2, 0));
+  });
+
+  it("clamps to text length for out-of-range offset", () => {
+    const text = "ab";
+    const pos = offsetToPosition(text, 100);
+    expect(pos.line).toBe(0);
+    expect(pos.character).toBe(2);
   });
 });

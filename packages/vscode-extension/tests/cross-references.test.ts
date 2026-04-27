@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   findAllCrossReferences,
   findAllDatasetCrossRefs,
+  findAllSystemCrossRefs,
 } from "../server/src/utils/cross-references.utils";
 
 // ---------------------------------------------------------------------------
@@ -134,5 +135,57 @@ describe("findAllDatasetCrossRefs", () => {
     const fileTexts = new Map([["file:///s.json", `{"source": {"system": "my-pipe"}}`]]);
     const refs = findAllDatasetCrossRefs("my-pipe", fileTexts, "file:///other.json");
     expect(refs).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findAllSystemCrossRefs
+// ---------------------------------------------------------------------------
+
+describe("findAllSystemCrossRefs", () => {
+  it("finds a system reference by id", () => {
+    const fileTexts = new Map([
+      ["file:///a.json", `{"source": {"type": "rest", "system": "my-sys"}}`],
+    ]);
+    const refs = findAllSystemCrossRefs("my-sys", fileTexts);
+    expect(refs).toHaveLength(1);
+    expect(refs[0].uri).toBe("file:///a.json");
+  });
+
+  it("nameStart/nameEnd point to the system id in the source text", () => {
+    const text = `{"source": {"system": "target-sys"}}`;
+    const fileTexts = new Map([["file:///b.json", text]]);
+    const refs = findAllSystemCrossRefs("target-sys", fileTexts);
+    expect(refs).toHaveLength(1);
+    expect(text.slice(refs[0].nameStart, refs[0].nameEnd)).toBe("target-sys");
+  });
+
+  it("finds multiple occurrences in one file", () => {
+    const text = `{"a": {"system": "s1"}, "b": {"system": "s1"}}`;
+    const fileTexts = new Map([["file:///c.json", text]]);
+    const refs = findAllSystemCrossRefs("s1", fileTexts);
+    expect(refs).toHaveLength(2);
+  });
+
+  it("finds references across multiple files", () => {
+    const fileTexts = new Map([
+      ["file:///p1.json", `{"source": {"system": "shared-sys"}}`],
+      ["file:///p2.json", `{"source": {"system": "shared-sys"}}`],
+      ["file:///p3.json", `{"source": {"system": "other-sys"}}`],
+    ]);
+    const refs = findAllSystemCrossRefs("shared-sys", fileTexts);
+    expect(refs).toHaveLength(2);
+    expect(refs.map((r) => r.uri)).toContain("file:///p1.json");
+    expect(refs.map((r) => r.uri)).toContain("file:///p2.json");
+  });
+
+  it("returns empty array when no system references exist", () => {
+    const fileTexts = new Map([["file:///d.json", `{"source": {"dataset": "ds"}}`]]);
+    expect(findAllSystemCrossRefs("any-sys", fileTexts)).toHaveLength(0);
+  });
+
+  it("does not confuse 'sys' with 'sys-extra'", () => {
+    const fileTexts = new Map([["file:///e.json", `{"source": {"system": "sys-extra"}}`]]);
+    expect(findAllSystemCrossRefs("sys", fileTexts)).toHaveLength(0);
   });
 });

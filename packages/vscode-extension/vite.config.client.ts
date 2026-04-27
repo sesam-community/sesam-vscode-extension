@@ -4,6 +4,9 @@ import { builtinModules } from "module";
 
 export default defineConfig({
   resolve: {
+    alias: {
+      "@sesam/core": resolve(__dirname, "../core/src/index.ts"),
+    },
     extensions: [".mts", ".ts", ".tsx", ".mjs", ".js", ".jsx", ".json"],
   },
   build: {

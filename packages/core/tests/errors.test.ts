@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { NodeApiError, NodeAuthError, NodeNetworkError } from "../src/errors.js";
+import {
+  NodeApiError,
+  NodeAuthError,
+  NodeNetworkError,
+  ValidationFailedError,
+} from "../src/errors.js";
 
 import type { NodeError } from "../src/errors.js";
 
@@ -86,5 +91,40 @@ describe("NodeError discriminated union", () => {
     } else {
       throw new Error("Expected network kind");
     }
+  });
+});
+
+describe("ValidationFailedError", () => {
+  it("has kind='validation'", () => {
+    const err = new ValidationFailedError([]);
+    expect(err.kind).toBe("validation");
+  });
+
+  it("is an instance of Error", () => {
+    expect(new ValidationFailedError([])).toBeInstanceOf(Error);
+  });
+
+  it("has the correct name", () => {
+    expect(new ValidationFailedError([]).name).toBe("ValidationFailedError");
+  });
+
+  it("message includes the error count", () => {
+    const err = new ValidationFailedError([
+      { file: "pipes/p.conf.pipe", message: "missing _id" },
+      { file: "pipes/q.conf.pipe", message: "missing type" },
+    ]);
+    expect(err.message).toBe("Validation failed with 2 error(s)");
+  });
+
+  it("exposes the errors array", () => {
+    const errors = [{ file: "pipes/p.conf.pipe", message: "missing _id", line: 1, column: 0 }];
+    const err = new ValidationFailedError(errors);
+    expect(err.errors).toEqual(errors);
+  });
+
+  it("handles empty errors array", () => {
+    const err = new ValidationFailedError([]);
+    expect(err.errors).toHaveLength(0);
+    expect(err.message).toBe("Validation failed with 0 error(s)");
   });
 });

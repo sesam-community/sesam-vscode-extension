@@ -46,6 +46,7 @@
 | F07 | Interactive Pipe Graph (canvas) | Phase 4 | `planned` (tracked as F15) | [impl-f07-pipe-graph.prompt.md](impl-f07-pipe-graph.prompt.md) |
 | F08 | Connector Development Tools | Phase 4 | `planned` | [impl-f08-connector-tools.prompt.md](impl-f08-connector-tools.prompt.md) |
 | F11 | Management Studio Functionalities | Phase 5 | `planned` | [impl-f11-management-studio.prompt.md](impl-f11-management-studio.prompt.md) |
+| E2E | End-to-End Tests via Playwright | Cross-cutting | `planned` | [e2e-playwright.prompt.md](../plans/e2e-playwright.prompt.md) |
 
 ---
 
