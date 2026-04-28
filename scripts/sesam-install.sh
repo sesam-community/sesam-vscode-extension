@@ -93,12 +93,36 @@ fi
 
 VSIX_VERSION=$(basename "$VSIX_FILE" | grep -oP '\d+\.\d+\.\d+' || true)
 
-# ── 6. Compare versions ───────────────────────────────────────────────────────
+# ── 6. Compare versions / show menu if up to date ────────────────────────────
 if [[ -n "$INSTALLED" && "$INSTALLED" == "$VSIX_VERSION" ]]; then
   success "Sesam extension ${BOLD}v${INSTALLED}${RESET} is already installed and up to date."
   echo ""
-  dim "  To update: download a newer installer archive from GitHub Releases."
-  dim "  To uninstall: bash sesam-install.sh --uninstall"
+  echo -e "  ${BOLD}What would you like to do?${RESET}"
+  echo -e "  ${CYAN}1)${RESET} Reinstall (same version)"
+  echo -e "  ${CYAN}2)${RESET} Uninstall"
+  echo -e "  ${CYAN}3)${RESET} Exit"
+  echo ""
+  read -r -p "  Choose [1/2/3]: " CHOICE
+  echo ""
+  case "${CHOICE:-3}" in
+    1)
+      info "Reinstalling Sesam extension v${VSIX_VERSION}…"
+      code --install-extension "$VSIX_FILE" --force
+      echo ""
+      success "Sesam extension ${BOLD}v${VSIX_VERSION}${RESET} reinstalled."
+      dim "  Restart VS Code to activate."
+      ;;
+    2)
+      info "Uninstalling Sesam extension v${INSTALLED}…"
+      code --uninstall-extension "$EXT_ID"
+      echo ""
+      success "Sesam extension v${INSTALLED} uninstalled."
+      dim "  Restart VS Code to complete the removal."
+      ;;
+    *)
+      dim "  No changes made."
+      ;;
+  esac
   echo ""
   read -r -p "Press Enter to close..."
   exit 0
