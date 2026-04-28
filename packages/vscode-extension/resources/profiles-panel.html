@@ -297,9 +297,7 @@
           ? '<button class="secondary" data-action="makeActive" data-profile="' + escAttr(row.name) + '">Make active</button>'
           : '';
 
-        const deleteBtn = !row.isActive
-          ? '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Delete profile">🗑 Delete</button>'
-          : '';
+        const deleteBtn = '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Delete profile">🗑 Delete</button>';
 
         card.innerHTML =
           '<div class="card-header">'
