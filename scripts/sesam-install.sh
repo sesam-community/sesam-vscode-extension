@@ -147,12 +147,12 @@ INSTALLED="$VSIX_VERSION"
 
 echo ""
 success "Sesam extension ${BOLD}v${VSIX_VERSION}${RESET} installed successfully."
-dim "  Restart VS Code to activate the new version."
+echo -e "  Restart VS Code to activate the new version."
 echo ""
 
 # ── 8. Post-install menu ──────────────────────────────────────────────────────
 while true; do
-  echo -e "  ${BOLD}What would you like to do?${RESET}"
+  echo -e "  ${BOLD}What would you like to do next?${RESET}"
   echo -e "  ${CYAN}1)${RESET} Reinstall (same version)"
   echo -e "  ${CYAN}2)${RESET} Uninstall"
   echo -e "  ${CYAN}3)${RESET} Exit"
