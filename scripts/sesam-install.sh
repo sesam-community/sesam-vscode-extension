@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # Sesam VS Code Extension — Installer & Updater
 #
-# First run  : downloads and installs the latest release.
-# Subsequent : checks whether a newer release is available and updates.
+# Usage:
+#   1. Download sesam-vX.Y.Z.vsix and this script from the GitHub Releases page
+#      into the same folder.
+#   2. Run:  bash sesam-install.sh
 #
-# Requirements: code (VS Code CLI), gh (GitHub CLI — https://cli.github.com)
+# On re-run: if the installed version matches the .vsix in this folder,
+# reports "already up to date". If a newer .vsix is present, updates.
+#
+# Requirements: code (VS Code CLI in PATH)
 
 set -euo pipefail
 
-REPO="datanav/sesam-ts"
 EXT_ID="bouvet.dtl-language-support"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── 1. Re-open in a graphical terminal when double-clicked ───────────────────
 if ! tty -s; then
@@ -30,62 +35,56 @@ echo "│  Sesam VS Code Extension — Installer    │"
 echo "└─────────────────────────────────────────┘"
 echo ""
 
-# ── 2. Check dependencies ────────────────────────────────────────────────────
-missing=()
-command -v code &>/dev/null || missing+=("code  — VS Code CLI (add VS Code to PATH)")
-command -v gh   &>/dev/null || missing+=("gh    — GitHub CLI  (https://cli.github.com)")
-
-if [[ ${#missing[@]} -gt 0 ]]; then
-  echo "ERROR: The following required tools were not found:"
-  for m in "${missing[@]}"; do echo "  • $m"; done
+# ── 2. Require code CLI ───────────────────────────────────────────────────────
+if ! command -v code &>/dev/null; then
+  echo "ERROR: 'code' command not found."
+  echo "  Add VS Code to your PATH: https://code.visualstudio.com/docs/setup/linux"
   echo ""
   read -r -p "Press Enter to close..."
   exit 1
 fi
 
-# ── 3. Resolve versions ──────────────────────────────────────────────────────
+# ── 3. Find .vsix next to this script ────────────────────────────────────────
+VSIX_FILE=$(ls "$SCRIPT_DIR"/sesam-*.vsix 2>/dev/null | sort -V | tail -1 || true)
+
+if [[ -z "$VSIX_FILE" ]]; then
+  echo "ERROR: No sesam-*.vsix file found in the same folder as this script."
+  echo ""
+  echo "  Download both sesam-vX.Y.Z.vsix and sesam-install.sh from:"
+  echo "  https://github.com/datanav/sesam-ts/releases/latest"
+  echo "  Place them in the same folder, then run this script again."
+  echo ""
+  read -r -p "Press Enter to close..."
+  exit 1
+fi
+
+VSIX_VERSION=$(basename "$VSIX_FILE" | grep -oP '\d+\.\d+\.\d+' || true)
+
+# ── 4. Check installed version ───────────────────────────────────────────────
 INSTALLED=$(code --list-extensions --show-versions 2>/dev/null \
   | grep -i "^${EXT_ID}@" | cut -d@ -f2 || true)
 
-LATEST_TAG=$(gh release view --repo "$REPO" --json tagName -q .tagName 2>/dev/null || true)
-
-if [[ -z "$LATEST_TAG" ]]; then
-  echo "ERROR: Could not reach GitHub. Make sure you are logged in:"
-  echo "  gh auth login"
-  echo ""
-  read -r -p "Press Enter to close..."
-  exit 1
-fi
-
-LATEST="${LATEST_TAG#v}"   # strip leading 'v'
-
-# ── 4. Compare ───────────────────────────────────────────────────────────────
-if [[ -n "$INSTALLED" && "$INSTALLED" == "$LATEST" ]]; then
+if [[ -n "$INSTALLED" && "$INSTALLED" == "$VSIX_VERSION" ]]; then
   echo "✓ Sesam extension v${INSTALLED} is already installed and up to date."
+  echo ""
+  echo "  To update: download a newer sesam-*.vsix from GitHub Releases,"
+  echo "  replace the .vsix in this folder, and run this script again."
   echo ""
   read -r -p "Press Enter to close..."
   exit 0
 fi
 
 if [[ -n "$INSTALLED" ]]; then
-  echo "Update available: v${INSTALLED}  →  v${LATEST}"
+  echo "Updating Sesam extension: v${INSTALLED}  →  v${VSIX_VERSION}…"
 else
-  echo "Installing Sesam extension v${LATEST}…"
+  echo "Installing Sesam extension v${VSIX_VERSION}…"
 fi
 
-# ── 5. Download & install ────────────────────────────────────────────────────
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-gh release download "$LATEST_TAG" \
-  --repo "$REPO" \
-  --pattern "*.vsix" \
-  --dir "$TMP_DIR"
-
-code --install-extension "$TMP_DIR"/*.vsix --force
+# ── 5. Install ────────────────────────────────────────────────────────────────
+code --install-extension "$VSIX_FILE" --force
 
 echo ""
-echo "✓ Sesam extension v${LATEST} installed successfully."
+echo "✓ Sesam extension v${VSIX_VERSION} installed successfully."
 echo "  Restart VS Code to activate the new version."
 echo ""
 read -r -p "Press Enter to close..."
