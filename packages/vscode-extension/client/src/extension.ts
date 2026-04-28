@@ -324,6 +324,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   getSesamChannel().appendLine("Sesam extension activated.");
 
+  // ── Icon Theme (one-time prompt) ──────────────────────────────────────────
+  const iconThemeKey = "sesam.iconThemePrompted";
+
+  if (!context.globalState.get(iconThemeKey)) {
+    await context.globalState.update(iconThemeKey, true);
+    const currentTheme = vscode.workspace.getConfiguration("workbench").get<string>("iconTheme");
+
+    if (currentTheme !== "sesam-icons") {
+      const choice = await vscode.window.showInformationMessage(
+        "The Sesam extension includes a file icon theme. Would you like to enable it?",
+        "Enable",
+        "Not now",
+      );
+
+      if (choice === "Enable") {
+        await vscode.workspace
+          .getConfiguration("workbench")
+          .update("iconTheme", "sesam-icons", vscode.ConfigurationTarget.Global);
+      }
+    }
+  }
+
   // ── Credential & Profile Managers (F03) ──────────────────────────────────
   initCredentialManager(context);
   initProfileManager(context);
