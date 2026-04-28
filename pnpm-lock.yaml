@@ -67,9 +67,6 @@ importers:
 
   packages/vscode-extension:
     dependencies:
-      '@sesam/core':
-        specifier: workspace:*
-        version: link:../core
       global:
         specifier: ^4.4.0
         version: 4.4.0
@@ -86,6 +83,9 @@ importers:
         specifier: ^1.0.12
         version: 1.0.12
     devDependencies:
+      '@sesam/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.37
