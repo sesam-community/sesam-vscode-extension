@@ -31,7 +31,7 @@
 - [Requirements](#requirements)
 - [Known Limitations](#known-limitations)
 - [Development](#development)
-- [Installation](#installation)
+- [Installation](docs/installation.md)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -810,57 +810,6 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 ## Development
 
 For information on setting up the development environment, running tests, and contributing, see the [Development Guide](docs/development.md).
-
----
-
-## Installation
-
-This extension is for **internal use only** and is not published to the Visual Studio Marketplace.
-
-### Option 1 — Installer bundle (recommended)
-
-The release includes a self-contained archive with both the `.vsix` and the installer script.
-
-**tar.gz (macOS / Linux)**
-
-1. Go to the [GitHub Releases page](https://github.com/datanav/sesam-ts/releases/latest)
-2. Download `sesam-installer-vX.Y.Z.tar.gz`
-3. Extract and run:
-
-```bash
-tar -xzf sesam-installer-v0.1.0.tar.gz && bash sesam-install.sh
-```
-
-**zip (Windows / cross-platform)**
-
-1. Go to the [GitHub Releases page](https://github.com/datanav/sesam-ts/releases/latest)
-2. Download `sesam-installer-vX.Y.Z.zip`
-3. Extract and run:
-
-```bash
-unzip sesam-installer-v0.1.0.zip && bash sesam-install.sh
-```
-
-The script detects the bundled `.vsix`, installs it, and shows an interactive menu. Running it again when the extension is already installed lets you reinstall or uninstall.
-
-> **Requirement**: `code` must be in your PATH. To add it in VS Code: **Command Palette → Shell Command: Install 'code' command in PATH**.
-> On Linux, do **not** double-click the `.sh` file — open a terminal and use `bash sesam-install.sh`.
-
-### Option 2 — Manual VSIX install
-
-1. Go to the [GitHub Releases page](https://github.com/datanav/sesam-ts/releases/latest)
-2. Download `sesam-vX.Y.Z.vsix`
-3. Run:
-
-```bash
-code --install-extension sesam-v0.1.0.vsix
-```
-
-Or via the VS Code UI: **Extensions view → `...` → Install from VSIX…**
-
-See [`agent/impl/impl-distribution.prompt.md`](agent/impl/impl-distribution.prompt.md) for the full distribution plan.
-
-> Full installation guide: [`docs/installation.md`](docs/installation.md)
 
 ---
 
