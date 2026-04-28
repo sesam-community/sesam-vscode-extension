@@ -7,6 +7,7 @@ export default defineConfig({
     alias: {
       "@sesam/core": resolve(__dirname, "../core/src/index.ts"),
     },
+    mainFields: ["main", "module"],
     extensions: [".mts", ".ts", ".tsx", ".mjs", ".js", ".jsx", ".json"],
   },
   build: {

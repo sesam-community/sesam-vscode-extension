@@ -4,6 +4,7 @@ import { builtinModules } from "module";
 
 export default defineConfig({
   resolve: {
+    mainFields: ["main", "module"],
     extensions: [".mts", ".ts", ".tsx", ".mjs", ".js", ".jsx", ".json"],
   },
   build: {

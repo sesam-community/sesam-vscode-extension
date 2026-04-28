@@ -15,6 +15,7 @@ tsconfig*.json
 
 # Dev artefacts
 node_modules/
+pnpm-lock.yaml
 *.vsix
 *.js.map
 
