@@ -43,7 +43,7 @@ jobs:
           mkdir -p sesam-installer
           cp ${{ github.workspace }}/sesam-${{ github.ref_name }}.vsix sesam-installer/
           cp scripts/sesam-install.sh sesam-installer/
-          tar -czf sesam-installer-${{ github.ref_name }}.tar.gz sesam-installer/
+          tar -C sesam-installer -czf sesam-installer-${{ github.ref_name }}.tar.gz .
           cd sesam-installer && zip -r ../sesam-installer-${{ github.ref_name }}.zip . && cd ..
 
       - name: Create GitHub Release
