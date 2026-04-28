@@ -647,7 +647,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "echo 'This extension is for internal use only. Use vsce package + GitHub Releases instead.' && exit 1",
+    "vscode:prepublish": "node -e \"if (!process.env.CI) { console.error('This extension is for internal use only. Use vsce package + GitHub Releases instead.'); process.exit(1); }\"",
     "build": "vite build --config vite.config.client.ts && vite build --config vite.config.server.ts",
     "build:dev": "vite build --config vite.config.client.ts --mode development && vite build --config vite.config.server.ts --mode development",
     "watch": "vite build --config vite.config.client.ts --watch & vite build --config vite.config.server.ts --watch",
