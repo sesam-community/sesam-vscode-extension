@@ -818,16 +818,29 @@ For information on setting up the development environment, running tests, and co
 
 This extension is for **internal use only** and is not published to the Visual Studio Marketplace.
 
-Download the latest `.vsix` from the GitHub Releases page of the `sesam-ts` monorepo, then install:
+### Option 1 — Installer script (recommended)
+
+1. Go to the [GitHub Releases page](https://github.com/datanav/sesam-ts/releases/latest)
+2. Download `sesam-install.sh`
+3. Open a terminal in the download folder and run:
 
 ```bash
-code --install-extension sesam-x.y.z.vsix
+bash sesam-install.sh
 ```
 
-Or use the convenience script in the monorepo:
+The script installs the extension and prints the version. Running it again checks for a newer version and upgrades automatically.
+
+> **Requirements**: [`gh` CLI](https://cli.github.com) (logged in) and `code` in PATH.
+> On Linux, do **not** double-click the `.sh` file — open a terminal and use `bash sesam-install.sh`.
+
+### Option 2 — Manual
+
+1. Go to the [GitHub Releases page](https://github.com/datanav/sesam-ts/releases/latest)
+2. Download `sesam-v0.1.0.vsix`
+3. Run:
 
 ```bash
-bash scripts/install-extension.sh
+code --install-extension sesam-v0.1.0.vsix
 ```
 
 See [`agent/impl/impl-distribution.prompt.md`](agent/impl/impl-distribution.prompt.md) for the full distribution plan.
