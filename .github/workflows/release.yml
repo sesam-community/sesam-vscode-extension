@@ -36,10 +36,10 @@ jobs:
         run: pnpm --filter dtl-language-support build
 
       - name: Package VSIX
-        run: pnpm --filter dtl-language-support exec vsce package --no-dependencies --out sesam-${{ github.ref_name }}.vsix
+        run: pnpm --filter dtl-language-support exec vsce package --no-dependencies --out ${{ github.workspace }}/sesam-${{ github.ref_name }}.vsix
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: sesam-${{ github.ref_name }}.vsix
+          files: ${{ github.workspace }}/sesam-${{ github.ref_name }}.vsix
           generate_release_notes: true
