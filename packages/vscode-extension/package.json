@@ -655,7 +655,7 @@
     "lint": "eslint src client/src server/src",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package": "vsce package"
+    "package": "vsce package --no-dependencies --skip-license"
   },
   "dependencies": {
     "@sesam/core": "workspace:*",
