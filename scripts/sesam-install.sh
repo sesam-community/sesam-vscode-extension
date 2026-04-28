@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # Sesam VS Code Extension — Installer & Updater
 #
-# Usage: bash sesam-install.sh [--uninstall]
+# Usage:
+#   bash sesam-install.sh            — install or update
+#   bash sesam-install.sh --uninstall — remove the extension
 #
-# Requirements: curl, code (VS Code CLI in PATH)
+# The script looks for a sesam-*.vsix in the same folder as this script.
+# To update: replace the .vsix with a newer one and run again.
+#
+# Requirements: code (VS Code CLI in PATH)
 
 set -euo pipefail
 
-REPO="datanav/sesam-ts"
 EXT_ID="bouvet.dtl-language-support"
-TOKEN_FILE="$HOME/.config/sesam/github-token"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
@@ -45,25 +49,21 @@ echo -e "${BOLD}${CYAN}│  Sesam VS Code Extension — Installer    │${RESET}
 echo -e "${BOLD}${CYAN}└─────────────────────────────────────────┘${RESET}"
 echo ""
 
-# ── 2. Check required tools ───────────────────────────────────────────────────
-for tool in curl code; do
-  if ! command -v "$tool" &>/dev/null; then
-    error "'$tool' not found in PATH."
-    [[ "$tool" == "code" ]] && dim "  https://code.visualstudio.com/docs/setup/linux"
-    echo ""
-    read -r -p "Press Enter to close..."
-    exit 1
-  fi
-done
+# ── 2. Require code CLI ───────────────────────────────────────────────────────
+if ! command -v code &>/dev/null; then
+  error "'code' command not found."
+  dim "  Add VS Code to your PATH: https://code.visualstudio.com/docs/setup/linux"
+  echo ""
+  read -r -p "Press Enter to close..."
+  exit 1
+fi
 
-# ── 3. Uninstall mode ─────────────────────────────────────────────────────────
-UNINSTALL=false
-[[ "${1:-}" == "--uninstall" ]] && UNINSTALL=true
-
+# ── 3. Get currently installed version ───────────────────────────────────────
 INSTALLED=$(code --list-extensions --show-versions 2>/dev/null \
   | grep -i "^${EXT_ID}@" | cut -d@ -f2 || true)
 
-if [[ "$UNINSTALL" == "true" ]]; then
+# ── 4. Uninstall mode ─────────────────────────────────────────────────────────
+if [[ "${1:-}" == "--uninstall" ]]; then
   if [[ -z "$INSTALLED" ]]; then
     warn "Sesam extension is not currently installed."
   else
@@ -78,78 +78,26 @@ if [[ "$UNINSTALL" == "true" ]]; then
   exit 0
 fi
 
-# ── 4. Load or prompt for GitHub token ───────────────────────────────────────
-GH_TOKEN=""
-if [[ -f "$TOKEN_FILE" ]]; then
-  GH_TOKEN="$(cat "$TOKEN_FILE")"
-fi
+# ── 5. Find .vsix next to this script ────────────────────────────────────────
+VSIX_FILE=$(ls "$SCRIPT_DIR"/sesam-*.vsix 2>/dev/null | sort -V | tail -1 || true)
 
-if [[ -z "$GH_TOKEN" ]]; then
-  echo -e "A ${BOLD}GitHub Personal Access Token${RESET} is needed to download from the private repo."
+if [[ -z "$VSIX_FILE" ]]; then
+  error "No sesam-*.vsix file found in: $SCRIPT_DIR"
   echo ""
-  dim "  Create one at: https://github.com/settings/tokens"
-  dim "  Required scope: Contents: read  (or: repo)"
-  echo ""
-  read -r -s -p "Paste your token and press Enter: " GH_TOKEN
-  echo ""
-
-  if [[ -z "$GH_TOKEN" ]]; then
-    error "No token provided. Aborting."
-    echo ""
-    read -r -p "Press Enter to close..."
-    exit 1
-  fi
-
-  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-    -H "Authorization: token $GH_TOKEN" \
-    "https://api.github.com/repos/$REPO/releases/latest")
-
-  if [[ "$HTTP_STATUS" != "200" ]]; then
-    echo ""
-    error "Token validation failed (HTTP $HTTP_STATUS)."
-    dim "  Check that the token is correct and has 'Contents: read' scope."
-    echo ""
-    read -r -p "Press Enter to close..."
-    exit 1
-  fi
-
-  mkdir -p "$(dirname "$TOKEN_FILE")"
-  chmod 700 "$(dirname "$TOKEN_FILE")"
-  echo "$GH_TOKEN" > "$TOKEN_FILE"
-  chmod 600 "$TOKEN_FILE"
-  success "Token saved to ${TOKEN_FILE}"
-  echo ""
-fi
-
-# ── 5. Fetch latest release info ─────────────────────────────────────────────
-info "Checking latest release…"
-RELEASE_JSON=$(curl -sf \
-  -H "Authorization: token $GH_TOKEN" \
-  "https://api.github.com/repos/$REPO/releases/latest" || true)
-
-if [[ -z "$RELEASE_JSON" ]]; then
-  error "Could not fetch release info. Check your token or network connection."
-  dim "  To reset your token: rm $TOKEN_FILE"
+  dim "  The .vsix should be in the same folder as this script."
+  dim "  Download a fresh installer archive from GitHub Releases."
   echo ""
   read -r -p "Press Enter to close..."
   exit 1
 fi
 
-LATEST_TAG=$(echo "$RELEASE_JSON" | grep -oP '"tag_name":\s*"\K[^"]+')
-LATEST="${LATEST_TAG#v}"
-VSIX_URL=$(echo "$RELEASE_JSON" | grep -oP '"browser_download_url":\s*"\K[^"]+\.vsix')
-
-if [[ -z "$LATEST_TAG" || -z "$VSIX_URL" ]]; then
-  error "Could not find a .vsix asset in the latest release."
-  echo ""
-  read -r -p "Press Enter to close..."
-  exit 1
-fi
+VSIX_VERSION=$(basename "$VSIX_FILE" | grep -oP '\d+\.\d+\.\d+' || true)
 
 # ── 6. Compare versions ───────────────────────────────────────────────────────
-if [[ -n "$INSTALLED" && "$INSTALLED" == "$LATEST" ]]; then
+if [[ -n "$INSTALLED" && "$INSTALLED" == "$VSIX_VERSION" ]]; then
   success "Sesam extension ${BOLD}v${INSTALLED}${RESET} is already installed and up to date."
   echo ""
+  dim "  To update: download a newer installer archive from GitHub Releases."
   dim "  To uninstall: bash sesam-install.sh --uninstall"
   echo ""
   read -r -p "Press Enter to close..."
@@ -157,29 +105,17 @@ if [[ -n "$INSTALLED" && "$INSTALLED" == "$LATEST" ]]; then
 fi
 
 if [[ -n "$INSTALLED" ]]; then
-  echo -e "  ${YELLOW}Update available:${RESET} v${INSTALLED}  →  ${BOLD}v${LATEST}${RESET}"
+  echo -e "  ${YELLOW}Update available:${RESET} v${INSTALLED}  →  ${BOLD}v${VSIX_VERSION}${RESET}"
 else
-  echo -e "  Installing ${BOLD}Sesam extension v${LATEST}${RESET}…"
+  echo -e "  Installing ${BOLD}Sesam extension v${VSIX_VERSION}${RESET}…"
 fi
 echo ""
 
-# ── 7. Download & install ─────────────────────────────────────────────────────
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-VSIX_PATH="$TMP_DIR/sesam-${LATEST_TAG}.vsix"
-
-info "Downloading sesam-${LATEST_TAG}.vsix…"
-curl -sL \
-  -H "Authorization: token $GH_TOKEN" \
-  -H "Accept: application/octet-stream" \
-  "$VSIX_URL" \
-  -o "$VSIX_PATH"
-
-code --install-extension "$VSIX_PATH" --force
+# ── 7. Install ────────────────────────────────────────────────────────────────
+code --install-extension "$VSIX_FILE" --force
 
 echo ""
-success "Sesam extension ${BOLD}v${LATEST}${RESET} installed successfully."
+success "Sesam extension ${BOLD}v${VSIX_VERSION}${RESET} installed successfully."
 dim "  Restart VS Code to activate the new version."
 dim "  To uninstall: bash sesam-install.sh --uninstall"
 echo ""
