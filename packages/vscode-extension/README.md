@@ -510,13 +510,20 @@ If no local differences are found the download proceeds silently.
 
 The extension stores your Sesam JWT tokens securely in VS Code **SecretStorage** (OS keychain on Linux/macOS/Windows) — tokens are never written to disk or committed to source control.
 
-You can configure multiple named **profiles** (e.g. `dev`, `staging`, `prod`) and switch between them from the status bar.
+Each workspace folder is **locked to one profile**. Once the first full download succeeds the profile is bound to that folder and cannot be changed — open a new folder to use a different profile.
 
 #### Quick start
 
 1. Run **Sesam: Add Profile** from the Command Palette.
 2. Enter a profile name (e.g. `dev`), the portal URL (defaults to `https://portal.sesam.io`), your node URL, and your JWT.
-3. The active profile name is shown in the status bar: `$(key) Sesam: [dev]`. Click it to switch profiles.
+3. Run **Sesam: Download** — on success the profile is locked to this folder. The status bar item becomes non-interactive and shows `$(check) dev · <hostname>`.
+
+#### Profile lock
+
+- The lock is triggered by the first successful **full download** (`Sesam: Download`).
+- Once locked, `Sesam: Add Profile` and `Sesam: Switch Profile` are hidden from the command palette and blocked from the status bar.
+- The **Sesam: Profiles** panel still shows all profiles; non-active profiles display a `🔒 Locked to folder` badge.
+- To use a different profile, open a new VS Code folder — `workspaceState` is per-folder and starts fresh.
 
 #### How to obtain a JWT
 
@@ -530,11 +537,11 @@ JWTs expire — re-run **Sesam: Set JWT Token** when yours is refreshed.
 
 | Command | Description |
 |---|---|
-| `Sesam: Add Profile` | 4-step wizard — name, portal URL (default: `https://portal.sesam.io`), node URL, JWT. Creates or replaces a full profile. |
+| `Sesam: Add Profile` | 4-step wizard — name, portal URL (default: `https://portal.sesam.io`), node URL, JWT. Creates or replaces a full profile. Hidden once the folder is locked. |
 | `Sesam: Delete Profile` | Remove a profile entirely (JWT from SecretStorage + node URL from workspace state). |
-| `Sesam: Set JWT Token` | Quick command to store (or update) just the JWT for a named profile. |
+| `Sesam: Set JWT Token` | Quick command to store (or update) just the JWT for the active profile. |
 | `Sesam: Delete JWT Token` | Remove only the stored JWT for a profile, keeping the node URL. |
-| `Sesam: Switch Profile` | Switch the active profile from a QuickPick list. Same as clicking the status bar item. |
+| `Sesam: Switch Profile` | Switch the active profile. Hidden once the folder is locked. |
 | `Sesam: List Profiles` | Print all configured profiles (name, node URL, portal URL, token status) to the Sesam output channel. |
 
 #### Falling back to settings
@@ -719,11 +726,11 @@ my-sesam-project/
 | `Sesam: New Sesam Config File` | — | Create a new pipe or system config file from a template |
 | `Sesam: Format Document` | — | Format the active Sesam config file |
 | `Sesam: Clear Errors` | — | Clear all entries from the Sesam panel |
-| `Sesam: Add Profile` | — | Add a named Sesam profile (node URL + JWT) |
+| `Sesam: Add Profile` | — | Add a named Sesam profile (node URL + JWT). Hidden once the folder is locked. |
 | `Sesam: Delete Profile` | — | Remove a profile (JWT + node URL) entirely |
-| `Sesam: Set JWT Token` | — | Store or update the JWT for a named profile |
+| `Sesam: Set JWT Token` | — | Store or update the JWT for the active profile |
 | `Sesam: Delete JWT Token` | — | Remove only the JWT for a profile, keeping the node URL |
-| `Sesam: Switch Profile` | — | Switch the active profile (also available via the status bar) |
+| `Sesam: Switch Profile` | — | Switch the active profile. Hidden once the folder is locked. |
 | `Sesam: List Profiles` | — | Print all configured profiles to the Sesam output channel |
 | `@sesam /generate` | — | (Copilot) Generate a new Sesam pipe config |
 | `@sesam /explain` | — | (Copilot) Explain the active DTL transform or pipe config |

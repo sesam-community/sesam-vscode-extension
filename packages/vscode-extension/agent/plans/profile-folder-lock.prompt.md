@@ -1,6 +1,6 @@
 # Plan: One Profile Per Folder (Profile Lock)
 
-> **Status**: `in progress`
+> **Status**: `implemented`
 > **Context**: F03 (Secure Credential Management) — additive behaviour on top of the multi-profile switcher.
 
 ---
