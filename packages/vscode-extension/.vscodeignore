@@ -1,0 +1,21 @@
+# Source — not needed at runtime (Vite bundles everything into dist/)
+client/
+server/
+src/
+tests/
+types/
+agent/
+docs/
+
+# Config & tooling
+vite.config.*.ts
+vitest.config.ts
+tsconfig*.json
+*.config.mjs
+
+# Dev artefacts
+node_modules/
+*.vsix
+*.js.map
+
+# dist/ is intentionally NOT listed here — it must be included in the VSIX
