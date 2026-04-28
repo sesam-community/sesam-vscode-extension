@@ -169,8 +169,19 @@ export class ProfilesPanel {
         return;
       }
 
+      const activeProfile = getActiveProfileName();
+
       await deleteToken(message.profileName);
       await removeProfile(message.profileName);
+
+      if (message.profileName === activeProfile) {
+        const remainingNames = [
+          ...new Set([...listStoredProfileNames(), ...getStoredProfiles().map((p) => p.name)]),
+        ].filter((n) => n !== message.profileName);
+
+        await setActiveProfileName(remainingNames[0] ?? "default");
+      }
+
       await vscode.commands.executeCommand("sesam.refreshStatusBar");
       await this._loadAndSend();
       return;
@@ -191,10 +202,13 @@ export class ProfilesPanel {
     const profileMetas = getStoredProfiles();
     const storedNames = listStoredProfileNames();
 
-    // Union of all known profile names (active first)
-    const allNames = [
-      ...new Set([activeProfile, ...storedNames, ...profileMetas.map((p) => p.name)]),
-    ];
+    // Union of all known profile names (active first).
+    // Do NOT force-include activeProfile when it has no backing data — that would
+    // create a phantom "default" row after the last profile is deleted.
+    const backingNames = [...new Set([...storedNames, ...profileMetas.map((p) => p.name)])];
+    const allNames = backingNames.includes(activeProfile)
+      ? [activeProfile, ...backingNames.filter((n) => n !== activeProfile)]
+      : backingNames;
 
     const rows: ProfileRow[] = await Promise.all(
       allNames.map(async (name) => {
