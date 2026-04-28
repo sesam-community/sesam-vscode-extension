@@ -4,6 +4,7 @@
   "description": "Data Transformation Language (DTL) support for Sesam pipe configurations",
   "version": "0.1.0",
   "publisher": "bouvet",
+  "icon": "fileicons/sesam-logo.png",
   "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
