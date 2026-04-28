@@ -20,13 +20,7 @@ export default defineConfig({
     minify: false,
     target: "node20",
     rollupOptions: {
-      external: [
-        "vscode",
-        "vscode-languageclient",
-        "vscode-languageclient/node",
-        ...builtinModules,
-        ...builtinModules.map((m) => `node:${m}`),
-      ],
+      external: ["vscode", ...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
       output: {
         entryFileNames: "[name].js",
         chunkFileNames: "[name].js",
