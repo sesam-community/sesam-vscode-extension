@@ -38,10 +38,17 @@ jobs:
       - name: Package VSIX
         run: pnpm --filter dtl-language-support exec vsce package --no-dependencies --skip-license --out ${{ github.workspace }}/sesam-${{ github.ref_name }}.vsix
 
+      - name: Bundle installer archive
+        run: |
+          mkdir -p sesam-installer
+          cp ${{ github.workspace }}/sesam-${{ github.ref_name }}.vsix sesam-installer/
+          cp scripts/sesam-install.sh sesam-installer/
+          tar -czf sesam-installer-${{ github.ref_name }}.tar.gz sesam-installer/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            sesam-installer-${{ github.ref_name }}.tar.gz
             ${{ github.workspace }}/sesam-${{ github.ref_name }}.vsix
-            scripts/sesam-install.sh
           generate_release_notes: true
