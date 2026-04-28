@@ -131,6 +131,13 @@
       color: #fff;
     }
 
+    .badge-locked {
+      background: var(--vscode-badge-background, #4d4d4d);
+      color: var(--vscode-badge-foreground, #fff);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
     .card-fields {
       display: grid;
       grid-template-columns: max-content 1fr;
@@ -241,7 +248,7 @@
       vscode.postMessage({ type: 'addProfile' });
     });
 
-    function renderRows(rows) {
+    function renderRows(rows, isLocked) {
       const grid = document.getElementById('profiles-grid');
       grid.innerHTML = '';
 
@@ -294,7 +301,9 @@
         }
 
         const makeActiveBtn = !row.isActive
-          ? '<button class="secondary" data-action="makeActive" data-profile="' + escAttr(row.name) + '">Make active</button>'
+          ? (isLocked
+            ? '<span class="badge badge-locked">🔒 Locked to folder</span>'
+            : '<button class="secondary" data-action="makeActive" data-profile="' + escAttr(row.name) + '">Make active</button>')
           : '';
 
         const deleteBtn = '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Delete profile">🗑 Delete</button>';
@@ -361,7 +370,8 @@
       }
 
       if (msg.type === 'data') {
-        renderRows(msg.rows);
+        document.getElementById('btn-add').style.display = msg.isLocked ? 'none' : '';
+        renderRows(msg.rows, msg.isLocked);
       }
     });
 

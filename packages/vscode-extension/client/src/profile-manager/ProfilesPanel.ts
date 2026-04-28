@@ -24,6 +24,7 @@ import { DEFAULT_PORTAL_URL } from "../constants";
 import {
   getActiveProfileName,
   getStoredProfiles,
+  isProfileConnected,
   removeProfile,
   runAddProfile,
   setActiveProfileName,
@@ -230,7 +231,12 @@ export class ProfilesPanel {
       }),
     );
 
-    this._panel.webview.postMessage({ type: "data", rows, activeProfile });
+    this._panel.webview.postMessage({
+      type: "data",
+      rows,
+      activeProfile,
+      isLocked: isProfileConnected(),
+    });
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────

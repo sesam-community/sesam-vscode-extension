@@ -472,6 +472,14 @@
           "when": "workspaceFolderCount > 0"
         },
         {
+          "command": "sesam.addProfile",
+          "when": "!sesam.profileConnected"
+        },
+        {
+          "command": "sesam.switchProfile",
+          "when": "!sesam.profileConnected"
+        },
+        {
           "command": "sesam.revertConfig",
           "when": "false"
         }
