@@ -2,30 +2,29 @@
 
 ## Table of Contents
 
-### Features
-
-- [Syntax Highlighting](#syntax-highlighting)
-- [Auto-Completion](#auto-completion)
-- [Hover Documentation](#hover-documentation)
-- [Diagnostics (Linting)](#diagnostics-linting)
-- [Quick Fixes](#quick-fixes)
-- [Formatter](#formatter)
-- [Code Snippets](#code-snippets)
-- [Go to Rule Definition](#go-to-rule-definition)
-- [Cross-file Navigation](#cross-file-navigation)
-- [Dataset Alias Support](#dataset-alias-support)
-- [Pipe Lineage](#pipe-lineage)
-- [Pipe Dependents](#pipe-dependents)
-- [System Pipes](#system-pipes)
-- [Sesam Panel](#sesam-panel)
-- [Pipe Preview](#pipe-preview) — live server-side evaluation with syntax-highlighted output
-- [Node Integration — Upload & Download](#node-integration--upload--download)
-- [Node Integration — Run Pipe](#node-integration--run-pipe)
-- [Node Status](#node-status)
-- [Sync Status & Diff View](#sync-status--diff-view)
-- [New Sesam Config File](#new-sesam-config-file)
-- [Credential Management](#credential-management)
-- [Copilot Agent Integration](#copilot-agent-integration)
+- [Features](#features)
+  - [Syntax Highlighting](#syntax-highlighting)
+  - [Auto-Completion](#auto-completion)
+  - [Hover Documentation](#hover-documentation)
+  - [Diagnostics (Linting)](#diagnostics-linting)
+  - [Quick Fixes](#quick-fixes)
+  - [Formatter](#formatter)
+  - [Code Snippets](#code-snippets)
+  - [Go to Rule Definition](#go-to-rule-definition)
+  - [Cross-file Navigation](#cross-file-navigation)
+  - [Dataset Alias Support](#dataset-alias-support)
+  - [Pipe Lineage](#pipe-lineage)
+  - [Pipe Dependents](#pipe-dependents)
+  - [System Pipes](#system-pipes)
+  - [Sesam Panel](#sesam-panel)
+  - [Pipe Preview](#pipe-preview) — live server-side evaluation with syntax-highlighted output
+  - [Node Integration — Upload & Download](#node-integration--upload--download)
+  - [Node Integration — Run Pipe](#node-integration--run-pipe)
+  - [Node Status](#node-status)
+  - [Sync Status & Diff View](#sync-status--diff-view)
+  - [New Sesam Config File](#new-sesam-config-file)
+  - [Credential Management](#credential-management)
+  - [Copilot Agent Integration](#copilot-agent-integration)
 - [Getting Started](#getting-started)
 - [DTL Primer](#dtl-primer)
 - [Extension Settings](#extension-settings)
@@ -818,32 +817,50 @@ For information on setting up the development environment, running tests, and co
 
 This extension is for **internal use only** and is not published to the Visual Studio Marketplace.
 
-### Option 1 — Installer script (recommended)
+### Option 1 — Installer bundle (recommended)
+
+The release includes a self-contained archive with both the `.vsix` and the installer script.
+
+**tar.gz (macOS / Linux)**
 
 1. Go to the [GitHub Releases page](https://github.com/datanav/sesam-ts/releases/latest)
-2. Download `sesam-install.sh`
-3. Open a terminal in the download folder and run:
+2. Download `sesam-installer-vX.Y.Z.tar.gz`
+3. Extract and run:
 
 ```bash
-bash sesam-install.sh
+tar -xzf sesam-installer-v0.1.0.tar.gz && bash sesam-install.sh
 ```
 
-The script installs the extension and prints the version. Running it again checks for a newer version and upgrades automatically.
-
-> **Requirements**: [`gh` CLI](https://cli.github.com) (logged in) and `code` in PATH.
-> On Linux, do **not** double-click the `.sh` file — open a terminal and use `bash sesam-install.sh`.
-
-### Option 2 — Manual
+**zip (Windows / cross-platform)**
 
 1. Go to the [GitHub Releases page](https://github.com/datanav/sesam-ts/releases/latest)
-2. Download `sesam-v0.1.0.vsix`
+2. Download `sesam-installer-vX.Y.Z.zip`
+3. Extract and run:
+
+```bash
+unzip sesam-installer-v0.1.0.zip && bash sesam-install.sh
+```
+
+The script detects the bundled `.vsix`, installs it, and shows an interactive menu. Running it again when the extension is already installed lets you reinstall or uninstall.
+
+> **Requirement**: `code` must be in your PATH. To add it in VS Code: **Command Palette → Shell Command: Install 'code' command in PATH**.
+> On Linux, do **not** double-click the `.sh` file — open a terminal and use `bash sesam-install.sh`.
+
+### Option 2 — Manual VSIX install
+
+1. Go to the [GitHub Releases page](https://github.com/datanav/sesam-ts/releases/latest)
+2. Download `sesam-vX.Y.Z.vsix`
 3. Run:
 
 ```bash
 code --install-extension sesam-v0.1.0.vsix
 ```
 
+Or via the VS Code UI: **Extensions view → `...` → Install from VSIX…**
+
 See [`agent/impl/impl-distribution.prompt.md`](agent/impl/impl-distribution.prompt.md) for the full distribution plan.
+
+> Full installation guide: [`docs/installation.md`](docs/installation.md)
 
 ---
 
