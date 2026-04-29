@@ -282,8 +282,15 @@ Spec: [impl-f23-network-status](../packages/vscode-extension/agent/impl/impl-f23
 2. Show the table: pipe ID, state badge (running/ok/failed/disabled), OK runs, failures, queued, last run.
 3. Use a **filter pill** (e.g. Failed) — client-side filter, no network request.
 4. Type in the **search box** to narrow by pipe ID. Use `"exact-id"` for exact match.
-5. Show the **● Live** badge — Socket.IO connection; data updates in real time.
-6. Click a pipe ID → opens local config file. Click 🌐 icon → opens pipe in Management Studio.
+5. Click a pipe ID → opens local config file. Click 🌐 icon → opens pipe in Management Studio.
+
+#### Live updates via Socket.IO
+
+6. Point to the **● Live** badge (green) in the toolbar — the panel is connected to the node via Socket.IO and receives real-time push events (`pipes_updated`, `pipes_added`, `pipes_deleted`), exactly like Management Studio does.
+7. Trigger a pipe run from the terminal or another browser tab — watch the row update **without any manual refresh**.
+8. Click the **Live updates toggle** (checkbox) to pause the connection → badge turns grey (● Paused); a **Refresh** button appears for manual reload.
+9. Re-enable the toggle — badge goes green again and the panel catches up.
+10. Explain the fallback: if the node doesn't support Socket.IO the badge shows **○ Not supported** (red) and the manual **Refresh** button is always visible. There is no polling fallback — the node must support WebSocket for live mode.
 
 ### Test Management (if time permits)
 Spec: [impl-f05-test-management](../packages/vscode-extension/agent/impl/impl-f05-test-management.prompt.md)
