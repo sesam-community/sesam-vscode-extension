@@ -31,7 +31,7 @@
 - [Requirements](#requirements)
 - [Known Limitations](#known-limitations)
 - [Development](#development)
-- [Installation](docs/installation.md)
+- [Installation](#installation)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -810,6 +810,22 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 ## Development
 
 For information on setting up the development environment, running tests, and contributing, see the [Development Guide](docs/development.md).
+
+---
+
+## Installation
+
+This extension is not published to the VS Code Marketplace. Download the `.vsix` from the [GitHub Releases page](https://github.com/datanav/sesam-ts/releases/latest).
+
+**VS Code UI** — open the Extensions view (`Ctrl+Shift+X`), click the `···` menu, choose **Install from VSIX…**, and select the downloaded file.
+
+**Command line:**
+
+```bash
+code --install-extension sesam-v0.1.0.vsix
+```
+
+> **Requirement**: `code` must be in your PATH. To add it in VS Code: **Command Palette → Shell Command: Install 'code' command in PATH**.
 
 ---
 
