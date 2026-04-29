@@ -66,10 +66,10 @@ Spec: [impl-f12-conf-json-formatter](../packages/vscode-extension/agent/impl/imp
 
 ### Create a new config file
 
-**Command:** `dtl.newConfFile` (`DTL: New Sesam Config File`)  
-**Invoke via:** Explorer right-click → *DTL: New Sesam Config File* · Command Palette · keybinding
+**Command:** `dtl.newConfFile` (`Sesam: New Sesam Config File`)  
+**Invoke via:** Explorer right-click → *Sesam: New Sesam Config File* · Command Palette · keybinding
 
-1. Right-click `pipes/` in the Explorer → **DTL: New Sesam Config File**.
+1. Right-click `pipes/` in the Explorer → **Sesam: New Sesam Config File**.
 2. Walk through the wizard:
    - Template: *Pipe with DTL transform*
    - Source type: `dataset`
@@ -78,7 +78,7 @@ Spec: [impl-f12-conf-json-formatter](../packages/vscode-extension/agent/impl/imp
 
 ### Formatter
 
-**Command:** `dtl.formatDocument` (`Sesam: Format Document`)  
+**Command:** `sesam.formatDocument` (`Sesam: Format Document`)  
 **Keyboard:** `Shift+Alt+F`  
 **Auto-triggers:** on save for all `sesam-config` files
 
@@ -124,8 +124,8 @@ Trigger characters: `"`, `[`, `_`, `.`, `:`
 ### 4d. Linting & quick fixes (2 min)
 Spec: [impl-f19-syntax-linting](../packages/vscode-extension/agent/impl/impl-f19-syntax-linting.prompt.md)
 
-**Command:** `sesam.lintDocument` (`Sesam: Lint Document`)  
-See also: [copilot-agent.md — Available Tools](../packages/vscode-extension/docs/copilot-agent.md)
+**Copilot tools:** `#sesamLintDocument` · `#sesamLintWorkspace`  
+See [copilot-agent.md — Available Tools](../packages/vscode-extension/docs/copilot-agent.md)
 
 1. **Delete the `_id` field** — red squiggly appears immediately; the Sesam panel (bottom) updates.
 2. Press **Ctrl+.** on the squiggly → pick **Add `"_id"`** — the field is inserted.
@@ -169,7 +169,7 @@ Spec: [dataset-alias-support](../packages/vscode-extension/agent/plans/dataset-a
 **5 minutes | Demo**  
 Spec: [pipe-dag-tree](../packages/vscode-extension/agent/plans/pipe-dag-tree.prompt.md) · [system-pipes-view](../packages/vscode-extension/agent/plans/system-pipes-view.prompt.md)
 
-**Command:** `sesam.refreshPipeDAG` (`Sesam: Refresh Pipe DAG`)
+**Command:** `dtl.refreshDag` (`Sesam: Refresh Pipe DAG`)
 
 ### Pipe Lineage
 
@@ -200,9 +200,9 @@ Spec: [pipe-dag-tree](../packages/vscode-extension/agent/plans/pipe-dag-tree.pro
 ### 7a. Credential setup (2 min)
 Spec: [impl-f03-credential-management](../packages/vscode-extension/agent/impl/impl-f03-credential-management.prompt.md) · [credential-safety](../packages/vscode-extension/agent/plans/credential-safety.prompt.md) · [impl-f26-switch-profile](../packages/vscode-extension/agent/impl/impl-f26-switch-profile.prompt.md)
 
-**Command:** `sesam.addProfile` (`Sesam: Add/Edit Credentials`)
+**Command:** `sesam.addProfile` (`Sesam: Add Profile`)
 
-1. Open Command Palette (`Ctrl+Shift+P`) → **Sesam: Add/Edit Credentials**.
+1. Open Command Palette (`Ctrl+Shift+P`) → **Sesam: Add Profile**.
 2. Show the profile picker — multiple environments (dev / test / prod).
 3. Enter node URL and JWT — stored in VS Code **SecretStorage**, never written to disk.
 4. Point out the status bar bottom-left: shows active profile hostname.
@@ -248,7 +248,7 @@ Spec: [impl-f23-network-status](../packages/vscode-extension/agent/impl/impl-f23
 **5 minutes | Demo**  
 Spec: [impl-f06-status-diff-view](../packages/vscode-extension/agent/impl/impl-f06-status-diff-view.prompt.md)
 
-**Command:** `sesam.syncStatus` (`Sesam: Show Sync Status`) — sidebar panel
+**Command:** `sesam.showStatus` (`Sesam: Show Sync Status`) — sidebar panel
 
 1. Open the **Sesam Sync Status** sidebar panel.
 2. Show the three groups: **Modified**, **Node only**, **Local only**.
@@ -268,7 +268,7 @@ Spec: [impl-f04-node-preview](../packages/vscode-extension/agent/impl/impl-f04-n
 **Command:** `dtl.previewPipe` (`Sesam: Preview Pipe`) — editor title bar
 
 1. Open a pipe config.
-2. Command Palette → **Sesam: Preview Pipe**.
+2. Command Palette → **Sesam: Preview Pipe Output**.
 3. Edit the input entity JSON in the left pane.
 4. **Ctrl+Enter** (or ▶ Run preview) — output entity appears syntax-highlighted on the right.
 5. Mention: if credentials are missing, the error banner has an **Open Settings** link.
@@ -276,7 +276,7 @@ Spec: [impl-f04-node-preview](../packages/vscode-extension/agent/impl/impl-f04-n
 ### Node Status panel
 Spec: [impl-f23-network-status](../packages/vscode-extension/agent/impl/impl-f23-network-status.prompt.md) · [impl-f24-live-updates](../packages/vscode-extension/agent/impl/impl-f24-live-updates.prompt.md)
 
-**Command:** `sesam.nodeStatus` (`Sesam: Show Node Status`) — Explorer toolbar · editor title bar
+**Command:** `sesam.nodeStatus` (`Sesam: Open Node Status Panel`) — Explorer toolbar · editor title bar
 
 1. Click the Node Status button in the Explorer toolbar.
 2. Show the table: pipe ID, state badge (running/ok/failed/disabled), OK runs, failures, queued, last run.
@@ -288,7 +288,7 @@ Spec: [impl-f23-network-status](../packages/vscode-extension/agent/impl/impl-f23
 ### Test Management (if time permits)
 Spec: [impl-f05-test-management](../packages/vscode-extension/agent/impl/impl-f05-test-management.prompt.md)
 
-**Command:** `sesam.runTests` — VS Code Testing view (beaker icon in Activity Bar)
+**Command:** `sesam.runPipeTests` (`Sesam: Run Pipe Tests`) — VS Code Testing view (beaker icon in Activity Bar)
 
 1. Open the VS Code **Testing** view (beaker icon in Activity Bar).
 2. Show sesam test cases discovered from the `testdata/` / `expected/` folders.
@@ -306,18 +306,16 @@ Spec: [impl-f05-test-management](../packages/vscode-extension/agent/impl/impl-f0
 | `sesam.uploadFile` | Sesam: Upload This Config to Node | — |
 | `sesam.downloadFile` | Sesam: Download This Config from Node | — |
 | `sesam.pipeStatus` | Sesam: Show Pipe Status | — |
-| `sesam.nodeStatus` | Sesam: Show Node Status | — |
-| `sesam.systemStatus` | Sesam: Show System Status | — |
-| `sesam.syncStatus` | Sesam: Show Sync Status | — |
-| `sesam.refreshPipeDAG` | Sesam: Refresh Pipe DAG | — |
-| `sesam.addProfile` | Sesam: Add/Edit Credentials | — |
+| `sesam.nodeStatus` | Sesam: Open Node Status Panel | — |
+| `sesam.systemStatus` | Sesam: Open System Status | — |
+| `sesam.showStatus` | Sesam: Show Sync Status | — |
+| `dtl.refreshDag` | Sesam: Refresh Pipe DAG | — |
+| `sesam.addProfile` | Sesam: Add Profile | — |
 | `sesam.fixWithCopilot` | Sesam: Fix with Copilot | — |
-| `sesam.runTests` | Sesam: Run Tests | — |
-| `dtl.newConfFile` | DTL: New Sesam Config File | — |
-| `dtl.formatDocument` | Sesam: Format Document | `Shift+Alt+F` |
-| `dtl.previewPipe` | Sesam: Preview Pipe | — |
-| `sesam.lintDocument` | Sesam: Lint Document | — |
-| `sesam.lintWorkspace` | Sesam: Lint Workspace | — |
+| `sesam.runPipeTests` | Sesam: Run Pipe Tests | — |
+| `dtl.newConfFile` | Sesam: New Sesam Config File | — |
+| `sesam.formatDocument` | Sesam: Format Document | `Shift+Alt+F` |
+| `dtl.previewPipe` | Sesam: Preview Pipe Output | — |
 
 ---
 
@@ -349,7 +347,7 @@ A: No. The extension bundles a full TypeScript reimplementation of sesam-py. Not
 A: In VS Code's SecretStorage (OS keychain on Linux/macOS/Windows). Never written to disk or committed.
 
 **Q: Can I have multiple node profiles (dev/test/prod)?**  
-A: Yes. Use **Sesam: Add/Edit Credentials** to create named profiles and switch between them from the status bar or Command Palette.
+A: Yes. Use **Sesam: Add Profile** to create named profiles and switch between them from the status bar or Command Palette.
 
 **Q: The formatter re-orders my keys — can I turn that off?**  
 A: Yes. Set `dtl.format.reorderKeys` to `false` in VS Code settings. Formatting will still run on save but preserve insertion order.

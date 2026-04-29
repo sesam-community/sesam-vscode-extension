@@ -299,7 +299,7 @@ A dedicated **bottom panel tab** (alongside Terminal / Output) that shows all Se
 A live preview panel that evaluates DTL transforms against a sample input entity by posting to the configured Sesam node.
 
 1. Open a pipe config file.
-2. Run **Sesam: Preview Pipe** from the Command Palette (`Ctrl+Shift+P`).
+2. Run **Sesam: Preview Pipe Output** from the Command Palette (`Ctrl+Shift+P`).
 3. Edit the **Input Entity** and press **▶ Run preview** (or `Ctrl+Enter`).
 4. Both the **Input Entity** and **Output Entity** render with syntax-highlighted JSON.
 
@@ -320,7 +320,7 @@ The output pane renders JSON with token colours that match your VS Code theme:
 
 Create a new `*.conf.json` pipe or system config from a template — no copy-pasting boilerplate.
 
-**3 ways to invoke:** Explorer right-click → **DTL: New Sesam Config File** · Command Palette (`Ctrl+Shift+P`) → `DTL: New Sesam Config File` · custom keybinding to `dtl.newConfFile`.
+**3 ways to invoke:** Explorer right-click → **Sesam: New Sesam Config File** · Command Palette (`Ctrl+Shift+P`) → `Sesam: New Sesam Config File` · custom keybinding to `dtl.newConfFile`.
 
 **Wizard steps:**
 
@@ -704,7 +704,7 @@ my-sesam-project/
 
 | Command | Shortcut | Description |
 |---|---|---|
-| `DTL: Preview Pipe` | — | Open the preview panel for the active file |
+| `Sesam: Preview Pipe Output` | — | Open the preview panel for the active file |
 | `Sesam: Run Pipe` | `Ctrl+Shift+R` | Run the active pipe on the connected node |
 | `Sesam: Pipe Status` | — | Open the Node Status panel filtered to the active pipe |
 | `Sesam: Node Status` | — | Open the Node Status panel showing all pipes |
@@ -716,7 +716,7 @@ my-sesam-project/
 | `Sesam: Revert Config` | — | Overwrite local file with the node version (inline button on Modified sync items) |
 | `Sesam: Refresh Pipe DAG` | — | Rescan workspace and refresh Lineage / Dependents / System Pipes sidebars |
 | `DTL: Open Documentation` | — | Open the Sesam DTL docs in a browser |
-| `DTL: New Sesam Config File` | — | Create a new pipe or system config file from a template |
+| `Sesam: New Sesam Config File` | — | Create a new pipe or system config file from a template |
 | `Sesam: Format Document` | — | Format the active Sesam config file |
 | `Sesam: Clear Errors` | — | Clear all entries from the Sesam panel |
 | `Sesam: Add Profile` | — | Add a named Sesam profile (node URL + JWT) |
