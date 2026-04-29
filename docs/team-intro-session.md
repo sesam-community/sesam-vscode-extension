@@ -56,28 +56,18 @@ Concretely that meant:
 ## 2. Installation & First Look
 **5 minutes | Demo**
 
-### Steps to show
-
-1. Run the install script:
-   ```bash
-   bash scripts/install-extension.sh
-   ```
-2. Reload VS Code — note the new **Sesam** activity-bar icon.
-3. Point to a project folder that has `pipes/` and `systems/` subdirectories.
-4. Open the Explorer — show the `.conf.pipe` / `.conf.system` file icons.
-
-### Key talking points
-
-- File extensions `.conf.pipe` (pipes) and `.conf.system` (systems) are the canonical Sesam format; `.conf.json` is still supported for backwards compatibility.
-- All three map to the `sesam-config` language ID, which drives all the intelligence features.
-- The activity-bar sidebar contains three panels: **Pipe Lineage**, **Pipe Dependents**, **System Pipes**.
+Follow the steps at: [packages/vscode-extension#installation](https://github.com/datanav/sesam-ts/tree/main/packages/vscode-extension#installation)
 
 ---
 
 ## 3. File Types & the Formatter
-**5 minutes | Demo**
+**5 minutes | Demo**  
+Spec: [impl-f12-conf-json-formatter](../packages/vscode-extension/agent/impl/impl-f12-conf-json-formatter.prompt.md)
 
 ### Create a new config file
+
+**Command:** `dtl.newConfFile` (`DTL: New Sesam Config File`)  
+**Invoke via:** Explorer right-click → *DTL: New Sesam Config File* · Command Palette · keybinding
 
 1. Right-click `pipes/` in the Explorer → **DTL: New Sesam Config File**.
 2. Walk through the wizard:
@@ -88,10 +78,15 @@ Concretely that meant:
 
 ### Formatter
 
+**Command:** `dtl.formatDocument` (`Sesam: Format Document`)  
+**Keyboard:** `Shift+Alt+F`  
+**Auto-triggers:** on save for all `sesam-config` files
+
 - **Save the file** — canonical key order is applied automatically on save.
 - Show the before/after: keys reorder to `_id → type → source → transform → …`.
 - Manual trigger: **Shift+Alt+F** or `Sesam: Format Document`.
 - Explain the DTL array layout: each rule on its own line, keeping diffs minimal.
+- Controlled by setting: `dtl.format.reorderKeys` (default `true`)
 
 ### Key talking points
 
@@ -104,6 +99,7 @@ Concretely that meant:
 **10 minutes | Demo**
 
 ### 4a. Config property completions (3 min)
+Spec: [impl-f21-config-prop-completions](../packages/vscode-extension/agent/impl/impl-f21-config-prop-completions.prompt.md)
 
 1. Inside the empty `"source": {}`, press `"` — show the property suggestions (`type`, `dataset`, …).
 2. Type `"type": "` — show **source type completions** (all 18 types with descriptions).
@@ -117,13 +113,19 @@ Concretely that meant:
 3. Show variable completions: type `_` → `_S`, `_T`, `_P` completions appear.
 4. Show reserved field completions: `_id`, `_deleted`, etc.
 
+Trigger characters: `"`, `[`, `_`, `.`, `:`
+
 ### 4c. Hover documentation (2 min)
 
-1. Hover over a DTL function name — show the **signature**, description, parameter list, and link to Sesam docs.
+1. Hover over a DTL function name — show the **signature**, description, parameter list, and link to [Sesam docs](https://docs.sesam.io).
 2. Hover over `_S` — show the variable description.
 3. Hover over `_id` — show the reserved field docs.
 
 ### 4d. Linting & quick fixes (2 min)
+Spec: [impl-f19-syntax-linting](../packages/vscode-extension/agent/impl/impl-f19-syntax-linting.prompt.md)
+
+**Command:** `sesam.lintDocument` (`Sesam: Lint Document`)  
+See also: [copilot-agent.md — Available Tools](../packages/vscode-extension/docs/copilot-agent.md)
 
 1. **Delete the `_id` field** — red squiggly appears immediately; the Sesam panel (bottom) updates.
 2. Press **Ctrl+.** on the squiggly → pick **Add `"_id"`** — the field is inserted.
@@ -137,6 +139,7 @@ Concretely that meant:
 **10 minutes | Demo**
 
 ### 5a. Cross-file dataset navigation (4 min)
+Spec: [cross-file-navigation](../packages/vscode-extension/agent/plans/cross-file-navigation.prompt.md)
 
 1. Open a pipe that reads from another dataset.
 2. **Ctrl+Click** the dataset ID in `"source"` — jumps to the producing pipe's config file.
@@ -145,6 +148,7 @@ Concretely that meant:
 5. Show document links: dataset IDs appear as **underlined clickable links** in the editor.
 
 ### 5b. Go to rule definition (3 min)
+Spec: [go-to-rule-definition](../packages/vscode-extension/agent/plans/go-to-rule-definition.prompt.md)
 
 1. Open a pipe with `apply` or `apply-hops` calls.
 2. **F12** on the rule name in `["apply", "my-rule", …]` — jumps to the rule definition.
@@ -152,6 +156,7 @@ Concretely that meant:
 4. Rename a rule: **F2** on the rule definition key → rename dialog → confirm. All call sites update atomically.
 
 ### 5c. Dataset alias support (3 min)
+Spec: [dataset-alias-support](../packages/vscode-extension/agent/plans/dataset-alias-support.prompt.md)
 
 1. Open a pipe with `"datasets": ["my-dataset alias"]`.
 2. Hover the alias token — shows the full dataset ID it stands for.
@@ -161,7 +166,10 @@ Concretely that meant:
 ---
 
 ## 6. Sidebar Views — Lineage, Dependents, System Pipes
-**5 minutes | Demo**
+**5 minutes | Demo**  
+Spec: [pipe-dag-tree](../packages/vscode-extension/agent/plans/pipe-dag-tree.prompt.md) · [system-pipes-view](../packages/vscode-extension/agent/plans/system-pipes-view.prompt.md)
+
+**Command:** `sesam.refreshPipeDAG` (`Sesam: Refresh Pipe DAG`)
 
 ### Pipe Lineage
 
@@ -190,6 +198,9 @@ Concretely that meant:
 **10 minutes | Demo**
 
 ### 7a. Credential setup (2 min)
+Spec: [impl-f03-credential-management](../packages/vscode-extension/agent/impl/impl-f03-credential-management.prompt.md) · [credential-safety](../packages/vscode-extension/agent/plans/credential-safety.prompt.md) · [impl-f26-switch-profile](../packages/vscode-extension/agent/impl/impl-f26-switch-profile.prompt.md)
+
+**Command:** `sesam.addProfile` (`Sesam: Add/Edit Credentials`)
 
 1. Open Command Palette (`Ctrl+Shift+P`) → **Sesam: Add/Edit Credentials**.
 2. Show the profile picker — multiple environments (dev / test / prod).
@@ -197,14 +208,23 @@ Concretely that meant:
 4. Point out the status bar bottom-left: shows active profile hostname.
 
 ### 7b. Upload (3 min)
+Spec: [impl-f01-sesam-commands](../packages/vscode-extension/agent/impl/impl-f01-sesam-commands.prompt.md)
+
+**Command:** `sesam.upload` (`Sesam: Upload to Node`) — `Ctrl+Shift+U`  
+**Command:** `sesam.uploadFile` (`Sesam: Upload This Config to Node`) — editor title bar
 
 1. Make a small intentional error in a config (e.g. remove `_id`).
 2. **Ctrl+Shift+U** → upload is **blocked** — the output channel opens with a grouped error report.
-3. Fix the error.
-4. **Ctrl+Shift+U** again — success notification shows pipe/system counts.
-5. Mention **Upload File** (editor title bar button) for single-file upload.
+3. Error notification includes **Fix with Copilot** button → opens `@sesam /fix` in chat.  
+   See [copilot-agent.md — @sesam Chat Participant](../packages/vscode-extension/docs/copilot-agent.md#sesam-chat-participant).
+4. Fix the error.
+5. **Ctrl+Shift+U** again — success notification shows pipe/system counts.
+6. Mention **Upload File** (editor title bar button) for single-file upload.
 
 ### 7c. Download (2 min)
+
+**Command:** `sesam.download` (`Sesam: Download from Node`) — `Ctrl+Shift+D`  
+**Command:** `sesam.downloadFile` (`Sesam: Download This Config from Node`) — editor title bar
 
 1. **Ctrl+Shift+D** → confirmation dialog before overwriting local files.
 2. After download, open any file — show key-ordering applied automatically.
@@ -212,6 +232,9 @@ Concretely that meant:
 4. Show **Download Guard**: if local files differ from node, the download warns you first.
 
 ### 7d. Run pipe (3 min)
+Spec: [impl-f23-network-status](../packages/vscode-extension/agent/impl/impl-f23-network-status.prompt.md) · [impl-f24-live-updates](../packages/vscode-extension/agent/impl/impl-f24-live-updates.prompt.md)
+
+**Command:** `sesam.runPipe` (`Sesam: Run Pipe`) — `Ctrl+Shift+R` · editor title bar play button
 
 1. Open any pipe config.
 2. **Ctrl+Shift+R** (or title-bar play button) — pipe runs on the node.
@@ -222,7 +245,10 @@ Concretely that meant:
 ---
 
 ## 8. Sync Status & Diff View
-**5 minutes | Demo**
+**5 minutes | Demo**  
+Spec: [impl-f06-status-diff-view](../packages/vscode-extension/agent/impl/impl-f06-status-diff-view.prompt.md)
+
+**Command:** `sesam.syncStatus` (`Sesam: Show Sync Status`) — sidebar panel
 
 1. Open the **Sesam Sync Status** sidebar panel.
 2. Show the three groups: **Modified**, **Node only**, **Local only**.
@@ -237,6 +263,9 @@ Concretely that meant:
 **5 minutes | Demo**
 
 ### Pipe Preview
+Spec: [impl-f04-node-preview](../packages/vscode-extension/agent/impl/impl-f04-node-preview.prompt.md)
+
+**Command:** `dtl.previewPipe` (`Sesam: Preview Pipe`) — editor title bar
 
 1. Open a pipe config.
 2. Command Palette → **Sesam: Preview Pipe**.
@@ -245,6 +274,9 @@ Concretely that meant:
 5. Mention: if credentials are missing, the error banner has an **Open Settings** link.
 
 ### Node Status panel
+Spec: [impl-f23-network-status](../packages/vscode-extension/agent/impl/impl-f23-network-status.prompt.md) · [impl-f24-live-updates](../packages/vscode-extension/agent/impl/impl-f24-live-updates.prompt.md)
+
+**Command:** `sesam.nodeStatus` (`Sesam: Show Node Status`) — Explorer toolbar · editor title bar
 
 1. Click the Node Status button in the Explorer toolbar.
 2. Show the table: pipe ID, state badge (running/ok/failed/disabled), OK runs, failures, queued, last run.
@@ -254,10 +286,38 @@ Concretely that meant:
 6. Click a pipe ID → opens local config file. Click 🌐 icon → opens pipe in Management Studio.
 
 ### Test Management (if time permits)
+Spec: [impl-f05-test-management](../packages/vscode-extension/agent/impl/impl-f05-test-management.prompt.md)
+
+**Command:** `sesam.runTests` — VS Code Testing view (beaker icon in Activity Bar)
 
 1. Open the VS Code **Testing** view (beaker icon in Activity Bar).
 2. Show sesam test cases discovered from the `testdata/` / `expected/` folders.
 3. Run a test — green/red inline decorations appear in the editor.
+
+---
+
+## All Commands Reference
+
+| Command ID | Title | Shortcut |
+|---|---|---|
+| `sesam.upload` | Sesam: Upload to Node | `Ctrl+Shift+U` |
+| `sesam.download` | Sesam: Download from Node | `Ctrl+Shift+D` |
+| `sesam.runPipe` | Sesam: Run Pipe | `Ctrl+Shift+R` |
+| `sesam.uploadFile` | Sesam: Upload This Config to Node | — |
+| `sesam.downloadFile` | Sesam: Download This Config from Node | — |
+| `sesam.pipeStatus` | Sesam: Show Pipe Status | — |
+| `sesam.nodeStatus` | Sesam: Show Node Status | — |
+| `sesam.systemStatus` | Sesam: Show System Status | — |
+| `sesam.syncStatus` | Sesam: Show Sync Status | — |
+| `sesam.refreshPipeDAG` | Sesam: Refresh Pipe DAG | — |
+| `sesam.addProfile` | Sesam: Add/Edit Credentials | — |
+| `sesam.fixWithCopilot` | Sesam: Fix with Copilot | — |
+| `sesam.runTests` | Sesam: Run Tests | — |
+| `dtl.newConfFile` | DTL: New Sesam Config File | — |
+| `dtl.formatDocument` | Sesam: Format Document | `Shift+Alt+F` |
+| `dtl.previewPipe` | Sesam: Preview Pipe | — |
+| `sesam.lintDocument` | Sesam: Lint Document | — |
+| `sesam.lintWorkspace` | Sesam: Lint Workspace | — |
 
 ---
 
@@ -275,6 +335,8 @@ Concretely that meant:
 | `Shift+Alt+F12` | Peek References |
 | `F2` | Rename symbol (rule, alias) |
 | `Ctrl+.` | Quick Fix (on squiggly underline) |
+| `Ctrl+Enter` | Run preview (Pipe Preview panel) |
+| `Ctrl+Alt+I` | Open Copilot Chat |
 
 ---
 
@@ -303,6 +365,18 @@ A: It means two pipes circularly depend on each other's datasets. The extension 
 
 **Q: How do I get Copilot to help with a broken pipe?**  
 A: If upload fails, the notification includes a **Fix with Copilot** button. It opens `@sesam /fix` in the chat panel, which reads the broken files and applies corrections automatically. You can also use `@sesam` in chat for any question about your configs.
+
+---
+
+## Further Reading
+
+| Doc | Link |
+|---|---|
+| Full feature reference | [README.md](../packages/vscode-extension/README.md) |
+| Setup & build guide | [docs/development.md](../packages/vscode-extension/docs/development.md) |
+| Copilot agent & tools | [docs/copilot-agent.md](../packages/vscode-extension/docs/copilot-agent.md) |
+| Feature roadmap | [agent/impl/README.md](../packages/vscode-extension/agent/impl/README.md) |
+| Product plan | [agent/sesam-extension-plan.prompt.md](../packages/vscode-extension/agent/sesam-extension-plan.prompt.md) |
 
 ---
 
