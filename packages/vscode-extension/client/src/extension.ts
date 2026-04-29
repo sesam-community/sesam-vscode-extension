@@ -324,22 +324,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   getSesamChannel().appendLine("Sesam extension activated.");
 
-  // ── Icon Theme (auto-apply on first install) ───────────────────────────────
-  const iconThemeKey = "sesam.iconThemeApplied";
+  // ── Icon Theme ────────────────────────────────────────────────────────────
+  // Always apply sesam-icons when the extension is active. This handles
+  // reinstalls and new machines correctly. If the user prefers a different
+  // theme they can change it via Preferences → File Icon Theme.
+  const currentTheme = vscode.workspace.getConfiguration("workbench").get<string>("iconTheme");
 
-  if (!context.globalState.get(iconThemeKey)) {
-    await context.globalState.update(iconThemeKey, true);
-    const currentTheme = vscode.workspace.getConfiguration("workbench").get<string>("iconTheme");
+  if (currentTheme !== "sesam-icons") {
+    await vscode.workspace
+      .getConfiguration("workbench")
+      .update("iconTheme", "sesam-icons", vscode.ConfigurationTarget.Global);
 
-    if (currentTheme !== "sesam-icons") {
-      await vscode.workspace
-        .getConfiguration("workbench")
-        .update("iconTheme", "sesam-icons", vscode.ConfigurationTarget.Global);
-
-      getSesamChannel().appendLine(
-        "Sesam icon theme enabled. To switch themes: Preferences → File Icon Theme.",
-      );
-    }
+    getSesamChannel().appendLine(
+      "Sesam icon theme enabled. To switch themes: Preferences → File Icon Theme.",
+    );
   }
 
   // ── Credential & Profile Managers (F03) ──────────────────────────────────
