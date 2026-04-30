@@ -50,4 +50,10 @@ export interface DtlFunction {
   /** Maximum number of arguments. null = variadic */
   maxArgs: number | null;
   docUrl: string;
+  /**
+   * Optional LSP completion snippet body (content between the outer `[` and `]`).
+   * Overrides the auto-generated insertText in buildFunctionCompletions.
+   * Use VS Code snippet syntax: `${1:placeholder}`, linked tab stops, etc.
+   */
+  snippet?: string;
 }

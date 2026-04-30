@@ -79,6 +79,11 @@ import {
   buildTransformTypeHover,
   buildDocumentSymbols,
   offsetToPosition,
+  getRefKeyAtValuePosition,
+  buildRefValueHover,
+  getPermissionsActionContext,
+  buildPermissionsActionCompletions,
+  buildPermissionsActionHover,
 } from "./utils/server.utils";
 import {
   findApplyRuleReference,
@@ -108,6 +113,7 @@ import { findAddPropertyAtOffset, findAllAddPropertyDefinitions } from "./utils/
 import { buildCodeActionsForDiagnostics } from "./utils/code-actions.utils";
 
 import type { DtlSettings } from "./server.types";
+import type { ConfigFileType } from "./utils/server.utils";
 import type { ValidatorOptions } from "../../types/dtl-validator.types";
 import type {
   LintContentRequest,
@@ -325,6 +331,18 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     return buildSystemTypeCompletions();
   }
 
+  // Permissions action completion: must be checked before isPropKeyContext because
+  // `, "` inside an actions array also matches the generic key-position predicate.
+  const permCtx = getPermissionsActionContext(prefix);
+
+  if (permCtx) {
+    // Infer system vs pipe from content for .conf.json files where URI alone is ambiguous.
+    const effectiveFileType: ConfigFileType =
+      fileType !== "unknown" ? fileType : /"type"\s*:\s*"system:/.test(prefix) ? "system" : "pipe";
+
+    return buildPermissionsActionCompletions(effectiveFileType, permCtx.usedActions);
+  }
+
   // Property key completion: cursor is at a JSON object key position.
   // Checked before variable context so that keys starting with "_" (like "_id")
   // get prop completions rather than DTL variable completions.
@@ -433,6 +451,25 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
       if (content) {
         return { contents: { kind: MarkupKind.Markdown, value: content } };
       }
+    }
+
+    // Reference value hover ("dataset": "...", "system": "...", etc.)
+    const refHit = getRefKeyAtValuePosition(prefix);
+
+    if (refHit) {
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: buildRefValueHover(refHit.refKey, refHit.block, word),
+        },
+      };
+    }
+
+    // Permissions action hover ("read_config", "write_config", etc.)
+    const permHover = buildPermissionsActionHover(word);
+
+    if (permHover) {
+      return { contents: { kind: MarkupKind.Markdown, value: permHover } };
     }
 
     const fn = getDtlFunction(word);

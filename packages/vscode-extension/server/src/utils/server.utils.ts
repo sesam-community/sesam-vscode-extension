@@ -354,6 +354,14 @@ const PIPE_ROOT_PROPS: readonly PropInfo[] = [
     sortText: "1_15",
     valueSnippet: "${0|true,false|}",
   },
+  {
+    label: "permissions",
+    detail: "array — role-based access control list (optional)",
+    sortText: "9_01",
+    valueSnippet:
+      '[\n  ["allow",\n    ["group:${1:Developer}"],\n    ["${2|read_config,write_config,run_pump_operation,read_data,write_data|}"]\n  ]\n]',
+    docUrl: "https://docs.sesam.io/hub/documentation/operations/security.html#pipe-permissions",
+  },
 ];
 
 const SYS_CONFIG_DOCS =
@@ -384,6 +392,14 @@ const SYSTEM_ROOT_PROPS: readonly PropInfo[] = [
     sortText: "1_02",
   },
   { label: "comment", detail: "string — internal note (optional)", sortText: "1_03" },
+  {
+    label: "permissions",
+    detail: "array — role-based access control list (optional)",
+    sortText: "9_01",
+    valueSnippet:
+      '[\n  ["allow",\n    ["group:${1:Developer}"],\n    ["${2|read_data,write_data,read_config,write_config,read_proxy,write_proxy|}"]\n  ]\n]',
+    docUrl: "https://docs.sesam.io/hub/documentation/operations/security.html#system-permissions",
+  },
 ];
 
 const NODE_METADATA_ROOT_PROPS: readonly PropInfo[] = [
@@ -1460,6 +1476,222 @@ export const buildPropKeyHover = (word: string, path: string[]): string | null =
 // Type value hover builders (for hovering over source/transform/system type values)
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns the key name and enclosing block when the cursor is sitting on a
+ * plain string value after one of the tracked reference keys, e.g.:
+ *   "source": { "dataset": "my-ds"  }  → { refKey: "dataset", block: "source" }
+ *   "sink":   { "system":  "crm"    }  → { refKey: "system",  block: "sink"   }
+ * Returns null otherwise.
+ */
+export const getRefKeyAtValuePosition = (
+  prefix: string,
+): { refKey: string; block: string | null } | null => {
+  const m = /"(dataset|system|entity|master_dataset|dependency_dataset)"\s*:\s*"[^"]*$/.exec(
+    prefix,
+  );
+
+  if (!m) {
+    return null;
+  }
+
+  const blockMatch = /"(source|sink|transform|pump)"\s*:\s*[[{]/.exec(prefix.slice(0, m.index));
+
+  return { refKey: m[1], block: blockMatch?.[1] ?? null };
+};
+
+type RefValueInfo = { label: string; docUrl: string };
+
+const REF_VALUE_INFO = (refKey: string, block: string | null): RefValueInfo => {
+  const PIPE_DOCS_BASE = "https://docs.sesam.io/hub/documentation/service-configuration/pipes";
+
+  if (refKey === "dataset") {
+    if (block === "source") {
+      return {
+        label: "Source dataset",
+        docUrl: `${PIPE_DOCS_BASE}/configuration-sources.html`,
+      };
+    }
+
+    if (block === "sink") {
+      return {
+        label: "Sink dataset",
+        docUrl: `${PIPE_DOCS_BASE}/configuration-sinks.html`,
+      };
+    }
+
+    return {
+      label: "Dataset reference",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-sources.html`,
+    };
+  }
+
+  if (refKey === "system") {
+    if (block === "source") {
+      return {
+        label: "Source system",
+        docUrl: `${PIPE_DOCS_BASE}/configuration-sources.html`,
+      };
+    }
+
+    if (block === "sink") {
+      return {
+        label: "Sink system",
+        docUrl: `${PIPE_DOCS_BASE}/configuration-sinks.html`,
+      };
+    }
+
+    return {
+      label: "System reference",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-sources.html`,
+    };
+  }
+
+  const fallbacks: Record<string, RefValueInfo> = {
+    entity: {
+      label: "Entity reference",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-pipes.html`,
+    },
+    master_dataset: {
+      label: "Master dataset",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-pipes.html`,
+    },
+    dependency_dataset: {
+      label: "Dependency dataset",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-pipes.html`,
+    },
+  };
+
+  return fallbacks[refKey] ?? { label: refKey, docUrl: "" };
+};
+
+export const buildRefValueHover = (refKey: string, block: string | null, value: string): string => {
+  const { label, docUrl } = REF_VALUE_INFO(refKey, block);
+  const docLink = docUrl ? `\n\n[📖 Documentation](${docUrl})` : "";
+
+  return `**\`${value}\`**\n\n*${label}*${docLink}`;
+};
+
+// ---------------------------------------------------------------------------
+// Permissions action completions / hover
+// ---------------------------------------------------------------------------
+
+const SECURITY_DOC_PIPE =
+  "https://docs.sesam.io/hub/documentation/operations/security.html#pipe-permissions";
+const SECURITY_DOC_SYSTEM =
+  "https://docs.sesam.io/hub/documentation/operations/security.html#system-permissions";
+
+interface PermissionAction {
+  name: string;
+  detail: string;
+  appliesTo: ReadonlyArray<"pipe" | "system">;
+}
+
+const PERMISSION_ACTIONS: readonly PermissionAction[] = [
+  {
+    name: "read_config",
+    detail: "Read the configuration of this resource.",
+    appliesTo: ["pipe", "system"],
+  },
+  {
+    name: "write_config",
+    detail: "Update the configuration of this resource.",
+    appliesTo: ["pipe", "system"],
+  },
+  {
+    name: "read_data",
+    detail: "Read entities from the dataset produced by this resource.",
+    appliesTo: ["pipe", "system"],
+  },
+  {
+    name: "write_data",
+    detail: "Write entities to the dataset or endpoint of this resource.",
+    appliesTo: ["pipe", "system"],
+  },
+  {
+    name: "run_pump_operation",
+    detail: "Start, stop, or reset the pump on this pipe.",
+    appliesTo: ["pipe"],
+  },
+  {
+    name: "read_proxy",
+    detail: "Read via the system's HTTP proxy endpoint.",
+    appliesTo: ["system"],
+  },
+  {
+    name: "write_proxy",
+    detail: "Write via the system's HTTP proxy endpoint.",
+    appliesTo: ["system"],
+  },
+];
+
+/**
+ * When the cursor is inside the actions array of a permissions entry, returns
+ * the list of action strings already present. Returns null otherwise.
+ *
+ *   ["allow", ["group:Dev"], ["read_config", "<cursor>"  →  { usedActions: ["read_config"] }
+ */
+export const getPermissionsActionContext = (
+  prefix: string,
+): { usedActions: readonly string[] } | null => {
+  if (!/"permissions"\s*:\s*\[/.test(prefix)) {
+    return null;
+  }
+
+  // Capture the partial actions array (third element of the entry tuple) up to
+  // the open quote at the cursor position.
+  const match = /\[\s*"(?:allow|deny)"\s*,\s*\[[^\]]*\]\s*,\s*(\[[^\]]*"[^"]*$)/.exec(prefix);
+
+  if (!match) {
+    return null;
+  }
+
+  // Extract the already-closed action strings from the captured partial array.
+  const usedActions: string[] = [];
+  const pattern = /"([^"]+)"/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = pattern.exec(match[1])) !== null) {
+    usedActions.push(m[1]);
+  }
+
+  return { usedActions };
+};
+
+export const buildPermissionsActionCompletions = (
+  fileType: ConfigFileType,
+  usedActions: readonly string[] = [],
+): CompletionItem[] => {
+  const scope = fileType === "system" ? "system" : "pipe";
+  const docUrl = fileType === "system" ? SECURITY_DOC_SYSTEM : SECURITY_DOC_PIPE;
+
+  return PERMISSION_ACTIONS.filter(
+    (a) => a.appliesTo.includes(scope) && !usedActions.includes(a.name),
+  ).map(({ name, detail }) => ({
+    label: name,
+    kind: CompletionItemKind.EnumMember,
+    detail,
+    documentation: {
+      kind: MarkupKind.Markdown,
+      value: `**\`${name}\`**\n\n${detail}\n\n[📖 Documentation](${docUrl})`,
+    },
+    insertText: name,
+    sortText: name,
+  }));
+};
+
+export const buildPermissionsActionHover = (word: string): string | null => {
+  const action = PERMISSION_ACTIONS.find((a) => a.name === word);
+
+  if (!action) {
+    return null;
+  }
+
+  const scope = action.appliesTo.join(" and ");
+  const docUrl = action.appliesTo.includes("pipe") ? SECURITY_DOC_PIPE : SECURITY_DOC_SYSTEM;
+
+  return `**\`${action.name}\`**\n\n${action.detail}\n\n*Applies to: ${scope}*\n\n[📖 Documentation](${docUrl})`;
+};
+
 const buildTypeHoverContent = (
   label: string,
   categoryLabel: string,
@@ -1541,9 +1773,9 @@ export const buildFunctionCompletions = (): CompletionItem[] => {
     // so the final result is ["add", "property", "value"].
     const required = fn.params.filter((p) => !p.optional);
     const paramSnippets = required.map((p, i) => `"\${${i + 1}:${p.name}}"`);
-    const insertText =
+    const autoInsertText =
       paramSnippets.length > 0 ? `"${fn.name}", ${paramSnippets.join(", ")}` : `"${fn.name}"`;
-
+    const insertText = fn.snippet ?? autoInsertText;
     return {
       label: fn.name,
       kind: fn.kind === "transform" ? CompletionItemKind.Method : CompletionItemKind.Function,

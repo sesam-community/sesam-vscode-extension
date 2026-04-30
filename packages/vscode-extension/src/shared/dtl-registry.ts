@@ -317,6 +317,7 @@ const TransformFns = [
     description:
       "A no-op transform used for inline documentation. Any number of comment lines can be given.",
     params: [{ name: "text", optional: true, description: "Comment text (ignored at runtime)." }],
+    snippet: '"comment", "${1:Comment text}"',
     minArgs: 0,
     maxArgs: null,
     docUrl: `${BASE_DOC_URL}/dtl-functions-transforms.html`,
@@ -845,14 +846,35 @@ const DictionaryFns = [
     category: "Dictionaries",
     kind: "expression",
     signature: "apply-hops(rule-id, hops-spec)",
-    description: "Applies a named rule to entities fetched via hops.",
+    description:
+      "Evaluates a hops expression and applies a named transform rule to the results. Use instead of `apply` when the rule contains hops (required for dependency tracking).",
     params: [
-      { name: "rule-id", description: "The rule identifier string." },
-      { name: "hops-spec", description: "A hops specification object." },
+      {
+        name: "rule-id",
+        description: "The ID of the transform rule to apply to each hopped entity.",
+      },
+      {
+        name: "hops-spec",
+        description:
+          "Dict with:\n" +
+          '- `datasets` *(required)*: list of `"<dataset-id> <alias>"` strings.\n' +
+          '- `where` *(required)*: join expression(s), e.g. `["eq", "_S._id", "alias.ref"]`.\n' +
+          "- `return` *(optional)*: alias of the dataset to return (defaults to last alias).\n" +
+          "- `recurse` *(optional, boolean)*: traverse recursively until no more output.\n" +
+          "- `exclude_root` *(optional, boolean)*: exclude the input entity from recursive results.\n" +
+          "- `max-depth` *(optional, integer)*: maximum recursion depth (only with `recurse`).",
+      },
     ],
+    snippet:
+      '"apply-hops", "${1:rule-id}", {\n' +
+      '  "datasets": ["${2:dataset} ${3:alias}"],\n' +
+      '  "where": [\n' +
+      '    ["eq", "_S._id", "${3:alias}.${4:ref}"]\n' +
+      "  ]\n" +
+      "}",
     minArgs: 2,
     maxArgs: 2,
-    docUrl: `${BASE_DOC_URL}/dtl-functions-dictionaries.html`,
+    docUrl: `${BASE_DOC_URL}/dtl-functions-dictionaries.html#apply-hops`,
   },
   {
     name: "apply-ns",
@@ -973,16 +995,30 @@ const HopsFns = [
     category: "Hops",
     kind: "expression",
     signature: "hops(hops-spec)",
-    description: "Performs a hop to retrieve related entities from another dataset.",
+    description: "Traverses to related entities in another dataset via join expressions.",
     params: [
       {
         name: "hops-spec",
-        description: 'Object with "datasets", "where", and optionally "return" and "max-depth".',
+        description:
+          "Dict with:\n" +
+          '- `datasets` *(required)*: list of `"<dataset-id> <alias>"` strings.\n' +
+          '- `where` *(required)*: join expression(s), e.g. `["eq", "_S._id", "alias.ref"]`.\n' +
+          "- `return` *(optional)*: alias of the dataset to return (defaults to last alias).\n" +
+          "- `recurse` *(optional, boolean)*: traverse recursively until no more output.\n" +
+          "- `exclude_root` *(optional, boolean)*: exclude the input entity from recursive results.\n" +
+          "- `max-depth` *(optional, integer)*: maximum recursion depth (only with `recurse`).",
       },
     ],
+    snippet:
+      '"hops", {\n' +
+      '  "datasets": ["${1:dataset} ${2:alias}"],\n' +
+      '  "where": [\n' +
+      '    ["eq", "_S._id", "${2:alias}.${3:ref}"]\n' +
+      "  ]\n" +
+      "}",
     minArgs: 1,
     maxArgs: 1,
-    docUrl: `${BASE_DOC_URL}/dtl-functions-hops.html`,
+    docUrl: `${BASE_DOC_URL}/dtl-functions-hops.html#hops`,
   },
   {
     name: "lookup-entity",
