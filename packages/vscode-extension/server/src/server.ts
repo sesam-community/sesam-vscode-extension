@@ -81,6 +81,9 @@ import {
   offsetToPosition,
   getRefKeyAtValuePosition,
   buildRefValueHover,
+  isPermissionsActionContext,
+  buildPermissionsActionCompletions,
+  buildPermissionsActionHover,
 } from "./utils/server.utils";
 import {
   findApplyRuleReference,
@@ -349,6 +352,11 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     return buildVariableCompletions();
   }
 
+  // Permissions action completion: inside the actions array of a permissions entry
+  if (isPermissionsActionContext(prefix)) {
+    return buildPermissionsActionCompletions();
+  }
+
   // Function name completion: only inside a DTL rule array (transform.rules.<name>.[...)
   if (isDtlRuleArrayContext(prefix)) {
     return buildFunctionCompletions();
@@ -447,6 +455,13 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
           value: buildRefValueHover(refHit.refKey, refHit.block, word),
         },
       };
+    }
+
+    // Permissions action hover ("read_config", "write_config", etc.)
+    const permHover = buildPermissionsActionHover(word);
+
+    if (permHover) {
+      return { contents: { kind: MarkupKind.Markdown, value: permHover } };
     }
 
     const fn = getDtlFunction(word);

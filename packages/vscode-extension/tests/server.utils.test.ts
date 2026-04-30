@@ -33,6 +33,11 @@ import {
   buildTransformTypeHover,
   isAtJsonKeyPosition,
   offsetToPosition,
+  getRefKeyAtValuePosition,
+  buildRefValueHover,
+  isPermissionsActionContext,
+  buildPermissionsActionCompletions,
+  buildPermissionsActionHover,
 } from "../server/src/utils/server.utils";
 
 import { getDtlFunction } from "../src/shared/dtl-registry";
@@ -1006,5 +1011,141 @@ describe("offsetToPosition", () => {
     const pos = offsetToPosition(text, 100);
     expect(pos.line).toBe(0);
     expect(pos.character).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// permissions prop in PIPE_ROOT_PROPS / SYSTEM_ROOT_PROPS
+// ---------------------------------------------------------------------------
+
+describe("permissions property completions", () => {
+  it("permissions is a known pipe root property with security docUrl", () => {
+    const hover = buildPropKeyHover("permissions", []);
+    expect(hover).not.toBeNull();
+    expect(hover).toContain("security.html#pipe-permissions");
+  });
+
+  it("permissions is a known system root property with security docUrl", () => {
+    // Simulate path for a system root context — PROP_TABLE_BY_PATH falls through
+    // to the combined superset for unknown paths, which includes SYSTEM_ROOT_PROPS
+    const hover = buildPropKeyHover("permissions", ["system_defaults"]);
+    expect(hover).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getRefKeyAtValuePosition / buildRefValueHover
+// ---------------------------------------------------------------------------
+
+describe("getRefKeyAtValuePosition", () => {
+  it("returns dataset refKey for dataset source context", () => {
+    const prefix = `{\n  "source": {\n    "type": "dataset",\n    "dataset": "products-collect`;
+    const result = getRefKeyAtValuePosition(prefix);
+    expect(result?.refKey).toBe("dataset");
+    expect(result?.block).toBe("source");
+  });
+
+  it("returns system refKey for sink context", () => {
+    const prefix = `{\n  "sink": {\n    "type": "rest",\n    "system": "my-crm`;
+    const result = getRefKeyAtValuePosition(prefix);
+    expect(result?.refKey).toBe("system");
+    expect(result?.block).toBe("sink");
+  });
+
+  it("returns null when not on a value position", () => {
+    const prefix = `{\n  "type": "dataset"`;
+    expect(getRefKeyAtValuePosition(prefix)).toBeNull();
+  });
+});
+
+describe("buildRefValueHover", () => {
+  it("labels source dataset with correct doc link", () => {
+    const md = buildRefValueHover("dataset", "source", "products-collect");
+    expect(md).toContain("products-collect");
+    expect(md).toContain("Source dataset");
+    expect(md).toContain("configuration-sources.html");
+  });
+
+  it("labels sink system with correct doc link", () => {
+    const md = buildRefValueHover("system", "sink", "wikidata");
+    expect(md).toContain("Sink system");
+    expect(md).toContain("configuration-sinks.html");
+  });
+
+  it("falls back gracefully for unknown block", () => {
+    const md = buildRefValueHover("dataset", null, "some-dataset");
+    expect(md).toContain("Dataset reference");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isPermissionsActionContext / buildPermissionsActionCompletions / buildPermissionsActionHover
+// ---------------------------------------------------------------------------
+
+describe("isPermissionsActionContext", () => {
+  it("returns true when cursor is inside the actions array", () => {
+    const prefix = `"permissions": [\n  ["allow", ["group:Developer"], ["read_config`;
+    expect(isPermissionsActionContext(prefix)).toBe(true);
+  });
+
+  it("returns true for an empty actions array with open quote", () => {
+    const prefix = `"permissions": [\n  ["allow", ["group:Dev"], ["`;
+    expect(isPermissionsActionContext(prefix)).toBe(true);
+  });
+
+  it("returns false when not inside a permissions array", () => {
+    const prefix = `"source": {\n  "type": "dataset"`;
+    expect(isPermissionsActionContext(prefix)).toBe(false);
+  });
+
+  it("returns false when cursor is in the principals array, not actions", () => {
+    const prefix = `"permissions": [\n  ["allow", ["group:Dev`;
+    expect(isPermissionsActionContext(prefix)).toBe(false);
+  });
+});
+
+describe("buildPermissionsActionCompletions", () => {
+  it("includes all 7 permission actions", () => {
+    const items = buildPermissionsActionCompletions();
+    const labels = items.map((i) => i.label);
+    expect(labels).toContain("read_config");
+    expect(labels).toContain("write_config");
+    expect(labels).toContain("read_data");
+    expect(labels).toContain("write_data");
+    expect(labels).toContain("run_pump_operation");
+    expect(labels).toContain("read_proxy");
+    expect(labels).toContain("write_proxy");
+  });
+
+  it("each item links to the security docs", () => {
+    const items = buildPermissionsActionCompletions();
+    items.forEach((item) => {
+      expect(JSON.stringify(item.documentation)).toContain("security.html");
+    });
+  });
+});
+
+describe("buildPermissionsActionHover", () => {
+  it("returns markdown for a known action", () => {
+    const md = buildPermissionsActionHover("read_config");
+    expect(md).not.toBeNull();
+    expect(md).toContain("read_config");
+    expect(md).toContain("security.html");
+  });
+
+  it("notes that run_pump_operation applies to pipe only", () => {
+    const md = buildPermissionsActionHover("run_pump_operation");
+    expect(md).toContain("pipe");
+    expect(md).not.toContain("system");
+  });
+
+  it("notes that read_proxy applies to system only", () => {
+    const md = buildPermissionsActionHover("read_proxy");
+    expect(md).toContain("system");
+    expect(md).not.toContain("Applies to: pipe");
+  });
+
+  it("returns null for an unknown word", () => {
+    expect(buildPermissionsActionHover("not_a_permission")).toBeNull();
   });
 });

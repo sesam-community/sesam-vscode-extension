@@ -290,5 +290,18 @@
       "}"
     ],
     "description": "DTL transform rules block for a pipe config."
+  },
+  "Sesam permissions": {
+    "scope": "sesam-config,json",
+    "prefix": "sesam-permissions",
+    "body": [
+      "\"permissions\": [",
+      "\t[\"allow\",",
+      "\t\t[\"group:${1:Developer}\"],",
+      "\t\t[\"${2|read_config,write_config,run_pump_operation,read_data,write_data|}\"]",
+      "\t]",
+      "]"
+    ],
+    "description": "Role-based ACL for a pipe or system. See https://docs.sesam.io/hub/documentation/operations/security.html"
   }
 }

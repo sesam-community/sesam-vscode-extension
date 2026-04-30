@@ -354,6 +354,14 @@ const PIPE_ROOT_PROPS: readonly PropInfo[] = [
     sortText: "1_15",
     valueSnippet: "${0|true,false|}",
   },
+  {
+    label: "permissions",
+    detail: "array — role-based access control list (optional)",
+    sortText: "9_01",
+    valueSnippet:
+      '[\n  ["allow",\n    ["group:${1:Developer}"],\n    ["${2|read_config,write_config,run_pump_operation,read_data,write_data|}"]\n  ]\n]',
+    docUrl: "https://docs.sesam.io/hub/documentation/operations/security.html#pipe-permissions",
+  },
 ];
 
 const SYS_CONFIG_DOCS =
@@ -384,6 +392,14 @@ const SYSTEM_ROOT_PROPS: readonly PropInfo[] = [
     sortText: "1_02",
   },
   { label: "comment", detail: "string — internal note (optional)", sortText: "1_03" },
+  {
+    label: "permissions",
+    detail: "array — role-based access control list (optional)",
+    sortText: "9_01",
+    valueSnippet:
+      '[\n  ["allow",\n    ["group:${1:Developer}"],\n    ["${2|read_data,write_data,read_config,write_config,read_proxy,write_proxy|}"]\n  ]\n]',
+    docUrl: "https://docs.sesam.io/hub/documentation/operations/security.html#system-permissions",
+  },
 ];
 
 const NODE_METADATA_ROOT_PROPS: readonly PropInfo[] = [
@@ -1553,6 +1569,98 @@ export const buildRefValueHover = (refKey: string, block: string | null, value: 
   const docLink = docUrl ? `\n\n[📖 Documentation](${docUrl})` : "";
 
   return `**\`${value}\`**\n\n*${label}*${docLink}`;
+};
+
+// ---------------------------------------------------------------------------
+// Permissions action completions / hover
+// ---------------------------------------------------------------------------
+
+const SECURITY_DOC =
+  "https://docs.sesam.io/hub/documentation/operations/security.html#pipe-permissions";
+
+interface PermissionAction {
+  name: string;
+  detail: string;
+  appliesTo: ReadonlyArray<"pipe" | "system">;
+}
+
+const PERMISSION_ACTIONS: readonly PermissionAction[] = [
+  {
+    name: "read_config",
+    detail: "Read the configuration of this resource.",
+    appliesTo: ["pipe", "system"],
+  },
+  {
+    name: "write_config",
+    detail: "Update the configuration of this resource.",
+    appliesTo: ["pipe", "system"],
+  },
+  {
+    name: "read_data",
+    detail: "Read entities from the dataset produced by this resource.",
+    appliesTo: ["pipe", "system"],
+  },
+  {
+    name: "write_data",
+    detail: "Write entities to the dataset or endpoint of this resource.",
+    appliesTo: ["pipe", "system"],
+  },
+  {
+    name: "run_pump_operation",
+    detail: "Start, stop, or reset the pump on this pipe.",
+    appliesTo: ["pipe"],
+  },
+  {
+    name: "read_proxy",
+    detail: "Read via the system's HTTP proxy endpoint.",
+    appliesTo: ["system"],
+  },
+  {
+    name: "write_proxy",
+    detail: "Write via the system's HTTP proxy endpoint.",
+    appliesTo: ["system"],
+  },
+];
+
+/**
+ * Returns true when the cursor is inside the actions array of a permissions
+ * entry, e.g. the `"` or word after the second `[` in:
+ *   ["allow", ["group:Dev"], ["read_config"
+ */
+export const isPermissionsActionContext = (prefix: string): boolean => {
+  // Must be inside a "permissions" array value
+  if (!/"permissions"\s*:\s*\[/.test(prefix)) {
+    return false;
+  }
+
+  // Last open [ that is not yet closed should be the actions array
+  // Pattern: ["allow"|"deny", [...], ["   ← cursor here
+  return /\[\s*"(?:allow|deny)"\s*,\s*\[[^\]]*\]\s*,\s*\[\s*"[^"]*$/.test(prefix);
+};
+
+export const buildPermissionsActionCompletions = (): CompletionItem[] =>
+  PERMISSION_ACTIONS.map(({ name, detail }) => ({
+    label: name,
+    kind: CompletionItemKind.EnumMember,
+    detail,
+    documentation: {
+      kind: MarkupKind.Markdown,
+      value: `**\`${name}\`**\n\n${detail}\n\n[📖 Documentation](${SECURITY_DOC})`,
+    },
+    insertText: name,
+    sortText: name,
+  }));
+
+export const buildPermissionsActionHover = (word: string): string | null => {
+  const action = PERMISSION_ACTIONS.find((a) => a.name === word);
+
+  if (!action) {
+    return null;
+  }
+
+  const scope = action.appliesTo.join(" and ");
+
+  return `**\`${action.name}\`**\n\n${action.detail}\n\n*Applies to: ${scope}*\n\n[📖 Documentation](${SECURITY_DOC})`;
 };
 
 const buildTypeHoverContent = (
