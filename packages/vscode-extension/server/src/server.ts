@@ -113,6 +113,7 @@ import { findAddPropertyAtOffset, findAllAddPropertyDefinitions } from "./utils/
 import { buildCodeActionsForDiagnostics } from "./utils/code-actions.utils";
 
 import type { DtlSettings } from "./server.types";
+import type { ConfigFileType } from "./utils/server.utils";
 import type { ValidatorOptions } from "../../types/dtl-validator.types";
 import type {
   LintContentRequest,

@@ -1494,7 +1494,7 @@ export const getRefKeyAtValuePosition = (
     return null;
   }
 
-  const blockMatch = /"(source|sink|transform|pump)"\s*:\s*[\[{]/.exec(prefix.slice(0, m.index));
+  const blockMatch = /"(source|sink|transform|pump)"\s*:\s*[[{]/.exec(prefix.slice(0, m.index));
 
   return { refKey: m[1], block: blockMatch?.[1] ?? null };
 };
