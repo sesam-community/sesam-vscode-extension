@@ -19,6 +19,7 @@
 | 7 | [Node integration — credentials, upload/download, run](#7-node-integration--credentials-uploaddownload-run) | 10 min |
 | 8 | [Sync status & diff view](#8-sync-status--diff-view) | 5 min |
 | 9 | [Testing, Pipe Preview, Node Status](#9-testing-pipe-preview-node-status) | 5 min |
+| 10 | [Copilot chat participant — @sesam](#10-copilot-chat-participant--sesam) | 5 min |
 | Q&A | Open discussion | 0 min (buffer for overflow) |
 
 ---
@@ -300,6 +301,49 @@ Spec: [impl-f05-test-management](../packages/vscode-extension/agent/impl/impl-f0
 1. Open the VS Code **Testing** view (beaker icon in Activity Bar).
 2. Show sesam test cases discovered from the `testdata/` / `expected/` folders.
 3. Run a test — green/red inline decorations appear in the editor.
+
+---
+
+## 10. Copilot Chat Participant — @sesam
+**5 minutes | Demo**  
+Spec: [impl-f09-copilot-agent](../packages/vscode-extension/agent/impl/impl-f09-copilot-agent.prompt.md)  
+See also: [copilot-agent.md](../packages/vscode-extension/docs/copilot-agent.md)
+
+> **Requires:** GitHub Copilot extension signed in. Other AI extensions (Continue, Cline, etc.) cannot invoke `@sesam`.
+
+### What it is
+
+`@sesam` is a Sesam-aware Copilot chat participant. Unlike `#sesamLintDocument` / `#sesamLintWorkspace` (which Copilot's agent calls automatically), `@sesam` is always **user-initiated** and supports richer, multi-step interaction — it embeds the DTL function reference and your active file into the system prompt.
+
+### How to invoke
+
+1. Open Copilot Chat (`Ctrl+Alt+I`) and switch the mode selector to **Agent**.
+2. Type `@sesam` — *Sesam Assistant* appears in the autocomplete.
+
+### Slash commands
+
+| Command | What it does |
+|---|---|
+| `/generate` | Generate a new Sesam pipe config |
+| `/explain` | Explain the active pipe config or a dragged-in file |
+| `/test` | Generate `testdata/<pipe-id>-input.json` + `expected.json` |
+| `/fix` | Fix DTL errors in the active file (also triggered by the upload failure button) |
+| `/cli` | Get sesam-py CLI command syntax and examples |
+
+### Demo steps
+
+1. **Generate** — type `@sesam /generate a pipe that reads from a REST system "hr-api" and maps employeeId to _T.id`.
+   - `@sesam` generates the JSON, lints it automatically, and shows a **Save as hr-api.conf.json** button — click to write the file directly into `pipes/`.
+2. **Explain** — open a complex pipe, then type `@sesam /explain`.
+   - `@sesam` reads the active file and explains each transform rule in plain language.
+3. **Fix** — introduce an error (e.g. wrong function name), run `Ctrl+Shift+U` to get the upload error notification, click **Fix with Copilot**.
+   - Equivalent to typing `@sesam /fix` manually in chat — Copilot reads the broken file and applies corrections to disk.
+4. **Lint tools** — ask naturally: *"Are there any errors across all my pipe configs?"*
+   - Copilot calls `#sesamLintWorkspace` automatically and returns a grouped per-file summary.
+
+### Key talking point
+
+`@sesam` is always context-aware — it knows your DTL functions, your active file, and your attached files. You never have to paste JSON into chat.
 
 ---
 
