@@ -37,10 +37,18 @@
           "name": "support.variable.entity.dtl"
         },
         {
-          "comment": "Dataset alias — second token in 'dataset-id alias' strings inside datasets arrays. Dataset IDs always start with a lowercase letter, which prevents ordinary sentences from matching.",
-          "match": "\"[a-z][^\"\\s]* ([a-zA-Z][a-zA-Z0-9_-]*)\"",
+          "comment": "Config reference values — string values of 'dataset', 'system', 'entity', 'master_dataset', 'dependency_dataset' keys.",
+          "match": "(?<=\"(?:dataset|system|entity|master_dataset|dependency_dataset)\"\\s*:\\s*)\"([^\"]+)\"",
           "captures": {
-            "1": { "name": "entity.name.tag.alias.sesam" }
+            "1": { "name": "entity.name.reference.sesam" }
+          }
+        },
+        {
+          "comment": "Dataset alias — 'dataset-id alias' strings inside datasets arrays. Dataset IDs always start with a lowercase letter.",
+          "match": "\"([a-z][^\"\\s]*) ([a-zA-Z][a-zA-Z0-9_-]*)\"",
+          "captures": {
+            "1": { "name": "entity.name.reference.sesam" },
+            "2": { "name": "entity.name.tag.alias.sesam" }
           }
         }
       ]
