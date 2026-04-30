@@ -123,6 +123,22 @@
     ],
     "description": "Hop to related entities in another dataset."
   },
+  "DTL hops-recursive": {
+    "scope": "dtl,json",
+    "prefix": "hops-recursive",
+    "body": [
+      "[\"hops\", {",
+      "  \"datasets\": [\"${1:dataset-name} ${2:ALIAS}\"],",
+      "  \"where\": [",
+      "    [\"eq\", \"_S._id\", \"${2:ALIAS}.${3:ref-property}\"]",
+      "  ],",
+      "  \"recurse\": true,",
+      "  \"exclude_root\": ${4|false,true|},",
+      "  \"max-depth\": ${5:10}",
+      "}]"
+    ],
+    "description": "Recursive hop — traverses until no more output."
+  },
   "DTL apply-hops": {
     "scope": "dtl,json",
     "prefix": "apply-hops",
@@ -134,7 +150,7 @@
       "  ]",
       "}]"
     ],
-    "description": "Apply a rule to entities fetched via hops."
+    "description": "Apply a rule to entities fetched via hops (use instead of apply when the rule contains hops)."
   },
   "DTL map": {
     "scope": "dtl,json",

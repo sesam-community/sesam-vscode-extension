@@ -1541,9 +1541,9 @@ export const buildFunctionCompletions = (): CompletionItem[] => {
     // so the final result is ["add", "property", "value"].
     const required = fn.params.filter((p) => !p.optional);
     const paramSnippets = required.map((p, i) => `"\${${i + 1}:${p.name}}"`);
-    const insertText =
+    const autoInsertText =
       paramSnippets.length > 0 ? `"${fn.name}", ${paramSnippets.join(", ")}` : `"${fn.name}"`;
-
+    const insertText = fn.snippet ?? autoInsertText;
     return {
       label: fn.name,
       kind: fn.kind === "transform" ? CompletionItemKind.Method : CompletionItemKind.Function,
