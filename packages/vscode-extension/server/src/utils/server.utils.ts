@@ -1460,6 +1460,101 @@ export const buildPropKeyHover = (word: string, path: string[]): string | null =
 // Type value hover builders (for hovering over source/transform/system type values)
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns the key name and enclosing block when the cursor is sitting on a
+ * plain string value after one of the tracked reference keys, e.g.:
+ *   "source": { "dataset": "my-ds"  }  → { refKey: "dataset", block: "source" }
+ *   "sink":   { "system":  "crm"    }  → { refKey: "system",  block: "sink"   }
+ * Returns null otherwise.
+ */
+export const getRefKeyAtValuePosition = (
+  prefix: string,
+): { refKey: string; block: string | null } | null => {
+  const m = /"(dataset|system|entity|master_dataset|dependency_dataset)"\s*:\s*"[^"]*$/.exec(
+    prefix,
+  );
+
+  if (!m) {
+    return null;
+  }
+
+  const blockMatch = /"(source|sink|transform|pump)"\s*:\s*[\[{]/.exec(prefix.slice(0, m.index));
+
+  return { refKey: m[1], block: blockMatch?.[1] ?? null };
+};
+
+type RefValueInfo = { label: string; docUrl: string };
+
+const REF_VALUE_INFO = (refKey: string, block: string | null): RefValueInfo => {
+  const PIPE_DOCS_BASE = "https://docs.sesam.io/hub/documentation/service-configuration/pipes";
+
+  if (refKey === "dataset") {
+    if (block === "source") {
+      return {
+        label: "Source dataset",
+        docUrl: `${PIPE_DOCS_BASE}/configuration-sources.html`,
+      };
+    }
+
+    if (block === "sink") {
+      return {
+        label: "Sink dataset",
+        docUrl: `${PIPE_DOCS_BASE}/configuration-sinks.html`,
+      };
+    }
+
+    return {
+      label: "Dataset reference",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-sources.html`,
+    };
+  }
+
+  if (refKey === "system") {
+    if (block === "source") {
+      return {
+        label: "Source system",
+        docUrl: `${PIPE_DOCS_BASE}/configuration-sources.html`,
+      };
+    }
+
+    if (block === "sink") {
+      return {
+        label: "Sink system",
+        docUrl: `${PIPE_DOCS_BASE}/configuration-sinks.html`,
+      };
+    }
+
+    return {
+      label: "System reference",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-sources.html`,
+    };
+  }
+
+  const fallbacks: Record<string, RefValueInfo> = {
+    entity: {
+      label: "Entity reference",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-pipes.html`,
+    },
+    master_dataset: {
+      label: "Master dataset",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-pipes.html`,
+    },
+    dependency_dataset: {
+      label: "Dependency dataset",
+      docUrl: `${PIPE_DOCS_BASE}/configuration-pipes.html`,
+    },
+  };
+
+  return fallbacks[refKey] ?? { label: refKey, docUrl: "" };
+};
+
+export const buildRefValueHover = (refKey: string, block: string | null, value: string): string => {
+  const { label, docUrl } = REF_VALUE_INFO(refKey, block);
+  const docLink = docUrl ? `\n\n[📖 Documentation](${docUrl})` : "";
+
+  return `**\`${value}\`**\n\n*${label}*${docLink}`;
+};
+
 const buildTypeHoverContent = (
   label: string,
   categoryLabel: string,

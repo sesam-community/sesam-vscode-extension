@@ -79,6 +79,8 @@ import {
   buildTransformTypeHover,
   buildDocumentSymbols,
   offsetToPosition,
+  getRefKeyAtValuePosition,
+  buildRefValueHover,
 } from "./utils/server.utils";
 import {
   findApplyRuleReference,
@@ -433,6 +435,18 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
       if (content) {
         return { contents: { kind: MarkupKind.Markdown, value: content } };
       }
+    }
+
+    // Reference value hover ("dataset": "...", "system": "...", etc.)
+    const refHit = getRefKeyAtValuePosition(prefix);
+
+    if (refHit) {
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: buildRefValueHover(refHit.refKey, refHit.block, word),
+        },
+      };
     }
 
     const fn = getDtlFunction(word);
