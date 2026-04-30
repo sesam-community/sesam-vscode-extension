@@ -81,7 +81,7 @@ import {
   offsetToPosition,
   getRefKeyAtValuePosition,
   buildRefValueHover,
-  isPermissionsActionContext,
+  getPermissionsActionContext,
   buildPermissionsActionCompletions,
   buildPermissionsActionHover,
 } from "./utils/server.utils";
@@ -332,8 +332,14 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
 
   // Permissions action completion: must be checked before isPropKeyContext because
   // `, "` inside an actions array also matches the generic key-position predicate.
-  if (isPermissionsActionContext(prefix)) {
-    return buildPermissionsActionCompletions(fileType);
+  const permCtx = getPermissionsActionContext(prefix);
+
+  if (permCtx) {
+    // Infer system vs pipe from content for .conf.json files where URI alone is ambiguous.
+    const effectiveFileType: ConfigFileType =
+      fileType !== "unknown" ? fileType : /"type"\s*:\s*"system:/.test(prefix) ? "system" : "pipe";
+
+    return buildPermissionsActionCompletions(effectiveFileType, permCtx.usedActions);
   }
 
   // Property key completion: cursor is at a JSON object key position.

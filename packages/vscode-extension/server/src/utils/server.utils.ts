@@ -1625,28 +1625,48 @@ const PERMISSION_ACTIONS: readonly PermissionAction[] = [
 ];
 
 /**
- * Returns true when the cursor is inside the actions array of a permissions
- * entry, e.g. the `"` or word after the second `[` in:
- *   ["allow", ["group:Dev"], ["read_config"
+ * When the cursor is inside the actions array of a permissions entry, returns
+ * the list of action strings already present. Returns null otherwise.
+ *
+ *   ["allow", ["group:Dev"], ["read_config", "<cursor>"  →  { usedActions: ["read_config"] }
  */
-export const isPermissionsActionContext = (prefix: string): boolean => {
-  // Must be inside a "permissions" array value
+export const getPermissionsActionContext = (
+  prefix: string,
+): { usedActions: readonly string[] } | null => {
   if (!/"permissions"\s*:\s*\[/.test(prefix)) {
-    return false;
+    return null;
   }
 
-  // Match anywhere inside the actions array, whether it's the first item or
-  // a subsequent one. The actions array is the third element of the entry tuple:
-  //   ["allow"|"deny", [...principals...], ["<cursor>"
-  //   ["allow"|"deny", [...principals...], ["read_config", "<cursor>"
-  return /\[\s*"(?:allow|deny)"\s*,\s*\[[^\]]*\]\s*,\s*\[[^\]]*"[^"]*$/.test(prefix);
+  // Capture the partial actions array (third element of the entry tuple) up to
+  // the open quote at the cursor position.
+  const match = /\[\s*"(?:allow|deny)"\s*,\s*\[[^\]]*\]\s*,\s*(\[[^\]]*"[^"]*$)/.exec(prefix);
+
+  if (!match) {
+    return null;
+  }
+
+  // Extract the already-closed action strings from the captured partial array.
+  const usedActions: string[] = [];
+  const pattern = /"([^"]+)"/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = pattern.exec(match[1])) !== null) {
+    usedActions.push(m[1]);
+  }
+
+  return { usedActions };
 };
 
-export const buildPermissionsActionCompletions = (fileType: ConfigFileType): CompletionItem[] => {
+export const buildPermissionsActionCompletions = (
+  fileType: ConfigFileType,
+  usedActions: readonly string[] = [],
+): CompletionItem[] => {
   const scope = fileType === "system" ? "system" : "pipe";
   const docUrl = fileType === "system" ? SECURITY_DOC_SYSTEM : SECURITY_DOC_PIPE;
 
-  return PERMISSION_ACTIONS.filter((a) => a.appliesTo.includes(scope)).map(({ name, detail }) => ({
+  return PERMISSION_ACTIONS.filter(
+    (a) => a.appliesTo.includes(scope) && !usedActions.includes(a.name),
+  ).map(({ name, detail }) => ({
     label: name,
     kind: CompletionItemKind.EnumMember,
     detail,

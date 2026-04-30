@@ -35,7 +35,7 @@ import {
   offsetToPosition,
   getRefKeyAtValuePosition,
   buildRefValueHover,
-  isPermissionsActionContext,
+  getPermissionsActionContext,
   buildPermissionsActionCompletions,
   buildPermissionsActionHover,
 } from "../server/src/utils/server.utils";
@@ -1079,33 +1079,40 @@ describe("buildRefValueHover", () => {
 });
 
 // ---------------------------------------------------------------------------
-// isPermissionsActionContext / buildPermissionsActionCompletions / buildPermissionsActionHover
+// getPermissionsActionContext / buildPermissionsActionCompletions / buildPermissionsActionHover
 // ---------------------------------------------------------------------------
 
-describe("isPermissionsActionContext", () => {
-  it("returns true when cursor is inside the actions array", () => {
+describe("getPermissionsActionContext", () => {
+  it("returns non-null when cursor is inside the actions array", () => {
     const prefix = `"permissions": [\n  ["allow", ["group:Developer"], ["read_config`;
-    expect(isPermissionsActionContext(prefix)).toBe(true);
+    expect(getPermissionsActionContext(prefix)).not.toBeNull();
   });
 
-  it("returns true for an empty actions array with open quote", () => {
+  it("returns empty usedActions for an empty actions array", () => {
     const prefix = `"permissions": [\n  ["allow", ["group:Dev"], ["`;
-    expect(isPermissionsActionContext(prefix)).toBe(true);
+    expect(getPermissionsActionContext(prefix)).toEqual({ usedActions: [] });
   });
 
-  it("returns true when a second action is being typed", () => {
+  it("returns usedActions with already-closed action when typing the next one", () => {
     const prefix = `"permissions": [\n  ["allow", ["group:Developer"], ["read_config", "`;
-    expect(isPermissionsActionContext(prefix)).toBe(true);
+    expect(getPermissionsActionContext(prefix)).toEqual({ usedActions: ["read_config"] });
   });
 
-  it("returns false when not inside a permissions array", () => {
+  it("returns all closed actions when multiple are present", () => {
+    const prefix = `"permissions": [\n  ["allow", ["group:Developer"], ["read_config", "read_data", "`;
+    expect(getPermissionsActionContext(prefix)).toEqual({
+      usedActions: ["read_config", "read_data"],
+    });
+  });
+
+  it("returns null when not inside a permissions array", () => {
     const prefix = `"source": {\n  "type": "dataset"`;
-    expect(isPermissionsActionContext(prefix)).toBe(false);
+    expect(getPermissionsActionContext(prefix)).toBeNull();
   });
 
-  it("returns false when cursor is in the principals array, not actions", () => {
+  it("returns null when cursor is in the principals array, not actions", () => {
     const prefix = `"permissions": [\n  ["allow", ["group:Dev`;
-    expect(isPermissionsActionContext(prefix)).toBe(false);
+    expect(getPermissionsActionContext(prefix)).toBeNull();
   });
 });
 
@@ -1132,6 +1139,15 @@ describe("buildPermissionsActionCompletions", () => {
     expect(labels).toContain("read_proxy");
     expect(labels).toContain("write_proxy");
     expect(labels).not.toContain("run_pump_operation");
+  });
+
+  it("filters out already-used actions", () => {
+    const items = buildPermissionsActionCompletions("pipe", ["read_config", "read_data"]);
+    const labels = items.map((i) => i.label);
+    expect(labels).not.toContain("read_config");
+    expect(labels).not.toContain("read_data");
+    expect(labels).toContain("write_config");
+    expect(labels).toContain("run_pump_operation");
   });
 
   it("pipe items link to pipe-permissions anchor", () => {
