@@ -39,6 +39,7 @@ import {
   runSwitchProfile,
   confirmIfProduction,
   setNodeConnected,
+  setProfileConnected,
   profileSwitchHooks,
 } from "./profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
@@ -1210,6 +1211,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             vscode.window.showInformationMessage(
               `Sesam: Download complete — ${result.pipesWritten} pipes, ${result.systemsWritten} systems.`,
             );
+            await setProfileConnected();
+
             if (syncStatusProvider.isLoaded()) {
               refreshSyncStatusSilently();
             }

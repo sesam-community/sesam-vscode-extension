@@ -29,6 +29,7 @@ export interface ProfileMeta {
 
 const PROFILES_KEY = "sesam.profiles";
 const ACTIVE_PROFILE_KEY = "sesam.activeProfile"; // workspaceState key — never written to settings.json
+const PROFILE_CONNECTED_KEY = "sesam.profileConnected"; // true once a successful full download locks the folder
 
 let _context: vscode.ExtensionContext | undefined;
 let _statusBarItem: vscode.StatusBarItem | undefined;
@@ -57,9 +58,10 @@ export const initProfileManager = (context: vscode.ExtensionContext): void => {
   _context = context;
 
   _statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
-  _statusBarItem.command = "sesam.switchProfile";
-  _statusBarItem.tooltip = "Click to switch Sesam profile";
   context.subscriptions.push(_statusBarItem);
+
+  // Restore the lock context key so `when` clauses are correct after a reload.
+  void vscode.commands.executeCommand("setContext", "sesam.profileConnected", isProfileConnected());
 
   void _refreshStatusBar();
 };
@@ -200,6 +202,11 @@ const _refreshStatusBar = async (): Promise<void> => {
       : `$(circle-outline) Sesam: [${active}]`;
   }
 
+  const locked = isProfileConnected();
+  _statusBarItem.command = locked ? undefined : "sesam.switchProfile";
+  _statusBarItem.tooltip = locked
+    ? "Profile locked to this folder"
+    : "Click to switch Sesam profile";
   _statusBarItem.show();
 };
 
@@ -249,7 +256,42 @@ export const confirmIfProduction = async (actionLabel: string): Promise<boolean>
 // Commands (registered in extension.ts, logic lives here)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Profile lock — one profile per folder
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true when a successful full download has locked this workspace folder
+ * to its current profile. The lock persists across reloads (workspaceState) and
+ * can only be cleared by opening a new VS Code folder.
+ */
+export const isProfileConnected = (): boolean =>
+  ctx().workspaceState.get<boolean>(PROFILE_CONNECTED_KEY) ?? false;
+
+/**
+ * Locks this workspace folder to the current active profile.
+ * Called after a successful `sesam.download` completes.
+ */
+export const setProfileConnected = async (): Promise<void> => {
+  await ctx().workspaceState.update(PROFILE_CONNECTED_KEY, true);
+  await vscode.commands.executeCommand("setContext", "sesam.profileConnected", true);
+  void _refreshStatusBar();
+};
+
+// ---------------------------------------------------------------------------
+// Commands (registered in extension.ts, logic lives here)
+// ---------------------------------------------------------------------------
+
 export const runSwitchProfile = async (targetProfile?: string): Promise<void> => {
+  // ── Guard: folder locked to its profile ────────────────────────────────
+  if (isProfileConnected()) {
+    vscode.window.showInformationMessage(
+      "Sesam: This folder is locked to its profile. Open a new folder to use a different profile.",
+    );
+
+    return;
+  }
+
   // ── Guard: unsaved files ────────────────────────────────────────────────
   const dirtyFiles = vscode.workspace.textDocuments.filter((d) => d.isDirty && !d.isUntitled);
 
@@ -314,7 +356,7 @@ export const runSwitchProfile = async (targetProfile?: string): Promise<void> =>
         label: name,
         description: name === activeProfile ? "$(check) active" : undefined,
       })),
-      { label: "$(add) Add profile…", description: "" },
+      ...(knownNames.length === 0 ? [{ label: "$(add) Add profile…", description: "" }] : []),
     ];
 
     const picked = await vscode.window.showQuickPick(items, {
@@ -405,6 +447,14 @@ export const runSwitchProfile = async (targetProfile?: string): Promise<void> =>
 type RunAddProfileOptions = { isNew: true } | { profileName: string } | undefined;
 
 export const runAddProfile = async (options?: RunAddProfileOptions): Promise<void> => {
+  if (isProfileConnected()) {
+    vscode.window.showInformationMessage(
+      "Sesam: This folder is locked to its profile. Open a new folder to add a different profile.",
+    );
+
+    return;
+  }
+
   const profileMetas = getStoredProfiles();
   const storedNames = listStoredProfileNames();
   const activeProfile = getActiveProfileName();
