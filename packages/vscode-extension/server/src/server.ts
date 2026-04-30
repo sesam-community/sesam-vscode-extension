@@ -330,6 +330,12 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     return buildSystemTypeCompletions();
   }
 
+  // Permissions action completion: must be checked before isPropKeyContext because
+  // `, "` inside an actions array also matches the generic key-position predicate.
+  if (isPermissionsActionContext(prefix)) {
+    return buildPermissionsActionCompletions(fileType);
+  }
+
   // Property key completion: cursor is at a JSON object key position.
   // Checked before variable context so that keys starting with "_" (like "_id")
   // get prop completions rather than DTL variable completions.
@@ -350,11 +356,6 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
   // Variable completion: triggered after "_" or inside a string starting with "_"
   if (isVariableContext(prefix)) {
     return buildVariableCompletions();
-  }
-
-  // Permissions action completion: inside the actions array of a permissions entry
-  if (isPermissionsActionContext(prefix)) {
-    return buildPermissionsActionCompletions();
   }
 
   // Function name completion: only inside a DTL rule array (transform.rules.<name>.[...)

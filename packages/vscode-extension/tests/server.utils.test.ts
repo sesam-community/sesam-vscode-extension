@@ -1093,6 +1093,11 @@ describe("isPermissionsActionContext", () => {
     expect(isPermissionsActionContext(prefix)).toBe(true);
   });
 
+  it("returns true when a second action is being typed", () => {
+    const prefix = `"permissions": [\n  ["allow", ["group:Developer"], ["read_config", "`;
+    expect(isPermissionsActionContext(prefix)).toBe(true);
+  });
+
   it("returns false when not inside a permissions array", () => {
     const prefix = `"source": {\n  "type": "dataset"`;
     expect(isPermissionsActionContext(prefix)).toBe(false);
@@ -1105,22 +1110,41 @@ describe("isPermissionsActionContext", () => {
 });
 
 describe("buildPermissionsActionCompletions", () => {
-  it("includes all 7 permission actions", () => {
-    const items = buildPermissionsActionCompletions();
+  it("returns only pipe actions for pipe file type", () => {
+    const items = buildPermissionsActionCompletions("pipe");
     const labels = items.map((i) => i.label);
     expect(labels).toContain("read_config");
     expect(labels).toContain("write_config");
     expect(labels).toContain("read_data");
     expect(labels).toContain("write_data");
     expect(labels).toContain("run_pump_operation");
-    expect(labels).toContain("read_proxy");
-    expect(labels).toContain("write_proxy");
+    expect(labels).not.toContain("read_proxy");
+    expect(labels).not.toContain("write_proxy");
   });
 
-  it("each item links to the security docs", () => {
-    const items = buildPermissionsActionCompletions();
+  it("returns only system actions for system file type", () => {
+    const items = buildPermissionsActionCompletions("system");
+    const labels = items.map((i) => i.label);
+    expect(labels).toContain("read_config");
+    expect(labels).toContain("write_config");
+    expect(labels).toContain("read_data");
+    expect(labels).toContain("write_data");
+    expect(labels).toContain("read_proxy");
+    expect(labels).toContain("write_proxy");
+    expect(labels).not.toContain("run_pump_operation");
+  });
+
+  it("pipe items link to pipe-permissions anchor", () => {
+    const items = buildPermissionsActionCompletions("pipe");
     items.forEach((item) => {
-      expect(JSON.stringify(item.documentation)).toContain("security.html");
+      expect(JSON.stringify(item.documentation)).toContain("pipe-permissions");
+    });
+  });
+
+  it("system items link to system-permissions anchor", () => {
+    const items = buildPermissionsActionCompletions("system");
+    items.forEach((item) => {
+      expect(JSON.stringify(item.documentation)).toContain("system-permissions");
     });
   });
 });

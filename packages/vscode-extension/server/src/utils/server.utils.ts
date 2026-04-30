@@ -1575,8 +1575,10 @@ export const buildRefValueHover = (refKey: string, block: string | null, value: 
 // Permissions action completions / hover
 // ---------------------------------------------------------------------------
 
-const SECURITY_DOC =
+const SECURITY_DOC_PIPE =
   "https://docs.sesam.io/hub/documentation/operations/security.html#pipe-permissions";
+const SECURITY_DOC_SYSTEM =
+  "https://docs.sesam.io/hub/documentation/operations/security.html#system-permissions";
 
 interface PermissionAction {
   name: string;
@@ -1633,23 +1635,29 @@ export const isPermissionsActionContext = (prefix: string): boolean => {
     return false;
   }
 
-  // Last open [ that is not yet closed should be the actions array
-  // Pattern: ["allow"|"deny", [...], ["   ← cursor here
-  return /\[\s*"(?:allow|deny)"\s*,\s*\[[^\]]*\]\s*,\s*\[\s*"[^"]*$/.test(prefix);
+  // Match anywhere inside the actions array, whether it's the first item or
+  // a subsequent one. The actions array is the third element of the entry tuple:
+  //   ["allow"|"deny", [...principals...], ["<cursor>"
+  //   ["allow"|"deny", [...principals...], ["read_config", "<cursor>"
+  return /\[\s*"(?:allow|deny)"\s*,\s*\[[^\]]*\]\s*,\s*\[[^\]]*"[^"]*$/.test(prefix);
 };
 
-export const buildPermissionsActionCompletions = (): CompletionItem[] =>
-  PERMISSION_ACTIONS.map(({ name, detail }) => ({
+export const buildPermissionsActionCompletions = (fileType: ConfigFileType): CompletionItem[] => {
+  const scope = fileType === "system" ? "system" : "pipe";
+  const docUrl = fileType === "system" ? SECURITY_DOC_SYSTEM : SECURITY_DOC_PIPE;
+
+  return PERMISSION_ACTIONS.filter((a) => a.appliesTo.includes(scope)).map(({ name, detail }) => ({
     label: name,
     kind: CompletionItemKind.EnumMember,
     detail,
     documentation: {
       kind: MarkupKind.Markdown,
-      value: `**\`${name}\`**\n\n${detail}\n\n[📖 Documentation](${SECURITY_DOC})`,
+      value: `**\`${name}\`**\n\n${detail}\n\n[📖 Documentation](${docUrl})`,
     },
     insertText: name,
     sortText: name,
   }));
+};
 
 export const buildPermissionsActionHover = (word: string): string | null => {
   const action = PERMISSION_ACTIONS.find((a) => a.name === word);
@@ -1659,8 +1667,9 @@ export const buildPermissionsActionHover = (word: string): string | null => {
   }
 
   const scope = action.appliesTo.join(" and ");
+  const docUrl = action.appliesTo.includes("pipe") ? SECURITY_DOC_PIPE : SECURITY_DOC_SYSTEM;
 
-  return `**\`${action.name}\`**\n\n${action.detail}\n\n*Applies to: ${scope}*\n\n[📖 Documentation](${SECURITY_DOC})`;
+  return `**\`${action.name}\`**\n\n${action.detail}\n\n*Applies to: ${scope}*\n\n[📖 Documentation](${docUrl})`;
 };
 
 const buildTypeHoverContent = (
