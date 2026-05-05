@@ -49,6 +49,22 @@ describe("parseDtlText — dtl extension", () => {
     expect(call?.argCount).toBe(4); // _T.x, 1, 2, 3
   });
 
+  it("does not parse nested array args of comment as DTL calls", () => {
+    const text = `[
+      ["comment", " -- header -- ",
+        [" -- line one"],
+        [" -- line two"]
+      ]
+    ]`;
+    const { calls } = parseDtlText(text, "dtl");
+    const commentCall = calls.find((c) => c.functionName === "comment");
+    expect(commentCall).toBeDefined();
+    expect(commentCall!.isTopLevel).toBe(true);
+    expect(commentCall!.argCount).toBe(3); // 1 string + 2 array args
+    // Nested arrays must not be recorded as separate calls
+    expect(calls.filter((c) => c.functionName !== "comment")).toHaveLength(0);
+  });
+
   it("records position info — call range starts before function name", () => {
     const text = `[["add", "_T.x", 1]]`;
     const { calls } = parseDtlText(text, "dtl");

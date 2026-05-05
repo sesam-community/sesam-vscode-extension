@@ -3,8 +3,22 @@
   "name": "DTL",
   "scopeName": "source.dtl",
   "fileTypes": ["dtl"],
-  "patterns": [{ "include": "#array" }, { "include": "#value" }],
+  "patterns": [{ "include": "#comment-array" }, { "include": "#array" }, { "include": "#value" }],
   "repository": {
+    "comment-array": {
+      "comment": "Entire DTL comment call — rendered as a comment (dimmed by themes)",
+      "name": "comment.block.dtl",
+      "begin": "\\[\\s*\"comment\"",
+      "end": "\\]",
+      "patterns": [{ "include": "#comment-nested-array" }]
+    },
+    "comment-nested-array": {
+      "comment": "Nested array inside a DTL comment — tracked to keep bracket balance correct",
+      "name": "comment.block.dtl",
+      "begin": "\\[",
+      "end": "\\]",
+      "patterns": [{ "include": "#comment-nested-array" }]
+    },
     "array": {
       "name": "meta.array.dtl",
       "begin": "\\[",
@@ -112,6 +126,7 @@
         { "include": "#number" },
         { "include": "#boolean" },
         { "include": "#null" },
+        { "include": "#comment-array" },
         { "include": "#array" },
         { "include": "#object" }
       ]
