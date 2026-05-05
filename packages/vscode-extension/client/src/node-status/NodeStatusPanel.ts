@@ -138,9 +138,12 @@ export class NodeStatusPanel {
       this._disposables,
     );
 
-    this._liveUpdates = new SesamLiveUpdates((statuses, eventType, errorMessage) => {
-      this._handleLiveUpdate(statuses, eventType, errorMessage);
-    });
+    this._liveUpdates = new SesamLiveUpdates(
+      (statuses, eventType, errorMessage) => {
+        this._handleLiveUpdate(statuses, eventType, errorMessage);
+      },
+      (msg) => logLiveUpdate(msg),
+    );
   }
 
   // ── Message handler ───────────────────────────────────────────────────────
@@ -340,6 +343,7 @@ export class NodeStatusPanel {
   /** Open the Socket.IO connection. Caller must have already verified support. */
   private _doConnect(nodeUrl: string, jwt: string): void {
     logLiveUpdate(`Connecting to ${toWebSocketUrl(nodeUrl)}`);
+    this._panel.webview.postMessage({ type: "connection-state", state: "connecting" });
     this._liveUpdates.connect(nodeUrl, jwt);
   }
 
@@ -756,6 +760,13 @@ export class NodeStatusPanel {
     .live-badge.live     { background: rgba(73,185,90,0.18);  color: #4db86a; }
     .live-badge.disabled { background: rgba(128,128,128,0.15); color: #8a8a8a; }
     .live-badge.offline  { background: rgba(229,83,75,0.18);  color: #e95b55; }
+    .live-badge.connecting { background: rgba(128,128,128,0.15); color: #8a8a8a; }
+
+    @keyframes live-spin { to { transform: rotate(360deg); } }
+    .live-badge.connecting .spin {
+      display: inline-block;
+      animation: live-spin 1s linear infinite;
+    }
 
     .live-toggle {
       display: flex;
@@ -928,7 +939,14 @@ export class NodeStatusPanel {
       const liveBadge = document.getElementById('liveBadge');
       const liveToggleLabel = document.getElementById('liveToggleLabel');
 
-      if (msg.state === 'live') {
+      if (msg.state === 'connecting') {
+        liveBadge.innerHTML = '<span class="spin">&#x21BB;</span> Connecting…';
+        liveBadge.title = 'Establishing live connection to the Sesam node…';
+        liveBadge.className = 'live-badge connecting';
+        liveBadge.style.display = '';
+        liveToggleLabel.style.display = 'none';
+        return;
+      } else if (msg.state === 'live') {
         liveBadge.textContent = '\u25CF Live';
         liveBadge.title = 'Connected to the Sesam node — pipe statuses update in real time';
         liveBadge.className = 'live-badge live';
