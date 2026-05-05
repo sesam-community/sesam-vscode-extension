@@ -103,12 +103,18 @@ export class SesamLiveUpdates {
     // connect() call gets a fresh Manager with no leftover state.
     // reconnection: false — a single attempt; if it fails we surface the
     // error immediately instead of silently retrying for another 20+ seconds.
+    //
+    // transports: ["polling", "websocket"] — start with HTTP long-polling
+    // (which the server accepts unconditionally) then let socket.io upgrade
+    // to WebSocket automatically. Using transports: ["websocket"] alone
+    // sends a bare WebSocket upgrade without a prior session; the Sesam server
+    // silently drops that request (the Node.js extension host sends no Origin
+    // header), causing a silent 10-second hang instead of an error.
     this._socket = io(wsUrl, {
       path: "/ws/",
       reconnection: false,
       timeout: CONNECT_TIMEOUT_MS,
-      transports: ["websocket"],
-      upgrade: false,
+      transports: ["polling", "websocket"],
       auth: { token: `bearer ${jwt}` },
       forceNew: true,
     });
