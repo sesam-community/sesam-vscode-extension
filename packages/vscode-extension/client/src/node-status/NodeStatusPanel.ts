@@ -25,10 +25,9 @@ import { SesamRunner } from "../sesam-runner";
 import { trackRequest } from "../network-status";
 import { getActiveProfileName, resolvePortalUrl } from "../profile-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
-import { SesamLiveUpdates } from "./live-updates";
-import { toWebSocketUrl } from "./live-updates";
+import { createLiveConnection, toWebSocketUrl } from "./live-updates";
 
-import type { LiveEventType } from "./live-updates";
+import type { LiveConnection, LiveEventType } from "./live-updates";
 import type { PipeStatus, SystemSummary } from "@sesam/core";
 
 // ---------------------------------------------------------------------------
@@ -85,7 +84,7 @@ export class NodeStatusPanel {
   private _liveEnabled: boolean;
   /** Becomes false after connect_error or mid-session disconnect. */
   private _liveSupported = true;
-  private readonly _liveUpdates: SesamLiveUpdates;
+  private readonly _liveUpdates: LiveConnection;
 
   // ── Static factory ────────────────────────────────────────────────────────
 
@@ -138,7 +137,7 @@ export class NodeStatusPanel {
       this._disposables,
     );
 
-    this._liveUpdates = new SesamLiveUpdates(
+    this._liveUpdates = createLiveConnection(
       (statuses, eventType, errorMessage) => {
         this._handleLiveUpdate(statuses, eventType, errorMessage);
       },

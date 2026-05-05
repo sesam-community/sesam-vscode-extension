@@ -1,8 +1,8 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { SesamLiveUpdates, toWebSocketUrl } from "../client/src/node-status/live-updates";
+import { createLiveConnection, toWebSocketUrl } from "../client/src/node-status/live-updates";
 
-import type { LiveEventType } from "../client/src/node-status/live-updates";
+import type { LiveConnection, LiveEventType } from "../client/src/node-status/live-updates";
 import type { PipeStatus } from "@sesam/core";
 
 // ---------------------------------------------------------------------------
@@ -153,16 +153,16 @@ describe("toWebSocketUrl", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SesamLiveUpdates
+// createLiveConnection
 // ---------------------------------------------------------------------------
 
-describe("SesamLiveUpdates", () => {
+describe("createLiveConnection", () => {
   let updates: Array<{ statuses: PipeStatus[]; eventType: LiveEventType; errorMessage?: string }>;
-  let liveUpdates: SesamLiveUpdates;
+  let liveUpdates: LiveConnection;
 
   beforeEach(() => {
     updates = [];
-    liveUpdates = new SesamLiveUpdates((statuses, eventType, errorMessage) => {
+    liveUpdates = createLiveConnection((statuses, eventType, errorMessage) => {
       updates.push({ statuses, eventType, errorMessage });
     });
   });
