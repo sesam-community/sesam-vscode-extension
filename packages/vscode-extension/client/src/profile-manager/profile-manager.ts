@@ -476,7 +476,7 @@ export const runSwitchProfile = async (targetProfile?: string): Promise<void> =>
   // ── Teardown current node state ─────────────────────────────────────────
   // Import is at the top of the call chain — use dynamic import to avoid a
   // circular dep (NodeStatusPanel imports from profile-manager).
-  const { NodeStatusPanel } = await import("../node-status/NodeStatusPanel");
+  const { NodeStatusPanel } = await import("../node-status/node-status-panel");
   NodeStatusPanel.currentPanel?.dispose();
 
   await vscode.commands.executeCommand("workbench.action.closeAllEditors");

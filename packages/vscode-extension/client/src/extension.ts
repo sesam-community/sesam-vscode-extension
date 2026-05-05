@@ -27,7 +27,7 @@ import { buildDagIndex, buildSystemIndex, extractFullPipeInfo } from "./graph/pi
 import { PipeDependentsProvider } from "./graph/PipeDependentsProvider";
 import { PipeLineageProvider } from "./graph/PipeLineageProvider";
 import { SystemPipesProvider } from "./graph/SystemPipesProvider";
-import { PreviewPanel } from "./preview/PreviewPanel";
+import { PreviewPanel } from "./preview/preview-panel";
 import {
   initProfileManager,
   getActiveProfileName,
@@ -57,8 +57,8 @@ import { pingNode } from "./node-client";
 import { disposeSesamChannel, getSesamChannel, logNodeRequest } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
-import { NodeStatusPanel } from "./node-status/NodeStatusPanel";
-import { ProfilesPanel } from "./profile-manager/ProfilesPanel";
+import { NodeStatusPanel } from "./node-status/node-status-panel";
+import { ProfilesPanel } from "./profile-manager/profiles-panel";
 import {
   SyncStatusProvider,
   SesamNodeConfigProvider,
