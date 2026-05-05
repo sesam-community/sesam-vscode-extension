@@ -25,6 +25,7 @@ import {
   getActiveProfileName,
   getStoredProfiles,
   isProfileConnected,
+  clearProfileConnected,
   removeProfile,
   runAddProfile,
   setActiveProfileName,
@@ -175,12 +176,16 @@ export class ProfilesPanel {
       await deleteToken(message.profileName);
       await removeProfile(message.profileName);
 
-      if (message.profileName === activeProfile) {
-        const remainingNames = [
-          ...new Set([...listStoredProfileNames(), ...getStoredProfiles().map((p) => p.name)]),
-        ].filter((n) => n !== message.profileName);
+      const remainingNames = [
+        ...new Set([...listStoredProfileNames(), ...getStoredProfiles().map((p) => p.name)]),
+      ];
 
+      if (message.profileName === activeProfile) {
         await setActiveProfileName(remainingNames[0] ?? "default");
+      }
+
+      if (remainingNames.length === 0) {
+        await clearProfileConnected();
       }
 
       await vscode.commands.executeCommand("sesam.refreshStatusBar");

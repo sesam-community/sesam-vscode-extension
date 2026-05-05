@@ -60,8 +60,19 @@ export const initProfileManager = (context: vscode.ExtensionContext): void => {
   _statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
   context.subscriptions.push(_statusBarItem);
 
-  // Restore the lock context key so `when` clauses are correct after a reload.
-  void vscode.commands.executeCommand("setContext", "sesam.profileConnected", isProfileConnected());
+  // If the workspace was marked as connected but all profiles have since been deleted,
+  // clear the stale lock so the "Add Profile" button and command become available again.
+  const hasProfiles = getStoredProfiles().length > 0 || listStoredProfileNames().length > 0;
+
+  if (isProfileConnected() && !hasProfiles) {
+    void clearProfileConnected();
+  } else {
+    void vscode.commands.executeCommand(
+      "setContext",
+      "sesam.profileConnected",
+      isProfileConnected(),
+    );
+  }
 
   void _refreshStatusBar();
 };
@@ -278,6 +289,16 @@ export const setProfileConnected = async (): Promise<void> => {
   void _refreshStatusBar();
 };
 
+/**
+ * Clears the profile lock so the user can add or switch profiles.
+ * Called automatically when all profiles are deleted.
+ */
+export const clearProfileConnected = async (): Promise<void> => {
+  await ctx().workspaceState.update(PROFILE_CONNECTED_KEY, undefined);
+  await vscode.commands.executeCommand("setContext", "sesam.profileConnected", false);
+  void _refreshStatusBar();
+};
+
 // ---------------------------------------------------------------------------
 // Commands (registered in extension.ts, logic lives here)
 // ---------------------------------------------------------------------------
@@ -487,12 +508,16 @@ export const runAddProfile = async (options?: RunAddProfileOptions): Promise<voi
     isNew = true;
   } else {
     // Default: show the full QuickPick (used from sesam.switchProfile / command palette)
-    const allKnown = [
-      activeProfile,
-      ...[...new Set([...storedNames, ...profileMetas.map((p) => p.name)])].filter(
-        (n) => n !== activeProfile,
-      ),
-    ];
+    const backingNames = [...new Set([...storedNames, ...profileMetas.map((p) => p.name)])];
+    const allKnown = backingNames.includes(activeProfile)
+      ? [activeProfile, ...backingNames.filter((n) => n !== activeProfile)]
+      : backingNames;
+
+    // No real profiles exist — skip the selection step and go straight to "add new"
+    if (allKnown.length === 0) {
+      await runAddProfile({ isNew: true });
+      return;
+    }
 
     const NEW_PROFILE_LABEL = "$(add) New profile…";
 
@@ -651,10 +676,19 @@ export const runDeleteProfile = async (): Promise<void> => {
   await deleteToken(picked.label);
   await removeProfile(picked.label);
 
-  // If the deleted profile was active, fall back to "default"
+  const remainingNames = [
+    ...new Set([...listStoredProfileNames(), ...getStoredProfiles().map((p) => p.name)]),
+  ];
+
+  // If the deleted profile was active, fall back to the next available profile (or "default")
   if (picked.label === activeProfile) {
-    await setActiveProfileName("default");
+    await setActiveProfileName(remainingNames[0] ?? "default");
     void _refreshStatusBar();
+  }
+
+  // If no profiles remain, unlock the workspace so the user can add a new profile
+  if (remainingNames.length === 0) {
+    await clearProfileConnected();
   }
 
   vscode.window.showInformationMessage(`Sesam: profile '${picked.label}' deleted.`);
