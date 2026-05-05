@@ -15,8 +15,8 @@
 import * as vscode from "vscode";
 
 import { deleteToken, getToken, listStoredProfileNames, storeToken } from "./credential-manager";
-import { DEFAULT_PORTAL_URL } from "./constants";
-import { getSesamChannel } from "./sesam-channel";
+import { DEFAULT_PORTAL_URL } from "../constants";
+import { getSesamChannel } from "../sesam-channel";
 
 export interface ProfileMeta {
   name: string;

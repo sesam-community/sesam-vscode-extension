@@ -22,7 +22,7 @@ import {
   deleteToken,
   listStoredProfileNames,
   storeToken,
-} from "./credential-manager";
+} from "./profile-manager/credential-manager";
 import { buildDagIndex, buildSystemIndex, extractFullPipeInfo } from "./graph/pipe-dag-builder";
 import { PipeDependentsProvider } from "./graph/PipeDependentsProvider";
 import { PipeLineageProvider } from "./graph/PipeLineageProvider";
@@ -41,11 +41,11 @@ import {
   setNodeConnected,
   setProfileConnected,
   profileSwitchHooks,
-} from "./profile-manager";
+} from "./profile-manager/profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
 import { registerSesamChatParticipant } from "./sesam-chat-participant";
-import { resolveCredentials } from "./credential-resolver";
+import { resolveCredentials } from "./profile-manager/credential-resolver";
 import { registerSesamTestController, isSesamTestRunning } from "./testing/sesam-test-controller";
 import {
   fetchNodeStatusHint,

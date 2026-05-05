@@ -19,7 +19,7 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { getToken, listStoredProfileNames, deleteToken } from "../credential-manager";
+import { getToken, listStoredProfileNames, deleteToken } from "./credential-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
 import {
   getActiveProfileName,
@@ -31,7 +31,7 @@ import {
   setActiveProfileName,
   setNodeConnected,
   upsertProfile,
-} from "../profile-manager";
+} from "./profile-manager";
 
 // ---------------------------------------------------------------------------
 // Types
