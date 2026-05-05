@@ -50,7 +50,7 @@ const createMockSocket = (): MockSocket => {
     },
 
     io: {
-      on(_event, _handler) {
+      on() {
         // manager lifecycle events — not needed for core behaviour tests
       },
     },
