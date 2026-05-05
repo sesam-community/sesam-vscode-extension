@@ -727,14 +727,13 @@ export const runDeleteProfile = async (): Promise<void> => {
     ...new Set([...listStoredProfileNames(), ...getStoredProfiles().map((p) => p.name)]),
   ];
 
-  // If the deleted profile was active, clear the active selection — don't auto-select
+  // If the deleted profile was active, clear the active selection and unlock the workspace
   if (picked.label === activeProfile) {
     await setActiveProfileName("");
     _nodeConnected = false;
-  }
-
-  // If no profiles remain, unlock the workspace so the user can add a new profile
-  if (remainingNames.length === 0) {
+    await clearProfileConnected();
+  } else if (remainingNames.length === 0) {
+    // Last profile deleted (non-active) — also unlock
     await clearProfileConnected();
   }
 

@@ -184,9 +184,8 @@ export class ProfilesPanel {
       if (message.profileName === activeProfile) {
         await setActiveProfileName("");
         setNodeConnected(false);
-      }
-
-      if (remainingNames.length === 0) {
+        await clearProfileConnected();
+      } else if (remainingNames.length === 0) {
         await clearProfileConnected();
       }
 
