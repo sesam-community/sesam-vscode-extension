@@ -14,7 +14,7 @@ import * as vscode from "vscode";
 
 import { testPipes, ValidationFailedError } from "@sesam/core";
 
-import { resolveCredentials } from "../credential-resolver";
+import { resolveCredentials } from "../profile-manager/credential-resolver";
 import { getSesamChannel, logNodeRequest } from "../sesam-channel";
 
 import type { TestResult } from "@sesam/core";

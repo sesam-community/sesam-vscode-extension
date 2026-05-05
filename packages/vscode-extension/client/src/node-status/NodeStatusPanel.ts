@@ -16,14 +16,14 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { resolveCredentials } from "../credential-resolver";
+import { resolveCredentials } from "../profile-manager/credential-resolver";
 import { fetchNodeStatusHint, fetchSupportsLiveUpdates } from "../portal-client";
 import { extractSubscriptionId } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
 import { logLiveUpdate } from "../sesam-channel";
 import { SesamRunner } from "../sesam-runner";
 import { trackRequest } from "../network-status";
-import { getActiveProfileName, resolvePortalUrl } from "../profile-manager";
+import { getActiveProfileName, resolvePortalUrl } from "../profile-manager/profile-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
 import { createLiveConnection, toWebSocketUrl } from "./live-updates";
 
