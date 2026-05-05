@@ -113,7 +113,26 @@ export const getActiveProfileName = (): string => {
       .update("activeProfile", undefined, vscode.ConfigurationTarget.Workspace);
   }
 
-  return ctx().workspaceState.get<string>(ACTIVE_PROFILE_KEY) ?? legacyValue ?? "";
+  const stored = ctx().workspaceState.get<string>(ACTIVE_PROFILE_KEY) ?? legacyValue ?? "";
+
+  // If the stored name has no backing data (stale "default" or deleted profile),
+  // treat it as unset so no phantom profile is shown.
+  if (stored) {
+    const knownNames = [
+      ...new Set([
+        ...listStoredProfileNames(),
+        ...ctx()
+          .workspaceState.get<{ name: string }[]>(PROFILES_KEY, [])
+          .map((p) => p.name),
+      ]),
+    ];
+
+    if (knownNames.length > 0 && !knownNames.includes(stored)) {
+      return "";
+    }
+  }
+
+  return stored;
 };
 
 export const setActiveProfileName = async (name: string): Promise<void> => {
@@ -193,6 +212,10 @@ const _refreshStatusBar = async (): Promise<void> => {
     _statusBarItem.backgroundColor = undefined;
     _statusBarItem.color = new vscode.ThemeColor("list.warningForeground");
     _statusBarItem.text = `$(account) Sesam: No profile configured — Click here to add new profile`;
+  } else if (!active) {
+    _statusBarItem.backgroundColor = undefined;
+    _statusBarItem.color = new vscode.ThemeColor("list.warningForeground");
+    _statusBarItem.text = `$(account) Sesam: No profile selected — Click here to select profile`;
   } else if (!hasCredentials) {
     _statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
     _statusBarItem.color = undefined;
@@ -222,16 +245,18 @@ const _refreshStatusBar = async (): Promise<void> => {
   const locked = isProfileConnected();
   _statusBarItem.command = locked
     ? undefined
-    : hasAnyProfile
+    : hasAnyProfile && active
       ? "sesam.switchProfile"
       : "sesam.addProfile";
   _statusBarItem.tooltip = locked
     ? "Profile locked to this folder"
     : !hasAnyProfile
       ? "No profiles configured — click to add one"
-      : !hasCredentials
-        ? `Profile '${active}' is missing a node URL or JWT — click to fix`
-        : `Active profile: ${active}${hostname ? ` (${hostname})` : ""} — click to switch`;
+      : !active
+        ? "Profiles exist but none is active — click to select one"
+        : !hasCredentials
+          ? `Profile '${active}' is missing a node URL or JWT — click to fix`
+          : `Active profile: ${active}${hostname ? ` (${hostname})` : ""} — click to switch`;
   _statusBarItem.show();
 };
 
