@@ -373,15 +373,19 @@ class DtlWalker {
     // Advance scan position past the opening bracket so nested calls are found later
     this.scanPos = arrayStart + 1;
 
-    // Recurse into any nested arrays (arguments that are themselves DTL calls)
-    for (let i = 1; i < arr.length; i++) {
-      if (Array.isArray(arr[i])) {
-        // Branch arguments of a top-level "if" or "case" inherit isTopLevel so that
-        // transform functions used as conditional branches are not mis-flagged as
-        // transform-in-expression (e.g. ["if", cond, ["add", ...]]).
-        // The condition argument (index 1 of "if") and all non-branch arguments stay false.
-        const isBranch = (firstName === "if" || firstName === "case") && i >= 2;
-        this.walkDtlArray(arr[i] as unknown[], isBranch ? isTopLevel : false, calls, errors);
+    // Recurse into any nested arrays (arguments that are themselves DTL calls).
+    // "comment" arguments are pure documentation and must not be validated as DTL
+    // calls — nested arrays like [" -- some text"] are intentional comment blocks.
+    if (firstName !== "comment") {
+      for (let i = 1; i < arr.length; i++) {
+        if (Array.isArray(arr[i])) {
+          // Branch arguments of a top-level "if" or "case" inherit isTopLevel so that
+          // transform functions used as conditional branches are not mis-flagged as
+          // transform-in-expression (e.g. ["if", cond, ["add", ...]]).
+          // The condition argument (index 1 of "if") and all non-branch arguments stay false.
+          const isBranch = (firstName === "if" || firstName === "case") && i >= 2;
+          this.walkDtlArray(arr[i] as unknown[], isBranch ? isTopLevel : false, calls, errors);
+        }
       }
     }
 
