@@ -113,7 +113,7 @@ export const getActiveProfileName = (): string => {
       .update("activeProfile", undefined, vscode.ConfigurationTarget.Workspace);
   }
 
-  return ctx().workspaceState.get<string>(ACTIVE_PROFILE_KEY) ?? legacyValue ?? "default";
+  return ctx().workspaceState.get<string>(ACTIVE_PROFILE_KEY) ?? legacyValue ?? "";
 };
 
 export const setActiveProfileName = async (name: string): Promise<void> => {
@@ -185,14 +185,20 @@ const _refreshStatusBar = async (): Promise<void> => {
   }
 
   const profiles = getStoredProfiles();
+  const storedNames = listStoredProfileNames();
+  const hasAnyProfile = profiles.length > 0 || storedNames.length > 0;
   const isProd = profiles.find((p) => p.name === active)?.production ?? false;
 
-  if (!hasCredentials) {
-    _statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+  if (!hasAnyProfile) {
+    _statusBarItem.backgroundColor = undefined;
+    _statusBarItem.color = new vscode.ThemeColor("list.warningForeground");
+    _statusBarItem.text = `$(account) Sesam: No profile configured — Click here to add new profile`;
+  } else if (!hasCredentials) {
+    _statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
     _statusBarItem.color = undefined;
     _statusBarItem.text = hostname
       ? `$(warning) ${active} · ${hostname}`
-      : `$(warning) Sesam: No credentials`;
+      : `$(warning) ${active}: missing credentials`;
   } else if (isProd) {
     _statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
     _statusBarItem.color = undefined;
@@ -214,10 +220,18 @@ const _refreshStatusBar = async (): Promise<void> => {
   }
 
   const locked = isProfileConnected();
-  _statusBarItem.command = locked ? undefined : "sesam.switchProfile";
+  _statusBarItem.command = locked
+    ? undefined
+    : hasAnyProfile
+      ? "sesam.switchProfile"
+      : "sesam.addProfile";
   _statusBarItem.tooltip = locked
     ? "Profile locked to this folder"
-    : "Click to switch Sesam profile";
+    : !hasAnyProfile
+      ? "No profiles configured — click to add one"
+      : !hasCredentials
+        ? `Profile '${active}' is missing a node URL or JWT — click to fix`
+        : `Active profile: ${active}${hostname ? ` (${hostname})` : ""} — click to switch`;
   _statusBarItem.show();
 };
 
@@ -680,9 +694,10 @@ export const runDeleteProfile = async (): Promise<void> => {
     ...new Set([...listStoredProfileNames(), ...getStoredProfiles().map((p) => p.name)]),
   ];
 
-  // If the deleted profile was active, fall back to the next available profile (or "default")
+  // If the deleted profile was active, fall back to the next available profile
   if (picked.label === activeProfile) {
-    await setActiveProfileName(remainingNames[0] ?? "default");
+    const next = remainingNames[0];
+    await setActiveProfileName(next ?? "");
     void _refreshStatusBar();
   }
 

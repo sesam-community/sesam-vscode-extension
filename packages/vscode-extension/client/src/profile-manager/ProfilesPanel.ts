@@ -181,7 +181,7 @@ export class ProfilesPanel {
       ];
 
       if (message.profileName === activeProfile) {
-        await setActiveProfileName(remainingNames[0] ?? "default");
+        await setActiveProfileName(remainingNames[0] ?? "");
       }
 
       if (remainingNames.length === 0) {
