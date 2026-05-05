@@ -29,6 +29,7 @@ import {
   removeProfile,
   runAddProfile,
   setActiveProfileName,
+  setNodeConnected,
   upsertProfile,
 } from "../profile-manager";
 
@@ -181,7 +182,8 @@ export class ProfilesPanel {
       ];
 
       if (message.profileName === activeProfile) {
-        await setActiveProfileName(remainingNames[0] ?? "");
+        await setActiveProfileName("");
+        setNodeConnected(false);
       }
 
       if (remainingNames.length === 0) {
