@@ -33,6 +33,7 @@ const PROFILE_CONNECTED_KEY = "sesam.profileConnected"; // true once a successfu
 
 let _context: vscode.ExtensionContext | undefined;
 let _statusBarItem: vscode.StatusBarItem | undefined;
+let _profilesPanelBtn: vscode.StatusBarItem | undefined;
 
 /** Tracks whether the Sesam node is currently confirmed reachable. */
 let _nodeConnected = false;
@@ -59,6 +60,13 @@ export const initProfileManager = (context: vscode.ExtensionContext): void => {
 
   _statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
   context.subscriptions.push(_statusBarItem);
+
+  _profilesPanelBtn = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 9);
+  _profilesPanelBtn.text = `$(organization)`;
+  _profilesPanelBtn.tooltip = "Sesam: Manage Profiles";
+  _profilesPanelBtn.command = "sesam.showProfiles";
+  _profilesPanelBtn.show();
+  context.subscriptions.push(_profilesPanelBtn);
 
   // If the workspace was marked as connected but all profiles have since been deleted,
   // clear the stale lock so the "Add Profile" button and command become available again.
@@ -723,7 +731,6 @@ export const runDeleteProfile = async (): Promise<void> => {
   if (picked.label === activeProfile) {
     const next = remainingNames[0];
     await setActiveProfileName(next ?? "");
-    void _refreshStatusBar();
   }
 
   // If no profiles remain, unlock the workspace so the user can add a new profile
@@ -731,6 +738,7 @@ export const runDeleteProfile = async (): Promise<void> => {
     await clearProfileConnected();
   }
 
+  void _refreshStatusBar();
   vscode.window.showInformationMessage(`Sesam: profile '${picked.label}' deleted.`);
   void vscode.commands.executeCommand("sesam.refreshProfilesPanel");
 };

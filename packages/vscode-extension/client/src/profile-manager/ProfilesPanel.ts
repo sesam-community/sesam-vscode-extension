@@ -189,6 +189,7 @@ export class ProfilesPanel {
       }
 
       await vscode.commands.executeCommand("sesam.refreshStatusBar");
+      await vscode.commands.executeCommand("sesam.refreshProfilesPanel");
       await this._loadAndSend();
       return;
     }
