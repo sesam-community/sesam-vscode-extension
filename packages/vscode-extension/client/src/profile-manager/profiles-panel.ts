@@ -142,18 +142,44 @@ export class ProfilesPanel {
 
     if (message.type === "saveProfile") {
       const trimmedPortal = message.portalUrl.trim();
+      const trimmedNode = message.nodeUrl.trim();
+      const trimmedJwt = message.jwt.trim();
       const isRename = message.oldName && message.oldName !== message.name;
+      const editedName = message.oldName || message.name;
+
+      // Detect credential/URL changes on the active connected profile so we
+      // can disconnect — the user must re-Connect with the new credentials.
+      const activeProfile = getActiveProfileName();
+
+      if (isProfileConnected() && editedName === activeProfile) {
+        const existingMeta = getStoredProfiles().find((p) => p.name === editedName);
+        const existingJwt = (await getToken(editedName)) ?? "";
+        const existingNode = existingMeta?.nodeUrl ?? "";
+        const existingPortal = existingMeta?.portalUrl ?? "";
+        const newPortalNorm =
+          trimmedPortal === DEFAULT_PORTAL_URL || trimmedPortal === "" ? "" : trimmedPortal;
+        const oldPortalNorm = existingPortal === DEFAULT_PORTAL_URL ? "" : existingPortal;
+        const credentialsChanged =
+          trimmedNode !== existingNode ||
+          newPortalNorm !== oldPortalNorm ||
+          (trimmedJwt !== "" && trimmedJwt !== existingJwt);
+
+        if (credentialsChanged || isRename) {
+          setNodeConnected(false);
+          await clearProfileConnected();
+        }
+      }
 
       await upsertProfile({
         name: message.name,
         portalUrl:
           trimmedPortal === DEFAULT_PORTAL_URL || trimmedPortal === "" ? undefined : trimmedPortal,
-        nodeUrl: message.nodeUrl.trim(),
+        nodeUrl: trimmedNode,
         production: message.production,
       });
 
-      if (message.jwt.trim()) {
-        await storeToken(message.name, message.jwt.trim());
+      if (trimmedJwt) {
+        await storeToken(message.name, trimmedJwt);
       }
 
       if (isRename) {

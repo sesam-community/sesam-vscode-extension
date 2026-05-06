@@ -546,13 +546,9 @@
           ? ''
           : '<button class="primary" data-action="connect" data-profile="' + escAttr(row.name) + '">Connect</button>';
 
-        const deleteBtn = isLocked
-          ? '<span class="badge badge-locked">🔒 Locked to folder</span>'
-          : '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Remove profile">🗑 Remove</button>';
+        const deleteBtn = '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Remove profile">🗑 Remove</button>';
 
-        const reconfigureBtn = isLocked
-          ? ''
-          : '<button class="secondary" data-action="editProfile" data-profile="' + escAttr(row.name) + '">Edit</button>';
+        const reconfigureBtn = '<button class="secondary" data-action="editProfile" data-profile="' + escAttr(row.name) + '">Edit</button>';
 
         const toggleProdBtn = isLocked
           ? ''
@@ -596,7 +592,11 @@
             return;
           }
 
-          console.log('[profiles-panel] postMessage', action, profile);
+          if (action === 'connect') {
+            btn.disabled = true;
+            btn.textContent = 'Connecting…';
+          }
+
           vscode.postMessage({ type: action, profileName: profile });
         });
       });
