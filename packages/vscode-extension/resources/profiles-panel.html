@@ -238,7 +238,6 @@
     .form-label {
       display: block;
       font-size: 12px;
-      opacity: 0.8;
       margin-bottom: 4px;
     }
 
@@ -355,6 +354,36 @@
     let _isLocked = false;
     let _formMode = 'new'; // 'new' | 'edit'
     let _formIsSaving = false;
+    let _formSnapshot = null;
+
+    const DEFAULT_PORTAL = 'https://portal.sesam.io';
+
+    // ── Dirty-check helpers ──
+
+    function _formSnapshot_take() {
+      return {
+        name: document.getElementById('f-name').value.trim(),
+        portal: document.getElementById('f-portal').value.trim(),
+        node: document.getElementById('f-node').value.trim(),
+        jwt: document.getElementById('f-jwt').value.trim(),
+        production: document.getElementById('f-production').checked,
+      };
+    }
+
+    function _isDirty() {
+      if (!_formSnapshot) return true;
+      const cur = _formSnapshot_take();
+      return cur.name !== _formSnapshot.name
+        || cur.portal !== _formSnapshot.portal
+        || cur.node !== _formSnapshot.node
+        || cur.jwt !== _formSnapshot.jwt
+        || cur.production !== _formSnapshot.production;
+    }
+
+    function _updateSaveBtn() {
+      const btn = document.getElementById('btn-form-save');
+      btn.disabled = !_isDirty();
+    }
 
     // ── Toolbar buttons ──
 
@@ -392,11 +421,18 @@
       document.getElementById('btn-form-save').disabled = true;
       document.getElementById('btn-form-save').textContent = 'Saving…';
       _formIsSaving = true;
+      _formSnapshot = null; // prevent re-enable via dirty-check while saving
 
       vscode.postMessage({ type: 'saveProfile', name, portalUrl, nodeUrl, jwt, production });
     });
 
     document.getElementById('btn-form-cancel').addEventListener('click', hideForm);
+
+    // Wire dirty-check to all form inputs
+    ['f-name', 'f-portal', 'f-node', 'f-jwt'].forEach((id) => {
+      document.getElementById(id).addEventListener('input', _updateSaveBtn);
+    });
+    document.getElementById('f-production').addEventListener('change', _updateSaveBtn);
 
     // ── Form helpers ──
 
@@ -412,18 +448,21 @@
 
       document.getElementById('form-name-row').style.display = mode === 'new' ? '' : 'none';
       document.getElementById('f-name').value = '';
-      document.getElementById('f-portal').value = row ? (row.portalUrl || '') : '';
+      document.getElementById('f-portal').value = row ? (row.portalUrl || DEFAULT_PORTAL) : DEFAULT_PORTAL;
       document.getElementById('f-node').value = row ? (row.nodeUrl || '') : '';
       document.getElementById('f-jwt').value = '';
       document.getElementById('f-production').checked = row ? (row.production || false) : false;
       document.getElementById('form-error').style.display = 'none';
-      document.getElementById('btn-form-save').disabled = false;
       document.getElementById('btn-form-save').textContent = 'Save';
 
       const hasExistingToken = mode === 'edit' && row && row.hasToken;
       document.getElementById('f-jwt-hint').style.display = hasExistingToken ? '' : 'none';
       document.getElementById('f-jwt-required').style.display = hasExistingToken ? 'none' : '';
       document.getElementById('profile-form-section').dataset.editName = (mode === 'edit' && row) ? row.name : '';
+
+      // Take snapshot AFTER values are set, then disable save until dirty
+      _formSnapshot = _formSnapshot_take();
+      document.getElementById('btn-form-save').disabled = true;
 
       if (mode === 'new') {
         document.getElementById('f-name').focus();
