@@ -55,6 +55,7 @@ interface ProfileRow {
 
 type MessageFromWebview =
   | { type: "ready" }
+  | { type: "connect"; profileName: string }
   | { type: "toggleProduction"; profileName: string }
   | { type: "deleteProfile"; profileName: string }
   | {
@@ -156,8 +157,15 @@ export class ProfilesPanel {
         await removeProfile(message.oldName);
       }
 
-      await setActiveProfileName(message.name);
       await vscode.commands.executeCommand("sesam.refreshStatusBar");
+      await this._loadAndSend();
+      return;
+    }
+
+    if (message.type === "connect") {
+      await setActiveProfileName(message.profileName);
+      await vscode.commands.executeCommand("sesam.refreshStatusBar");
+      await vscode.commands.executeCommand("sesam.download");
       await this._loadAndSend();
       return;
     }

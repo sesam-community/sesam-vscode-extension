@@ -131,13 +131,8 @@
       letter-spacing: 0.05em;
     }
 
-    .badge-active {
-      background: var(--vscode-testing-iconPassed, #4caf50);
-      color: #fff;
-    }
-
     .badge-connected {
-      background: var(--vscode-testing-iconPassed, #4caf50);
+      background: #1a7f37;
       color: #fff;
     }
 
@@ -547,6 +542,10 @@
           tokenHtml = '<span class="field-value token-none">not set</span>';
         }
 
+        const connectBtn = isLocked
+          ? ''
+          : '<button class="primary" data-action="connect" data-profile="' + escAttr(row.name) + '">$(play) Connect</button>';
+
         const deleteBtn = isLocked
           ? '<span class="badge badge-locked">🔒 Locked to folder</span>'
           : '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Remove profile">🗑 Remove</button>';
@@ -574,6 +573,7 @@
           + '<span class="field-label">JWT Token</span>' + tokenHtml
           + '</div>'
           + '<div class="card-actions">'
+          + connectBtn
           + reconfigureBtn
           + toggleProdBtn
           + deleteBtn
