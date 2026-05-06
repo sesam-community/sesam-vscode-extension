@@ -103,7 +103,7 @@
 
     .profile-card.active {
       border-color: var(--vscode-focusBorder);
-      background: var(--vscode-list-activeSelectionBackground, var(--vscode-editor-background));
+      border-width: 2px;
     }
 
     .profile-card.missing-metadata {
@@ -132,6 +132,11 @@
     }
 
     .badge-active {
+      background: var(--vscode-testing-iconPassed, #4caf50);
+      color: #fff;
+    }
+
+    .badge-connected {
       background: var(--vscode-testing-iconPassed, #4caf50);
       color: #fff;
     }
@@ -303,14 +308,14 @@
   <div class="toolbar">
     <h2>Sesam Profiles</h2>
     <button id="btn-add">+ Add Profile</button>
-    <button id="btn-reconfigure" style="display:none;">✎ Reconfigure Profile</button>
+    <button id="btn-reconfigure" style="display:none;">✎ Edit Profile</button>
   </div>
 
   <div class="content" id="content-section">
     <div class="state-msg" id="loading-msg">Loading…</div>
     <div class="profiles-grid" id="profiles-grid" style="display:none;"></div>
     <div class="legend" id="legend" style="display:none;">
-      <p>⚠ = Profile has a JWT stored but no node URL in this workspace. Click <em>Reconfigure</em> to set the node URL.</p>
+      <p>⚠ = Profile has a JWT stored but no node URL in this workspace. Click <em>Edit</em> to set the node URL.</p>
       <p>Token is shown masked (first 8 chars visible). Tokens are stored in VS Code SecretStorage and never written to disk.</p>
     </div>
   </div>
@@ -408,10 +413,8 @@
     // ── Form buttons ──
 
     document.getElementById('btn-form-save').addEventListener('click', () => {
-      const editName = document.getElementById('profile-form-section').dataset.editName;
-      const name = _formMode === 'new'
-        ? document.getElementById('f-name').value.trim()
-        : editName;
+      const oldName = document.getElementById('profile-form-section').dataset.editName || '';
+      const name = document.getElementById('f-name').value.trim();
       const portalUrl = document.getElementById('f-portal').value.trim();
       const nodeUrl = document.getElementById('f-node').value.trim();
       const jwt = document.getElementById('f-jwt').value.trim();
@@ -429,7 +432,7 @@
       _formIsSaving = true;
       _formSnapshot = null; // prevent re-enable via dirty-check while saving
 
-      vscode.postMessage({ type: 'saveProfile', name, portalUrl, nodeUrl, jwt, production });
+      vscode.postMessage({ type: 'saveProfile', name, oldName, portalUrl, nodeUrl, jwt, production });
     });
 
     document.getElementById('btn-form-cancel').addEventListener('click', hideForm);
@@ -449,10 +452,10 @@
       formEl.style.display = 'block';
 
       document.getElementById('form-heading').textContent =
-        mode === 'new' ? 'Configure Profile' : 'Reconfigure \'' + (row ? row.name : '') + '\'';
+        mode === 'new' ? 'Add Profile' : 'Edit \'' + (row ? row.name : '') + '\'';
 
-      document.getElementById('form-name-row').style.display = mode === 'new' ? '' : 'none';
-      document.getElementById('f-name').value = '';
+      document.getElementById('form-name-row').style.display = '';
+      document.getElementById('f-name').value = (mode === 'edit' && row) ? row.name : '';
       document.getElementById('f-portal').value = row ? (row.portalUrl || DEFAULT_PORTAL) : DEFAULT_PORTAL;
       document.getElementById('f-node').value = row ? (row.nodeUrl || '') : '';
       document.getElementById('f-jwt').value = (mode === 'edit' && row) ? (row.token || '') : '';
@@ -472,7 +475,7 @@
       if (mode === 'new') {
         document.getElementById('f-name').focus();
       } else {
-        document.getElementById('f-node').focus();
+        document.getElementById('f-name').focus();
       }
     }
 
@@ -513,8 +516,8 @@
           (row.isActive ? ' active' : '') +
           (!row.hasMetadata && row.hasToken ? ' missing-metadata' : '');
 
-        const activeBadge = row.isActive
-          ? '<span class="badge badge-active">active</span>'
+        const activeBadge = row.isConnected
+          ? '<span class="badge badge-connected">connected</span>'
           : '';
 
         const prodBadge = row.production
@@ -550,7 +553,7 @@
 
         const reconfigureBtn = isLocked
           ? ''
-          : '<button class="secondary" data-action="editProfile" data-profile="' + escAttr(row.name) + '">Reconfigure</button>';
+          : '<button class="secondary" data-action="editProfile" data-profile="' + escAttr(row.name) + '">Edit</button>';
 
         const toggleProdBtn = isLocked
           ? ''

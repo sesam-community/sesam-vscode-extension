@@ -46,6 +46,8 @@ interface ProfileRow {
   /** Full token value — sent to webview for pre-filling the edit form. */
   token: string;
   isActive: boolean;
+  /** True when this profile is the active one AND the workspace lock is set (node confirmed connected). */
+  isConnected: boolean;
   /** Profile has metadata in workspaceState. */
   hasMetadata: boolean;
   production: boolean;
@@ -58,6 +60,7 @@ type MessageFromWebview =
   | {
       type: "saveProfile";
       name: string;
+      oldName: string;
       portalUrl: string;
       nodeUrl: string;
       jwt: string;
@@ -134,6 +137,7 @@ export class ProfilesPanel {
 
     if (message.type === "saveProfile") {
       const trimmedPortal = message.portalUrl.trim();
+      const isRename = message.oldName && message.oldName !== message.name;
 
       await upsertProfile({
         name: message.name,
@@ -145,6 +149,11 @@ export class ProfilesPanel {
 
       if (message.jwt.trim()) {
         await storeToken(message.name, message.jwt.trim());
+      }
+
+      if (isRename) {
+        await deleteToken(message.oldName);
+        await removeProfile(message.oldName);
       }
 
       await setActiveProfileName(message.name);
@@ -233,6 +242,7 @@ export class ProfilesPanel {
           tokenHint,
           token: token ?? "",
           isActive: name === activeProfile,
+          isConnected: name === activeProfile && isProfileConnected(),
           hasMetadata: !!meta,
           production: meta?.production ?? false,
         };
