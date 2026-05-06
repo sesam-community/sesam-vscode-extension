@@ -244,7 +244,7 @@
       margin-bottom: 16px;
     }
 
-    .form-row { margin-bottom: 12px; }
+    .form-row { margin-bottom: 18px; }
 
     .form-label {
       display: block;
@@ -455,13 +455,13 @@
       document.getElementById('f-name').value = '';
       document.getElementById('f-portal').value = row ? (row.portalUrl || DEFAULT_PORTAL) : DEFAULT_PORTAL;
       document.getElementById('f-node').value = row ? (row.nodeUrl || '') : '';
-      document.getElementById('f-jwt').value = '';
+      document.getElementById('f-jwt').value = (mode === 'edit' && row) ? (row.token || '') : '';
       document.getElementById('f-production').checked = row ? (row.production || false) : false;
       document.getElementById('form-error').style.display = 'none';
       document.getElementById('btn-form-save').textContent = 'Save';
 
       const hasExistingToken = mode === 'edit' && row && row.hasToken;
-      document.getElementById('f-jwt-hint').style.display = hasExistingToken ? '' : 'none';
+      document.getElementById('f-jwt-hint').style.display = 'none';
       document.getElementById('f-jwt-required').style.display = hasExistingToken ? 'none' : '';
       document.getElementById('profile-form-section').dataset.editName = (mode === 'edit' && row) ? row.name : '';
 

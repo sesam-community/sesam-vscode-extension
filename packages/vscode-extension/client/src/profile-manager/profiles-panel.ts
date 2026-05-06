@@ -43,6 +43,8 @@ interface ProfileRow {
   hasToken: boolean;
   /** First 8 chars of the actual token — shown as partial hint. */
   tokenHint: string;
+  /** Full token value — sent to webview for pre-filling the edit form. */
+  token: string;
   isActive: boolean;
   /** Profile has metadata in workspaceState. */
   hasMetadata: boolean;
@@ -229,6 +231,7 @@ export class ProfilesPanel {
           portalUrl: meta?.portalUrl ?? DEFAULT_PORTAL_URL,
           hasToken,
           tokenHint,
+          token: token ?? "",
           isActive: name === activeProfile,
           hasMetadata: !!meta,
           production: meta?.production ?? false,
