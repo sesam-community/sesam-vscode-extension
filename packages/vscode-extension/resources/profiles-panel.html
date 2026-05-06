@@ -225,7 +225,8 @@
   <div class="toolbar">
     <h2>Sesam Profiles</h2>
     <button class="secondary" id="btn-refresh">↺ Refresh</button>
-    <button id="btn-add">+ Add Profile</button>
+    <button id="btn-add">+ Configure Profile</button>
+    <button id="btn-reconfigure" style="display:none;">✎ Reconfigure Profile</button>
   </div>
 
   <div class="content" id="content">
@@ -248,12 +249,16 @@
       vscode.postMessage({ type: 'addProfile' });
     });
 
+    document.getElementById('btn-reconfigure').addEventListener('click', () => {
+      vscode.postMessage({ type: 'addProfile' });
+    });
+
     function renderRows(rows, isLocked) {
       const grid = document.getElementById('profiles-grid');
       grid.innerHTML = '';
 
       if (!rows || rows.length === 0) {
-        document.getElementById('loading-msg').textContent = 'No profiles configured. Click "+ Add Profile" to get started.';
+        document.getElementById('loading-msg').textContent = 'No profile configured. Click "+ Configure Profile" to get started.';
         document.getElementById('loading-msg').style.display = 'flex';
         document.getElementById('profiles-grid').style.display = 'none';
         document.getElementById('legend').style.display = 'none';
@@ -306,7 +311,7 @@
             : '<button class="secondary" data-action="makeActive" data-profile="' + escAttr(row.name) + '">Make active</button>')
           : '';
 
-        const deleteBtn = '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Delete profile">🗑 Delete</button>';
+        const deleteBtn = '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Remove profile">🗑 Remove</button>';
 
         card.innerHTML =
           '<div class="card-header">'
@@ -321,14 +326,13 @@
           + '<span class="field-label">JWT Token</span>' + tokenHtml
           + '</div>'
           + '<div class="card-actions">'
-          + '<button class="secondary" data-action="editProfile" data-profile="' + escAttr(row.name) + '">Edit Profile</button>'
+          + '<button class="secondary" data-action="editProfile" data-profile="' + escAttr(row.name) + '">Reconfigure</button>'
           + '<button class="secondary" data-action="setToken" data-profile="' + escAttr(row.name) + '">'
           + (row.hasToken ? 'Update JWT' : 'Set JWT')
           + '</button>'
           + '<button class="secondary" data-action="toggleProduction" data-profile="' + escAttr(row.name) + '">'
           + (row.production ? 'Unmark Production' : 'Mark as Production')
           + '</button>'
-          + makeActiveBtn
           + deleteBtn
           + '</div>';
 
@@ -370,7 +374,9 @@
       }
 
       if (msg.type === 'data') {
-        document.getElementById('btn-add').style.display = msg.isLocked ? 'none' : '';
+        const hasProfile = msg.rows && msg.rows.length > 0;
+        document.getElementById('btn-add').style.display = (msg.isLocked || hasProfile) ? 'none' : '';
+        document.getElementById('btn-reconfigure').style.display = (!msg.isLocked && hasProfile) ? '' : 'none';
         renderRows(msg.rows, msg.isLocked);
       }
     });

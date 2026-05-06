@@ -155,8 +155,8 @@ export const getStoredProfiles = (): ProfileMeta[] =>
   ctx().workspaceState.get<ProfileMeta[]>(PROFILES_KEY) ?? [];
 
 export const upsertProfile = async (meta: ProfileMeta): Promise<void> => {
-  const profiles = getStoredProfiles().filter((p) => p.name !== meta.name);
-  await ctx().workspaceState.update(PROFILES_KEY, [...profiles, meta]);
+  // F28: enforce single profile per workspace — replace the whole array
+  await ctx().workspaceState.update(PROFILES_KEY, [meta]);
 };
 
 export const removeProfile = async (name: string): Promise<void> => {
@@ -517,7 +517,7 @@ type RunAddProfileOptions = { isNew: true } | { profileName: string } | undefine
 export const runAddProfile = async (options?: RunAddProfileOptions): Promise<void> => {
   if (isProfileConnected()) {
     vscode.window.showInformationMessage(
-      "Sesam: This folder is locked to its profile. Open a new folder to add a different profile.",
+      "Sesam: This folder is locked to its profile. Open a new folder to configure a different profile.",
     );
 
     return;
@@ -525,7 +525,6 @@ export const runAddProfile = async (options?: RunAddProfileOptions): Promise<voi
 
   const profileMetas = getStoredProfiles();
   const storedNames = listStoredProfileNames();
-  const activeProfile = getActiveProfileName();
 
   let profileName: string;
   let existingMeta: ProfileMeta | undefined;
@@ -536,60 +535,18 @@ export const runAddProfile = async (options?: RunAddProfileOptions): Promise<voi
     profileName = options.profileName;
     existingMeta = profileMetas.find((p) => p.name === profileName);
     isNew = false;
-  } else if (options && "isNew" in options && options.isNew) {
-    // Add flow: go directly to the name input box
-    const name = await vscode.window.showInputBox({
-      title: "Sesam: Add Profile — Profile name",
-      prompt: "Profile name (e.g. dev, staging, prod)",
-      placeHolder: "dev",
-      ignoreFocusOut: true,
-      validateInput: (v) => (v.trim() ? undefined : "Profile name cannot be empty"),
-    });
-
-    if (name === undefined) {
-      return;
-    }
-
-    profileName = name.trim();
-    existingMeta = undefined;
-    isNew = true;
   } else {
-    // Default: show the full QuickPick (used from sesam.switchProfile / command palette)
-    const backingNames = [...new Set([...storedNames, ...profileMetas.map((p) => p.name)])];
-    const allKnown = backingNames.includes(activeProfile)
-      ? [activeProfile, ...backingNames.filter((n) => n !== activeProfile)]
-      : backingNames;
+    // F28: if a profile already exists in this workspace, go straight to edit-mode
+    const existing = profileMetas[0] ?? (storedNames[0] ? { name: storedNames[0] } : undefined);
 
-    // No real profiles exist — skip the selection step and go straight to "add new"
-    if (allKnown.length === 0) {
-      await runAddProfile({ isNew: true });
-      return;
-    }
-
-    const NEW_PROFILE_LABEL = "$(add) New profile…";
-
-    const profileItems: vscode.QuickPickItem[] = [
-      ...allKnown.map((name) => ({
-        label: name,
-        description: name === activeProfile ? "$(check) active" : undefined,
-        detail: profileMetas.find((p) => p.name === name)?.nodeUrl,
-      })),
-      { label: NEW_PROFILE_LABEL, description: "Create a brand-new profile" },
-    ];
-
-    const profilePick = await vscode.window.showQuickPick(profileItems, {
-      title: "Sesam: Add / Update Profile — Step 1: Select or create",
-      placeHolder: "Select an existing profile to update, or create a new one",
-      ignoreFocusOut: true,
-    });
-
-    if (!profilePick) {
-      return;
-    }
-
-    if (profilePick.label === NEW_PROFILE_LABEL) {
+    if (existing) {
+      profileName = existing.name;
+      existingMeta = profileMetas.find((p) => p.name === profileName);
+      isNew = false;
+    } else {
+      // No profile yet — prompt for a name
       const name = await vscode.window.showInputBox({
-        title: "Sesam: Add Profile — Profile name",
+        title: "Sesam: Configure Profile — Step 1 of 5: Profile name",
         prompt: "Profile name (e.g. dev, staging, prod)",
         placeHolder: "dev",
         ignoreFocusOut: true,
@@ -603,18 +560,15 @@ export const runAddProfile = async (options?: RunAddProfileOptions): Promise<voi
       profileName = name.trim();
       existingMeta = undefined;
       isNew = true;
-    } else {
-      profileName = profilePick.label;
-      existingMeta = profileMetas.find((p) => p.name === profileName);
-      isNew = false;
     }
   }
 
   const stepOffset = isNew ? 2 : 1;
   const totalSteps = isNew ? 5 : 4;
+  const profileLabel = isNew ? "Configure Profile" : `Reconfigure '${profileName}'`;
 
   const portalUrl = await vscode.window.showInputBox({
-    title: `Sesam: Profile '${profileName}' — Step ${stepOffset} of ${totalSteps}: Portal URL`,
+    title: `Sesam: ${profileLabel} — Step ${stepOffset} of ${totalSteps}: Portal URL`,
     prompt: "Management Studio URL (press Enter to keep / use the default)",
     placeHolder: DEFAULT_PORTAL_URL,
     value: existingMeta?.portalUrl ?? DEFAULT_PORTAL_URL,
@@ -628,7 +582,7 @@ export const runAddProfile = async (options?: RunAddProfileOptions): Promise<voi
   }
 
   const nodeUrl = await vscode.window.showInputBox({
-    title: `Sesam: Profile '${profileName}' — Step ${stepOffset + 1} of ${totalSteps}: Node URL`,
+    title: `Sesam: ${profileLabel} — Step ${stepOffset + 1} of ${totalSteps}: Node URL`,
     prompt: "Sesam node URL",
     placeHolder: "https://datahub-xxxxxxxx.sesam.cloud",
     value: existingMeta?.nodeUrl ?? "",
@@ -641,7 +595,7 @@ export const runAddProfile = async (options?: RunAddProfileOptions): Promise<voi
   }
 
   const jwt = await vscode.window.showInputBox({
-    title: `Sesam: Profile '${profileName}' — Step ${totalSteps - 1} of ${totalSteps}: JWT Token`,
+    title: `Sesam: ${profileLabel} — Step ${totalSteps - 1} of ${totalSteps}: JWT Token`,
     prompt: "Paste your JWT token (obtained from the Sesam portal)",
     placeHolder: "eyJ…",
     password: true,
@@ -662,7 +616,7 @@ export const runAddProfile = async (options?: RunAddProfileOptions): Promise<voi
       },
     ],
     {
-      title: `Sesam: Profile '${profileName}' — Step ${totalSteps} of ${totalSteps}: Production?`,
+      title: `Sesam: ${profileLabel} — Step ${totalSteps} of ${totalSteps}: Production?`,
       placeHolder: "Is this a production environment?",
       ignoreFocusOut: true,
     },
@@ -694,51 +648,30 @@ export const runDeleteProfile = async (): Promise<void> => {
     return;
   }
 
+  // F28: single profile per workspace — no QuickPick needed
+  const profileToDelete = knownNames[0];
   const activeProfile = getActiveProfileName();
 
-  const items: vscode.QuickPickItem[] = knownNames.map((name) => ({
-    label: name,
-    description: name === activeProfile ? "$(check) active" : undefined,
-  }));
-
-  const picked = await vscode.window.showQuickPick(items, {
-    title: "Sesam: Delete Profile — Select profile",
-    placeHolder: "Select a profile to delete",
-  });
-
-  if (!picked) {
-    return;
-  }
-
   const confirmed = await vscode.window.showWarningMessage(
-    `Delete profile '${picked.label}'? This removes the stored JWT and node URL.`,
+    `Remove profile '${profileToDelete}' from this workspace? This deletes the stored JWT and node URL.`,
     { modal: true },
-    "Delete",
+    "Remove",
   );
 
-  if (confirmed !== "Delete") {
+  if (confirmed !== "Remove") {
     return;
   }
 
-  await deleteToken(picked.label);
-  await removeProfile(picked.label);
+  await deleteToken(profileToDelete);
+  await removeProfile(profileToDelete);
 
-  const remainingNames = [
-    ...new Set([...listStoredProfileNames(), ...getStoredProfiles().map((p) => p.name)]),
-  ];
-
-  // If the deleted profile was active, clear the active selection and unlock the workspace
-  if (picked.label === activeProfile) {
-    await setActiveProfileName("");
-    _nodeConnected = false;
-    await clearProfileConnected();
-  } else if (remainingNames.length === 0) {
-    // Last profile deleted (non-active) — also unlock
-    await clearProfileConnected();
-  }
+  // Always clear active selection and workspace lock on delete
+  await setActiveProfileName("");
+  _nodeConnected = false;
+  await clearProfileConnected();
 
   void _refreshStatusBar();
-  vscode.window.showInformationMessage(`Sesam: profile '${picked.label}' deleted.`);
+  vscode.window.showInformationMessage(`Sesam: profile '${profileToDelete}' removed.`);
   void vscode.commands.executeCommand("sesam.refreshProfilesPanel");
 };
 

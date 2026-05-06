@@ -173,11 +173,11 @@
       },
       {
         "command": "sesam.addProfile",
-        "title": "Sesam: Add Profile"
+        "title": "Sesam: Configure Profile"
       },
       {
         "command": "sesam.deleteProfile",
-        "title": "Sesam: Delete Profile"
+        "title": "Sesam: Remove Profile"
       },
       {
         "command": "sesam.listProfiles",
@@ -185,7 +185,7 @@
       },
       {
         "command": "sesam.switchProfile",
-        "title": "Sesam: Switch Profile"
+        "title": "Sesam: Reconfigure Profile"
       },
       {
         "command": "sesam.showProfiles",
