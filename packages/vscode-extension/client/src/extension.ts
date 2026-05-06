@@ -330,9 +330,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.showInformationMessage(`Sesam: Connected to '${profileName}' successfully.`);
     } else {
       setNodeConnected(false);
-      vscode.window.showErrorMessage(
-        `Sesam: Could not reach node — ${"message" in ping ? (ping as { message: string }).message : ping.status}.`,
-      );
+      vscode.window.showErrorMessage(`Sesam: Could not reach node — ${ping.message}.`);
     }
   };
 
