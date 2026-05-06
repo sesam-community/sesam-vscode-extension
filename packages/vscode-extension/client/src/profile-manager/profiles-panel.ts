@@ -19,17 +19,19 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { getToken, listStoredProfileNames, deleteToken } from "../credential-manager";
+import { getToken, listStoredProfileNames, deleteToken, storeToken } from "./credential-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
+import { getSesamChannel } from "../sesam-channel";
 import {
   getActiveProfileName,
   getStoredProfiles,
   isProfileConnected,
+  clearProfileConnected,
   removeProfile,
-  runAddProfile,
   setActiveProfileName,
+  setNodeConnected,
   upsertProfile,
-} from "../profile-manager";
+} from "./profile-manager";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,7 +44,11 @@ interface ProfileRow {
   hasToken: boolean;
   /** First 8 chars of the actual token — shown as partial hint. */
   tokenHint: string;
+  /** Full token value — sent to webview for pre-filling the edit form. */
+  token: string;
   isActive: boolean;
+  /** True when this profile is the active one AND the workspace lock is set (node confirmed connected). */
+  isConnected: boolean;
   /** Profile has metadata in workspaceState. */
   hasMetadata: boolean;
   production: boolean;
@@ -50,13 +56,18 @@ interface ProfileRow {
 
 type MessageFromWebview =
   | { type: "ready" }
-  | { type: "refresh" }
-  | { type: "setToken"; profileName: string }
-  | { type: "editProfile"; profileName: string }
-  | { type: "makeActive"; profileName: string }
+  | { type: "connect"; profileName: string }
   | { type: "toggleProduction"; profileName: string }
   | { type: "deleteProfile"; profileName: string }
-  | { type: "addProfile" };
+  | {
+      type: "saveProfile";
+      name: string;
+      oldName: string;
+      portalUrl: string;
+      nodeUrl: string;
+      jwt: string;
+      production: boolean;
+    };
 
 // ---------------------------------------------------------------------------
 // ProfilesPanel
@@ -65,6 +76,9 @@ type MessageFromWebview =
 export class ProfilesPanel {
   static currentPanel: ProfilesPanel | undefined;
   private static readonly _viewType = "sesamProfiles";
+
+  /** Wired in extension.ts — pings the node and locks the workspace to the profile. */
+  static onConnect: ((profileName: string) => Promise<void>) | undefined;
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
@@ -121,27 +135,72 @@ export class ProfilesPanel {
   // ── Message handler ───────────────────────────────────────────────────────
 
   private async _handleMessage(message: MessageFromWebview): Promise<void> {
-    if (message.type === "ready" || message.type === "refresh") {
+    if (message.type === "ready") {
       await this._loadAndSend();
       return;
     }
 
-    if (message.type === "setToken") {
-      // Switch to that profile first so sesam.setToken targets the right one
-      await setActiveProfileName(message.profileName);
-      await vscode.commands.executeCommand("sesam.setToken");
+    if (message.type === "saveProfile") {
+      const trimmedPortal = message.portalUrl.trim();
+      const trimmedNode = message.nodeUrl.trim();
+      const trimmedJwt = message.jwt.trim();
+      const isRename = message.oldName && message.oldName !== message.name;
+      const editedName = message.oldName || message.name;
+
+      // Detect credential/URL changes on the active connected profile so we
+      // can disconnect — the user must re-Connect with the new credentials.
+      const activeProfile = getActiveProfileName();
+
+      if (isProfileConnected() && editedName === activeProfile) {
+        const existingMeta = getStoredProfiles().find((p) => p.name === editedName);
+        const existingJwt = (await getToken(editedName)) ?? "";
+        const existingNode = existingMeta?.nodeUrl ?? "";
+        const existingPortal = existingMeta?.portalUrl ?? "";
+        const newPortalNorm =
+          trimmedPortal === DEFAULT_PORTAL_URL || trimmedPortal === "" ? "" : trimmedPortal;
+        const oldPortalNorm = existingPortal === DEFAULT_PORTAL_URL ? "" : existingPortal;
+        const credentialsChanged =
+          trimmedNode !== existingNode ||
+          newPortalNorm !== oldPortalNorm ||
+          (trimmedJwt !== "" && trimmedJwt !== existingJwt);
+
+        if (credentialsChanged || isRename) {
+          setNodeConnected(false);
+          await clearProfileConnected();
+        }
+      }
+
+      await upsertProfile({
+        name: message.name,
+        portalUrl:
+          trimmedPortal === DEFAULT_PORTAL_URL || trimmedPortal === "" ? undefined : trimmedPortal,
+        nodeUrl: trimmedNode,
+        production: message.production,
+      });
+
+      if (trimmedJwt) {
+        await storeToken(message.name, trimmedJwt);
+      }
+
+      if (isRename) {
+        await deleteToken(message.oldName);
+        await removeProfile(message.oldName);
+      }
+
+      await vscode.commands.executeCommand("sesam.refreshStatusBar");
       await this._loadAndSend();
       return;
     }
 
-    if (message.type === "editProfile") {
-      await runAddProfile({ profileName: message.profileName });
-      await this._loadAndSend();
-      return;
-    }
+    if (message.type === "connect") {
+      getSesamChannel().appendLine(
+        `[PROFILES] connect received for '${message.profileName}', onConnect=${!!ProfilesPanel.onConnect}`,
+      );
 
-    if (message.type === "makeActive") {
-      await vscode.commands.executeCommand("sesam.switchProfile", message.profileName);
+      if (ProfilesPanel.onConnect) {
+        await ProfilesPanel.onConnect(message.profileName);
+      }
+
       await this._loadAndSend();
       return;
     }
@@ -175,22 +234,22 @@ export class ProfilesPanel {
       await deleteToken(message.profileName);
       await removeProfile(message.profileName);
 
-      if (message.profileName === activeProfile) {
-        const remainingNames = [
-          ...new Set([...listStoredProfileNames(), ...getStoredProfiles().map((p) => p.name)]),
-        ].filter((n) => n !== message.profileName);
+      const remainingNames = [
+        ...new Set([...listStoredProfileNames(), ...getStoredProfiles().map((p) => p.name)]),
+      ];
 
-        await setActiveProfileName(remainingNames[0] ?? "default");
+      if (message.profileName === activeProfile) {
+        await setActiveProfileName("");
+        setNodeConnected(false);
+        await clearProfileConnected();
+      } else if (remainingNames.length === 0) {
+        await clearProfileConnected();
       }
 
       await vscode.commands.executeCommand("sesam.refreshStatusBar");
+      await vscode.commands.executeCommand("sesam.refreshProfilesPanel");
       await this._loadAndSend();
       return;
-    }
-
-    if (message.type === "addProfile") {
-      await runAddProfile({ isNew: true });
-      await this._loadAndSend();
     }
   }
 
@@ -224,7 +283,9 @@ export class ProfilesPanel {
           portalUrl: meta?.portalUrl ?? DEFAULT_PORTAL_URL,
           hasToken,
           tokenHint,
+          token: token ?? "",
           isActive: name === activeProfile,
+          isConnected: name === activeProfile && isProfileConnected(),
           hasMetadata: !!meta,
           production: meta?.production ?? false,
         };

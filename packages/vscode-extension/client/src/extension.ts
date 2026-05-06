@@ -22,18 +22,18 @@ import {
   deleteToken,
   listStoredProfileNames,
   storeToken,
-} from "./credential-manager";
+} from "./profile-manager/credential-manager";
 import { buildDagIndex, buildSystemIndex, extractFullPipeInfo } from "./graph/pipe-dag-builder";
 import { PipeDependentsProvider } from "./graph/PipeDependentsProvider";
 import { PipeLineageProvider } from "./graph/PipeLineageProvider";
 import { SystemPipesProvider } from "./graph/SystemPipesProvider";
-import { PreviewPanel } from "./preview/PreviewPanel";
+import { PreviewPanel } from "./preview/preview-panel";
 import {
   initProfileManager,
   getActiveProfileName,
+  setActiveProfileName,
   refreshStatusBar,
   resolveNodeUrl,
-  runAddProfile,
   runDeleteProfile,
   runListProfiles,
   runSwitchProfile,
@@ -41,11 +41,11 @@ import {
   setNodeConnected,
   setProfileConnected,
   profileSwitchHooks,
-} from "./profile-manager";
+} from "./profile-manager/profile-manager";
 import { SesamErrorsProvider } from "./SesamErrorsProvider";
 import { registerSesamLmTools } from "./lm-tools";
 import { registerSesamChatParticipant } from "./sesam-chat-participant";
-import { resolveCredentials } from "./credential-resolver";
+import { resolveCredentials } from "./profile-manager/credential-resolver";
 import { registerSesamTestController, isSesamTestRunning } from "./testing/sesam-test-controller";
 import {
   fetchNodeStatusHint,
@@ -57,8 +57,8 @@ import { pingNode } from "./node-client";
 import { disposeSesamChannel, getSesamChannel, logNodeRequest } from "./sesam-channel";
 import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
-import { NodeStatusPanel } from "./node-status/NodeStatusPanel";
-import { ProfilesPanel } from "./profile-manager/ProfilesPanel";
+import { NodeStatusPanel } from "./node-status/node-status-panel";
+import { ProfilesPanel } from "./profile-manager/profiles-panel";
 import {
   SyncStatusProvider,
   SesamNodeConfigProvider,
@@ -296,6 +296,43 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   NodeStatusPanel.context = context;
   NodeStatusPanel.onNodeCheckStart = () => showNodeStatus("checking");
   NodeStatusPanel.onNodeCheckSuccess = () => showNodeStatus("connected");
+
+  ProfilesPanel.onConnect = async (profileName: string) => {
+    await setActiveProfileName(profileName);
+    await vscode.commands.executeCommand("sesam.refreshStatusBar");
+
+    const creds = await resolveCredentials();
+
+    if (!creds) {
+      vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+      return;
+    }
+
+    const ready = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+    if (!ready) {
+      return;
+    }
+
+    const ping = await pingNode(creds.nodeUrl, creds.jwt, logNodeRequest);
+
+    if (ping.status === "auth") {
+      vscode.window.showErrorMessage(
+        "Sesam: Authentication failed \u2014 JWT may be invalid or expired.",
+      );
+      return;
+    }
+
+    if (ping.status === "ok") {
+      await setProfileConnected();
+      setNodeConnected(true);
+      await vscode.commands.executeCommand("sesam.refreshStatusBar");
+      vscode.window.showInformationMessage(`Sesam: Connected to '${profileName}' successfully.`);
+    } else {
+      setNodeConnected(false);
+      vscode.window.showErrorMessage(`Sesam: Could not reach node — ${ping.message}.`);
+    }
+  };
 
   // Reset all node state when the user switches profiles so the old poller
   // doesn't linger and sesam.nodeProvisioning is cleared for the new profile.
@@ -1576,7 +1613,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.showInformationMessage(`Sesam: JWT deleted for profile '${picked}'.`);
     }),
 
-    vscode.commands.registerCommand("sesam.addProfile", () => runAddProfile()),
+    vscode.commands.registerCommand("sesam.addProfile", () =>
+      ProfilesPanel.createOrShow(context.extensionUri),
+    ),
     vscode.commands.registerCommand("sesam.deleteProfile", () => runDeleteProfile()),
     vscode.commands.registerCommand("sesam.listProfiles", () => runListProfiles()),
     vscode.commands.registerCommand("sesam.switchProfile", (targetProfile?: string) =>

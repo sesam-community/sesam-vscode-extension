@@ -11,7 +11,7 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { resolveCredentials } from "../credential-resolver";
+import { resolveCredentials } from "../profile-manager/credential-resolver";
 import { fetchDatasetEntities, previewPipe } from "../node-client";
 import { fetchNodeStatusHint } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
