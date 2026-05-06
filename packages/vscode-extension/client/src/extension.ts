@@ -33,7 +33,6 @@ import {
   getActiveProfileName,
   refreshStatusBar,
   resolveNodeUrl,
-  runAddProfile,
   runDeleteProfile,
   runListProfiles,
   runSwitchProfile,
@@ -1576,7 +1575,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.showInformationMessage(`Sesam: JWT deleted for profile '${picked}'.`);
     }),
 
-    vscode.commands.registerCommand("sesam.addProfile", () => runAddProfile()),
+    vscode.commands.registerCommand("sesam.addProfile", () =>
+      ProfilesPanel.createOrShow(context.extensionUri),
+    ),
     vscode.commands.registerCommand("sesam.deleteProfile", () => runDeleteProfile()),
     vscode.commands.registerCommand("sesam.listProfiles", () => runListProfiles()),
     vscode.commands.registerCommand("sesam.switchProfile", (targetProfile?: string) =>

@@ -19,7 +19,7 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { getToken, listStoredProfileNames, deleteToken } from "./credential-manager";
+import { getToken, listStoredProfileNames, deleteToken, storeToken } from "./credential-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
 import {
   getActiveProfileName,
@@ -27,7 +27,6 @@ import {
   isProfileConnected,
   clearProfileConnected,
   removeProfile,
-  runAddProfile,
   setActiveProfileName,
   setNodeConnected,
   upsertProfile,
@@ -53,12 +52,16 @@ interface ProfileRow {
 type MessageFromWebview =
   | { type: "ready" }
   | { type: "refresh" }
-  | { type: "setToken"; profileName: string }
-  | { type: "editProfile"; profileName: string }
-  | { type: "makeActive"; profileName: string }
   | { type: "toggleProduction"; profileName: string }
   | { type: "deleteProfile"; profileName: string }
-  | { type: "addProfile" };
+  | {
+      type: "saveProfile";
+      name: string;
+      portalUrl: string;
+      nodeUrl: string;
+      jwt: string;
+      production: boolean;
+    };
 
 // ---------------------------------------------------------------------------
 // ProfilesPanel
@@ -128,22 +131,23 @@ export class ProfilesPanel {
       return;
     }
 
-    if (message.type === "setToken") {
-      // Switch to that profile first so sesam.setToken targets the right one
-      await setActiveProfileName(message.profileName);
-      await vscode.commands.executeCommand("sesam.setToken");
-      await this._loadAndSend();
-      return;
-    }
+    if (message.type === "saveProfile") {
+      const trimmedPortal = message.portalUrl.trim();
 
-    if (message.type === "editProfile") {
-      await runAddProfile({ profileName: message.profileName });
-      await this._loadAndSend();
-      return;
-    }
+      await upsertProfile({
+        name: message.name,
+        portalUrl:
+          trimmedPortal === DEFAULT_PORTAL_URL || trimmedPortal === "" ? undefined : trimmedPortal,
+        nodeUrl: message.nodeUrl.trim(),
+        production: message.production,
+      });
 
-    if (message.type === "makeActive") {
-      await vscode.commands.executeCommand("sesam.switchProfile", message.profileName);
+      if (message.jwt.trim()) {
+        await storeToken(message.name, message.jwt.trim());
+      }
+
+      await setActiveProfileName(message.name);
+      await vscode.commands.executeCommand("sesam.refreshStatusBar");
       await this._loadAndSend();
       return;
     }
@@ -193,11 +197,6 @@ export class ProfilesPanel {
       await vscode.commands.executeCommand("sesam.refreshProfilesPanel");
       await this._loadAndSend();
       return;
-    }
-
-    if (message.type === "addProfile") {
-      await runAddProfile({ isNew: true });
-      await this._loadAndSend();
     }
   }
 

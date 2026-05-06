@@ -219,6 +219,70 @@
     }
 
     .legend p { margin-bottom: 3px; }
+
+    /* ── profile form ── */
+    .form-container { max-width: 520px; }
+
+    .form-container h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .form-row { margin-bottom: 12px; }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 4px;
+    }
+
+    .required { color: var(--vscode-inputValidation-errorBorder, #f48771); }
+
+    .form-input {
+      width: 100%;
+      padding: 4px 8px;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+      border-radius: 2px;
+      font-size: 12px;
+      font-family: var(--vscode-font-family);
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .form-input:focus { border-color: var(--vscode-focusBorder); }
+
+    .jwt-wrap { display: flex; gap: 6px; }
+    .jwt-wrap .form-input { flex: 1; }
+
+    .form-hint {
+      font-size: 11px;
+      opacity: 0.6;
+      margin-top: 3px;
+    }
+
+    .checkbox-label {
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .form-error {
+      font-size: 12px;
+      color: var(--vscode-inputValidation-errorBorder, #f48771);
+      margin-bottom: 8px;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
   </style>
 </head>
 <body>
@@ -229,29 +293,171 @@
     <button id="btn-reconfigure" style="display:none;">✎ Reconfigure Profile</button>
   </div>
 
-  <div class="content" id="content">
+  <div class="content" id="content-section">
     <div class="state-msg" id="loading-msg">Loading…</div>
     <div class="profiles-grid" id="profiles-grid" style="display:none;"></div>
     <div class="legend" id="legend" style="display:none;">
-      <p>⚠ = Profile has a JWT stored but no node URL in this workspace. Run <em>Add Profile</em> to set the node URL.</p>
+      <p>⚠ = Profile has a JWT stored but no node URL in this workspace. Click <em>Reconfigure</em> to set the node URL.</p>
       <p>Token is shown masked (first 8 chars visible). Tokens are stored in VS Code SecretStorage and never written to disk.</p>
+    </div>
+  </div>
+
+  <div class="content" id="profile-form-section" style="display:none;">
+    <div class="form-container">
+      <h3 id="form-heading">Configure Profile</h3>
+
+      <div id="form-name-row" class="form-row">
+        <label for="f-name" class="form-label">Profile name <span class="required">*</span></label>
+        <input id="f-name" class="form-input" type="text" placeholder="dev" autocomplete="off" />
+      </div>
+
+      <div class="form-row">
+        <label for="f-portal" class="form-label">Portal URL</label>
+        <input id="f-portal" class="form-input" type="text" placeholder="https://portal.sesam.io" autocomplete="off" />
+      </div>
+
+      <div class="form-row">
+        <label for="f-node" class="form-label">Node URL <span class="required">*</span></label>
+        <input id="f-node" class="form-input" type="text" placeholder="https://datahub-xxxxxxxx.sesam.cloud" autocomplete="off" />
+      </div>
+
+      <div class="form-row">
+        <label for="f-jwt" class="form-label">JWT Token <span id="f-jwt-required" class="required">*</span></label>
+        <div class="jwt-wrap">
+          <input id="f-jwt" class="form-input" type="password" placeholder="eyJ…" autocomplete="off" />
+          <button type="button" class="secondary" id="btn-jwt-toggle">Show</button>
+        </div>
+        <p id="f-jwt-hint" class="form-hint" style="display:none;">Existing token is set — leave blank to keep it.</p>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">Production</label>
+        <label class="checkbox-label">
+          <input id="f-production" type="checkbox" />
+          Mark as production environment
+        </label>
+      </div>
+
+      <p id="form-error" class="form-error" style="display:none;"></p>
+
+      <div class="form-actions">
+        <button id="btn-form-save">Save</button>
+        <button class="secondary" id="btn-form-cancel">Cancel</button>
+      </div>
     </div>
   </div>
 
   <script>
     const vscode = acquireVsCodeApi();
 
+    let _currentRows = [];
+    let _isLocked = false;
+    let _formMode = 'new'; // 'new' | 'edit'
+    let _formIsSaving = false;
+
+    // ── Toolbar buttons ──
+
     document.getElementById('btn-refresh').addEventListener('click', () => {
       vscode.postMessage({ type: 'refresh' });
     });
 
     document.getElementById('btn-add').addEventListener('click', () => {
-      vscode.postMessage({ type: 'addProfile' });
+      showForm('new', null);
     });
 
     document.getElementById('btn-reconfigure').addEventListener('click', () => {
-      vscode.postMessage({ type: 'addProfile' });
+      if (_currentRows.length > 0) showForm('edit', _currentRows[0]);
     });
+
+    // ── Form buttons ──
+
+    document.getElementById('btn-jwt-toggle').addEventListener('click', () => {
+      const input = document.getElementById('f-jwt');
+      const btn = document.getElementById('btn-jwt-toggle');
+
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Hide';
+      } else {
+        input.type = 'password';
+        btn.textContent = 'Show';
+      }
+    });
+
+    document.getElementById('btn-form-save').addEventListener('click', () => {
+      const editName = document.getElementById('profile-form-section').dataset.editName;
+      const name = _formMode === 'new'
+        ? document.getElementById('f-name').value.trim()
+        : editName;
+      const portalUrl = document.getElementById('f-portal').value.trim();
+      const nodeUrl = document.getElementById('f-node').value.trim();
+      const jwt = document.getElementById('f-jwt').value.trim();
+      const production = document.getElementById('f-production').checked;
+
+      if (!name) { showFormError('Profile name is required.'); return; }
+      if (!nodeUrl) { showFormError('Node URL is required.'); return; }
+      if (!nodeUrl.startsWith('http')) { showFormError('Node URL must start with http(s)://'); return; }
+      if (portalUrl && !portalUrl.startsWith('http')) { showFormError('Portal URL must start with http(s)://'); return; }
+      if (_formMode === 'new' && !jwt) { showFormError('JWT Token is required.'); return; }
+
+      document.getElementById('form-error').style.display = 'none';
+      document.getElementById('btn-form-save').disabled = true;
+      document.getElementById('btn-form-save').textContent = 'Saving…';
+      _formIsSaving = true;
+
+      vscode.postMessage({ type: 'saveProfile', name, portalUrl, nodeUrl, jwt, production });
+    });
+
+    document.getElementById('btn-form-cancel').addEventListener('click', hideForm);
+
+    // ── Form helpers ──
+
+    function showForm(mode, row) {
+      _formMode = mode;
+      document.getElementById('content-section').style.display = 'none';
+      document.getElementById('profile-form-section').style.display = 'flex';
+
+      document.getElementById('form-heading').textContent =
+        mode === 'new' ? 'Configure Profile' : 'Reconfigure \'' + (row ? row.name : '') + '\'';
+
+      document.getElementById('form-name-row').style.display = mode === 'new' ? '' : 'none';
+      document.getElementById('f-name').value = '';
+      document.getElementById('f-portal').value = row ? (row.portalUrl || '') : '';
+      document.getElementById('f-node').value = row ? (row.nodeUrl || '') : '';
+      document.getElementById('f-jwt').value = '';
+      document.getElementById('f-jwt').type = 'password';
+      document.getElementById('btn-jwt-toggle').textContent = 'Show';
+      document.getElementById('f-production').checked = row ? (row.production || false) : false;
+      document.getElementById('form-error').style.display = 'none';
+      document.getElementById('btn-form-save').disabled = false;
+      document.getElementById('btn-form-save').textContent = 'Save';
+
+      const hasExistingToken = mode === 'edit' && row && row.hasToken;
+      document.getElementById('f-jwt-hint').style.display = hasExistingToken ? '' : 'none';
+      document.getElementById('f-jwt-required').style.display = hasExistingToken ? 'none' : '';
+      document.getElementById('profile-form-section').dataset.editName = (mode === 'edit' && row) ? row.name : '';
+
+      if (mode === 'new') {
+        document.getElementById('f-name').focus();
+      } else {
+        document.getElementById('f-node').focus();
+      }
+    }
+
+    function hideForm() {
+      _formMode = 'new';
+      _formIsSaving = false;
+      document.getElementById('profile-form-section').style.display = 'none';
+      document.getElementById('content-section').style.display = 'flex';
+    }
+
+    function showFormError(msg) {
+      const el = document.getElementById('form-error');
+      el.textContent = msg;
+      el.style.display = '';
+    }
+
+    // ── Grid rendering ──
 
     function renderRows(rows, isLocked) {
       const grid = document.getElementById('profiles-grid');
@@ -296,6 +502,7 @@
           : '<span class="field-value missing">(default)</span>';
 
         let tokenHtml;
+
         if (row.hasToken) {
           tokenHtml = '<span class="token-field">'
             + '<span class="token-dots">••••••••</span>'
@@ -305,13 +512,19 @@
           tokenHtml = '<span class="field-value token-none">not set</span>';
         }
 
-        const makeActiveBtn = !row.isActive
-          ? (isLocked
-            ? '<span class="badge badge-locked">🔒 Locked to folder</span>'
-            : '<button class="secondary" data-action="makeActive" data-profile="' + escAttr(row.name) + '">Make active</button>')
-          : '';
+        const deleteBtn = isLocked
+          ? '<span class="badge badge-locked">🔒 Locked to folder</span>'
+          : '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Remove profile">🗑 Remove</button>';
 
-        const deleteBtn = '<button class="secondary btn-danger" data-action="deleteProfile" data-profile="' + escAttr(row.name) + '" title="Remove profile">🗑 Remove</button>';
+        const reconfigureBtn = isLocked
+          ? ''
+          : '<button class="secondary" data-action="editProfile" data-profile="' + escAttr(row.name) + '">Reconfigure</button>';
+
+        const toggleProdBtn = isLocked
+          ? ''
+          : '<button class="secondary" data-action="toggleProduction" data-profile="' + escAttr(row.name) + '">'
+            + (row.production ? 'Unmark Production' : 'Mark as Production')
+            + '</button>';
 
         card.innerHTML =
           '<div class="card-header">'
@@ -326,13 +539,8 @@
           + '<span class="field-label">JWT Token</span>' + tokenHtml
           + '</div>'
           + '<div class="card-actions">'
-          + '<button class="secondary" data-action="editProfile" data-profile="' + escAttr(row.name) + '">Reconfigure</button>'
-          + '<button class="secondary" data-action="setToken" data-profile="' + escAttr(row.name) + '">'
-          + (row.hasToken ? 'Update JWT' : 'Set JWT')
-          + '</button>'
-          + '<button class="secondary" data-action="toggleProduction" data-profile="' + escAttr(row.name) + '">'
-          + (row.production ? 'Unmark Production' : 'Mark as Production')
-          + '</button>'
+          + reconfigureBtn
+          + toggleProdBtn
           + deleteBtn
           + '</div>';
 
@@ -344,6 +552,14 @@
         btn.addEventListener('click', () => {
           const action = btn.getAttribute('data-action');
           const profile = btn.getAttribute('data-profile');
+
+          if (action === 'editProfile') {
+            const row = _currentRows.find((r) => r.name === profile);
+
+            if (row) showForm('edit', row);
+
+            return;
+          }
 
           vscode.postMessage({ type: action, profileName: profile });
         });
@@ -374,10 +590,18 @@
       }
 
       if (msg.type === 'data') {
-        const hasProfile = msg.rows && msg.rows.length > 0;
+        _currentRows = msg.rows || [];
+        _isLocked = msg.isLocked;
+
+        if (_formIsSaving) {
+          _formIsSaving = false;
+          hideForm();
+        }
+
+        const hasProfile = _currentRows.length > 0;
         document.getElementById('btn-add').style.display = (msg.isLocked || hasProfile) ? 'none' : '';
         document.getElementById('btn-reconfigure').style.display = (!msg.isLocked && hasProfile) ? '' : 'none';
-        renderRows(msg.rows, msg.isLocked);
+        renderRows(_currentRows, _isLocked);
       }
     });
 

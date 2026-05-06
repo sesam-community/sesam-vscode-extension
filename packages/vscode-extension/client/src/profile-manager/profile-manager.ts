@@ -251,20 +251,14 @@ const _refreshStatusBar = async (): Promise<void> => {
   }
 
   const locked = isProfileConnected();
-  _statusBarItem.command = locked
-    ? undefined
-    : hasAnyProfile && active
-      ? "sesam.switchProfile"
-      : "sesam.addProfile";
+  _statusBarItem.command = locked ? undefined : "sesam.showProfiles";
   _statusBarItem.tooltip = locked
     ? "Profile locked to this folder"
     : !hasAnyProfile
-      ? "No profiles configured — click to add one"
-      : !active
-        ? "Profiles exist but none is active — click to select one"
-        : !hasCredentials
-          ? `Profile '${active}' is missing a node URL or JWT — click to fix`
-          : `Active profile: ${active}${hostname ? ` (${hostname})` : ""} — click to switch`;
+      ? "No profile configured — click to open Profiles panel"
+      : !hasCredentials
+        ? `Profile '${active}' is missing a node URL or JWT — click to fix`
+        : `Active profile: ${active}${hostname ? ` (${hostname})` : ""} — click to reconfigure`;
   _statusBarItem.show();
 };
 
@@ -437,7 +431,7 @@ export const runSwitchProfile = async (targetProfile?: string): Promise<void> =>
     }
 
     if (picked.label === "$(add) Add profile…") {
-      await runAddProfile();
+      void vscode.commands.executeCommand("sesam.showProfiles");
 
       return;
     }
@@ -510,132 +504,6 @@ export const runSwitchProfile = async (targetProfile?: string): Promise<void> =>
 
   // Use executeCommand with a flag so sesam.download skips its own confirmation dialog
   await vscode.commands.executeCommand("sesam.download", { skipConfirm: true });
-};
-
-type RunAddProfileOptions = { isNew: true } | { profileName: string } | undefined;
-
-export const runAddProfile = async (options?: RunAddProfileOptions): Promise<void> => {
-  if (isProfileConnected()) {
-    vscode.window.showInformationMessage(
-      "Sesam: This folder is locked to its profile. Open a new folder to configure a different profile.",
-    );
-
-    return;
-  }
-
-  const profileMetas = getStoredProfiles();
-  const storedNames = listStoredProfileNames();
-
-  let profileName: string;
-  let existingMeta: ProfileMeta | undefined;
-  let isNew: boolean;
-
-  if (options && "profileName" in options) {
-    // Edit flow: profile name is already known — skip the selection QuickPick
-    profileName = options.profileName;
-    existingMeta = profileMetas.find((p) => p.name === profileName);
-    isNew = false;
-  } else {
-    // F28: if a profile already exists in this workspace, go straight to edit-mode
-    const existing = profileMetas[0] ?? (storedNames[0] ? { name: storedNames[0] } : undefined);
-
-    if (existing) {
-      profileName = existing.name;
-      existingMeta = profileMetas.find((p) => p.name === profileName);
-      isNew = false;
-    } else {
-      // No profile yet — prompt for a name
-      const name = await vscode.window.showInputBox({
-        title: "Sesam: Configure Profile — Step 1 of 5: Profile name",
-        prompt: "Profile name (e.g. dev, staging, prod)",
-        placeHolder: "dev",
-        ignoreFocusOut: true,
-        validateInput: (v) => (v.trim() ? undefined : "Profile name cannot be empty"),
-      });
-
-      if (name === undefined) {
-        return;
-      }
-
-      profileName = name.trim();
-      existingMeta = undefined;
-      isNew = true;
-    }
-  }
-
-  const stepOffset = isNew ? 2 : 1;
-  const totalSteps = isNew ? 5 : 4;
-  const profileLabel = isNew ? "Configure Profile" : `Reconfigure '${profileName}'`;
-
-  const portalUrl = await vscode.window.showInputBox({
-    title: `Sesam: ${profileLabel} — Step ${stepOffset} of ${totalSteps}: Portal URL`,
-    prompt: "Management Studio URL (press Enter to keep / use the default)",
-    placeHolder: DEFAULT_PORTAL_URL,
-    value: existingMeta?.portalUrl ?? DEFAULT_PORTAL_URL,
-    ignoreFocusOut: true,
-    validateInput: (v) =>
-      v.trim().startsWith("http") ? undefined : "Must be a valid URL starting with http(s)://",
-  });
-
-  if (portalUrl === undefined) {
-    return;
-  }
-
-  const nodeUrl = await vscode.window.showInputBox({
-    title: `Sesam: ${profileLabel} — Step ${stepOffset + 1} of ${totalSteps}: Node URL`,
-    prompt: "Sesam node URL",
-    placeHolder: "https://datahub-xxxxxxxx.sesam.cloud",
-    value: existingMeta?.nodeUrl ?? "",
-    ignoreFocusOut: true,
-    validateInput: (v) => (v.trim() ? undefined : "Node URL cannot be empty"),
-  });
-
-  if (nodeUrl === undefined) {
-    return;
-  }
-
-  const jwt = await vscode.window.showInputBox({
-    title: `Sesam: ${profileLabel} — Step ${totalSteps - 1} of ${totalSteps}: JWT Token`,
-    prompt: "Paste your JWT token (obtained from the Sesam portal)",
-    placeHolder: "eyJ…",
-    password: true,
-    ignoreFocusOut: true,
-    validateInput: (v) => (v.trim() ? undefined : "JWT cannot be empty"),
-  });
-
-  if (jwt === undefined) {
-    return;
-  }
-
-  const productionPick = await vscode.window.showQuickPick(
-    [
-      { label: "No", description: "Standard profile — no extra confirmation required" },
-      {
-        label: "Yes",
-        description: "Mark as production — destructive commands will require typed confirmation",
-      },
-    ],
-    {
-      title: `Sesam: ${profileLabel} — Step ${totalSteps} of ${totalSteps}: Production?`,
-      placeHolder: "Is this a production environment?",
-      ignoreFocusOut: true,
-    },
-  );
-
-  if (productionPick === undefined) {
-    return;
-  }
-
-  const trimmedPortalUrl = portalUrl.trim();
-  await upsertProfile({
-    name: profileName,
-    portalUrl: trimmedPortalUrl === DEFAULT_PORTAL_URL ? undefined : trimmedPortalUrl,
-    nodeUrl: nodeUrl.trim(),
-    production: productionPick.label === "Yes",
-  });
-  await storeToken(profileName, jwt.trim());
-  void _refreshStatusBar();
-  void vscode.commands.executeCommand("sesam.refreshProfilesPanel");
 };
 
 export const runDeleteProfile = async (): Promise<void> => {
