@@ -51,7 +51,6 @@ interface ProfileRow {
 
 type MessageFromWebview =
   | { type: "ready" }
-  | { type: "refresh" }
   | { type: "toggleProduction"; profileName: string }
   | { type: "deleteProfile"; profileName: string }
   | {
@@ -126,7 +125,7 @@ export class ProfilesPanel {
   // ── Message handler ───────────────────────────────────────────────────────
 
   private async _handleMessage(message: MessageFromWebview): Promise<void> {
-    if (message.type === "ready" || message.type === "refresh") {
+    if (message.type === "ready") {
       await this._loadAndSend();
       return;
     }

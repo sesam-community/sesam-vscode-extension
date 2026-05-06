@@ -291,8 +291,7 @@
 <body>
   <div class="toolbar">
     <h2>Sesam Profiles</h2>
-    <button class="secondary" id="btn-refresh">↺ Refresh</button>
-    <button id="btn-add">+ Configure Profile</button>
+    <button id="btn-add">+ Add Profile</button>
     <button id="btn-reconfigure" style="display:none;">✎ Reconfigure Profile</button>
   </div>
 
@@ -386,10 +385,6 @@
     }
 
     // ── Toolbar buttons ──
-
-    document.getElementById('btn-refresh').addEventListener('click', () => {
-      vscode.postMessage({ type: 'refresh' });
-    });
 
     document.getElementById('btn-add').addEventListener('click', () => {
       showForm('new', null);
@@ -491,7 +486,7 @@
       grid.innerHTML = '';
 
       if (!rows || rows.length === 0) {
-        document.getElementById('loading-msg').textContent = 'No profile configured. Click "+ Configure Profile" to get started.';
+        document.getElementById('loading-msg').textContent = 'No profile configured. Click "+ Add Profile" to get started.';
         document.getElementById('loading-msg').style.display = 'flex';
         document.getElementById('profiles-grid').style.display = 'none';
         document.getElementById('legend').style.display = 'none';
@@ -607,14 +602,6 @@
 
     window.addEventListener('message', (event) => {
       const msg = event.data;
-
-      if (msg.type === 'loading') {
-        document.getElementById('loading-msg').textContent = 'Loading…';
-        document.getElementById('loading-msg').style.display = 'flex';
-        document.getElementById('profiles-grid').style.display = 'none';
-        document.getElementById('legend').style.display = 'none';
-        return;
-      }
 
       if (msg.type === 'data') {
         _currentRows = msg.rows || [];
