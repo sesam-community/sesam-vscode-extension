@@ -31,6 +31,7 @@ import { PreviewPanel } from "./preview/preview-panel";
 import {
   initProfileManager,
   getActiveProfileName,
+  setActiveProfileName,
   refreshStatusBar,
   resolveNodeUrl,
   runDeleteProfile,
@@ -295,6 +296,45 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   NodeStatusPanel.context = context;
   NodeStatusPanel.onNodeCheckStart = () => showNodeStatus("checking");
   NodeStatusPanel.onNodeCheckSuccess = () => showNodeStatus("connected");
+
+  ProfilesPanel.onConnect = async (profileName: string) => {
+    await setActiveProfileName(profileName);
+    await vscode.commands.executeCommand("sesam.refreshStatusBar");
+
+    const creds = await resolveCredentials();
+
+    if (!creds) {
+      vscode.window.showErrorMessage("Sesam: No credentials configured for this profile.");
+      return;
+    }
+
+    const ready = await ensureNodeReady(creds.nodeUrl, creds.jwt);
+
+    if (!ready) {
+      return;
+    }
+
+    const ping = await pingNode(creds.nodeUrl, creds.jwt, logNodeRequest);
+
+    if (ping.status === "auth") {
+      vscode.window.showErrorMessage(
+        "Sesam: Authentication failed \u2014 JWT may be invalid or expired.",
+      );
+      return;
+    }
+
+    if (ping.status === "ok") {
+      await setProfileConnected();
+      setNodeConnected(true);
+      await vscode.commands.executeCommand("sesam.refreshStatusBar");
+      vscode.window.showInformationMessage(`Sesam: Connected to '${profileName}' successfully.`);
+    } else {
+      setNodeConnected(false);
+      vscode.window.showErrorMessage(
+        `Sesam: Could not reach node — ${"message" in ping ? (ping as { message: string }).message : ping.status}.`,
+      );
+    }
+  };
 
   // Reset all node state when the user switches profiles so the old poller
   // doesn't linger and sesam.nodeProvisioning is cleared for the new profile.

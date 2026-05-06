@@ -21,6 +21,7 @@ import * as vscode from "vscode";
 
 import { getToken, listStoredProfileNames, deleteToken, storeToken } from "./credential-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
+import { getSesamChannel } from "../sesam-channel";
 import {
   getActiveProfileName,
   getStoredProfiles,
@@ -75,6 +76,9 @@ type MessageFromWebview =
 export class ProfilesPanel {
   static currentPanel: ProfilesPanel | undefined;
   private static readonly _viewType = "sesamProfiles";
+
+  /** Wired in extension.ts — pings the node and locks the workspace to the profile. */
+  static onConnect: ((profileName: string) => Promise<void>) | undefined;
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
@@ -163,9 +167,14 @@ export class ProfilesPanel {
     }
 
     if (message.type === "connect") {
-      await setActiveProfileName(message.profileName);
-      await vscode.commands.executeCommand("sesam.refreshStatusBar");
-      await vscode.commands.executeCommand("sesam.download");
+      getSesamChannel().appendLine(
+        `[PROFILES] connect received for '${message.profileName}', onConnect=${!!ProfilesPanel.onConnect}`,
+      );
+
+      if (ProfilesPanel.onConnect) {
+        await ProfilesPanel.onConnect(message.profileName);
+      }
+
       await this._loadAndSend();
       return;
     }

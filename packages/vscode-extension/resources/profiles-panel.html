@@ -544,7 +544,7 @@
 
         const connectBtn = isLocked
           ? ''
-          : '<button class="primary" data-action="connect" data-profile="' + escAttr(row.name) + '">▶ Connect</button>';
+          : '<button class="primary" data-action="connect" data-profile="' + escAttr(row.name) + '">Connect</button>';
 
         const deleteBtn = isLocked
           ? '<span class="badge badge-locked">🔒 Locked to folder</span>'
@@ -568,8 +568,8 @@
           + warnBadge
           + '</div>'
           + '<div class="card-fields">'
+            + '<span class="field-label">Portal URL</span>' + portalUrlHtml
           + '<span class="field-label">Node URL</span>' + nodeUrlHtml
-          + '<span class="field-label">Portal URL</span>' + portalUrlHtml
           + '<span class="field-label">JWT Token</span>' + tokenHtml
           + '</div>'
           + '<div class="card-actions">'
@@ -596,6 +596,7 @@
             return;
           }
 
+          console.log('[profiles-panel] postMessage', action, profile);
           vscode.postMessage({ type: action, profileName: profile });
         });
       });
