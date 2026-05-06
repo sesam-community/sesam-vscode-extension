@@ -72,6 +72,10 @@
       padding: 16px 12px;
     }
 
+    .content.form-view {
+      flex: none;
+    }
+
     /* ── profile cards ── */
     .profiles-grid {
       display: grid;
@@ -221,7 +225,7 @@
     .legend p { margin-bottom: 3px; }
 
     /* ── profile form ── */
-    .form-container { max-width: 520px; }
+    .form-container { max-width: 680px; width: 100%; }
 
     .form-container h3 {
       font-size: 13px;
@@ -323,10 +327,7 @@
 
       <div class="form-row">
         <label for="f-jwt" class="form-label">JWT Token <span id="f-jwt-required" class="required">*</span></label>
-        <div class="jwt-wrap">
-          <input id="f-jwt" class="form-input" type="password" placeholder="eyJ…" autocomplete="off" />
-          <button type="button" class="secondary" id="btn-jwt-toggle">Show</button>
-        </div>
+        <input id="f-jwt" class="form-input" type="password" placeholder="eyJ…" autocomplete="off" />
         <p id="f-jwt-hint" class="form-hint" style="display:none;">Existing token is set — leave blank to keep it.</p>
       </div>
 
@@ -371,19 +372,6 @@
 
     // ── Form buttons ──
 
-    document.getElementById('btn-jwt-toggle').addEventListener('click', () => {
-      const input = document.getElementById('f-jwt');
-      const btn = document.getElementById('btn-jwt-toggle');
-
-      if (input.type === 'password') {
-        input.type = 'text';
-        btn.textContent = 'Hide';
-      } else {
-        input.type = 'password';
-        btn.textContent = 'Show';
-      }
-    });
-
     document.getElementById('btn-form-save').addEventListener('click', () => {
       const editName = document.getElementById('profile-form-section').dataset.editName;
       const name = _formMode === 'new'
@@ -415,7 +403,9 @@
     function showForm(mode, row) {
       _formMode = mode;
       document.getElementById('content-section').style.display = 'none';
-      document.getElementById('profile-form-section').style.display = 'flex';
+      const formEl = document.getElementById('profile-form-section');
+      formEl.style.display = 'block';
+      formEl.style.flex = 'none';
 
       document.getElementById('form-heading').textContent =
         mode === 'new' ? 'Configure Profile' : 'Reconfigure \'' + (row ? row.name : '') + '\'';
@@ -425,8 +415,6 @@
       document.getElementById('f-portal').value = row ? (row.portalUrl || '') : '';
       document.getElementById('f-node').value = row ? (row.nodeUrl || '') : '';
       document.getElementById('f-jwt').value = '';
-      document.getElementById('f-jwt').type = 'password';
-      document.getElementById('btn-jwt-toggle').textContent = 'Show';
       document.getElementById('f-production').checked = row ? (row.production || false) : false;
       document.getElementById('form-error').style.display = 'none';
       document.getElementById('btn-form-save').disabled = false;
