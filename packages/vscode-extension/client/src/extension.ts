@@ -58,7 +58,7 @@ import { disposeSesamChannel, getSesamChannel, logNodeRequest } from "./sesam-ch
 import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
 import { NodeStatusPanel } from "./node-status/node-status-panel";
-import { resolveNodeUri } from "./node-root";
+import { resolveNodeUri, resolveNodePath } from "./node-root";
 import { ProfilesPanel } from "./profile-manager/profiles-panel";
 import {
   SyncStatusProvider,
@@ -1240,7 +1240,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             const result = await runner.download(
               { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
               {
-                outDir: workspaceDir,
+                outDir: resolveNodePath(workspaceDir),
                 formatter: (config) => formatSesamJson(config, 2, { reorderKeys: true }),
               },
             );
@@ -1458,7 +1458,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               pipeId,
               configType,
               {
-                outDir: workspaceDir,
+                outDir: resolveNodePath(workspaceDir),
                 formatter: (config) => formatSesamJson(config, 2, { reorderKeys: true }),
               },
             );
