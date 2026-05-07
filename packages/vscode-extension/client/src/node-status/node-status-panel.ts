@@ -57,6 +57,8 @@ export class NodeStatusPanel {
   static onDiffPipe: ((pipeId: string) => void) | undefined;
   /** Set by extension.ts to open a diff for a specific system against the node. */
   static onDiffSystem: ((systemId: string) => void) | undefined;
+  /** Set by extension.ts to resolve a pipe/system id to its local workspace file URI. */
+  static onResolveLocalFile: ((id: string) => vscode.Uri | undefined) | undefined;
   /** Set by extension.ts so the panel can persist the live-updates preference. */
   static context: vscode.ExtensionContext | undefined;
   /** Called when a node REST request is about to start. */
@@ -154,16 +156,22 @@ export class NodeStatusPanel {
     }
 
     if (message.type === "openLocalFile") {
-      // Scan all pipe/system config files and find one whose basename matches the id.
-      // Using a broad pattern + basename filter is more robust than per-extension globs
-      // because the workspace may use .conf.json, .conf.pipe, .json, etc.
-      const all = await vscode.workspace.findFiles("**/{pipes,systems}/**", "**/node_modules/**");
-
-      const CONFIG_EXTS = [".conf.json", ".conf.pipe", ".conf.system", ".json"];
-      const match = all.find((uri) => {
-        const base = path.basename(uri.fsPath);
-        return CONFIG_EXTS.some((ext) => base === `${message.pipeId}${ext}`);
-      });
+      // Fast path: use DAG index (O(1)) if available — avoids a full findFiles scan.
+      // Fallback: scan workspace (DAG not yet built or pipe not in index).
+      const fastMatch = NodeStatusPanel.onResolveLocalFile?.(message.pipeId);
+      const match =
+        fastMatch ??
+        (await (async () => {
+          const all = await vscode.workspace.findFiles(
+            "**/{pipes,systems}/**",
+            "**/node_modules/**",
+          );
+          const CONFIG_EXTS = [".conf.json", ".conf.pipe", ".conf.system", ".json"];
+          return all.find((uri) => {
+            const base = path.basename(uri.fsPath);
+            return CONFIG_EXTS.some((ext) => base === `${message.pipeId}${ext}`);
+          });
+        })());
 
       if (!match) {
         vscode.window.showWarningMessage(

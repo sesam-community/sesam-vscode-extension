@@ -294,6 +294,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Wire the provisioning poller into PreviewPanel and NodeStatusPanel live eval failures
   PreviewPanel.onProvisioningNeeded = startPollerIfNeeded;
   NodeStatusPanel.onProvisioningNeeded = startPollerIfNeeded;
+  NodeStatusPanel.onResolveLocalFile = (id: string): vscode.Uri | undefined => {
+    const pipeInfo = dagRef.current?.byId.get(id);
+
+    if (pipeInfo) {
+      return vscode.Uri.parse(pipeInfo.fileUri);
+    }
+
+    const sysInfo = systemRef.current?.get(id);
+
+    if (sysInfo) {
+      return vscode.Uri.parse(sysInfo.fileUri);
+    }
+
+    return undefined;
+  };
   NodeStatusPanel.context = context;
   NodeStatusPanel.onNodeCheckStart = () => showNodeStatus("checking");
   NodeStatusPanel.onNodeCheckSuccess = () => showNodeStatus("connected");
@@ -604,16 +619,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           const content = formatSesamJson(nodeConfig, 2, { reorderKeys });
           const nodeUri = nodeConfigProvider.store(pipeId, "pipe", content);
 
-          // Find local file
-          const all = await vscode.workspace.findFiles(
-            "**/{pipes,systems}/**",
-            "**/node_modules/**",
-          );
-          const CONFIG_EXTS = [".conf.json", ".conf.pipe", ".conf.system", ".json"];
-          const localMatch = all.find((uri) => {
-            const base = uri.fsPath.split("/").at(-1) ?? "";
-            return CONFIG_EXTS.some((ext) => base === `${pipeId}${ext}`);
-          });
+          // Find local file: try DAG index (O(1)), fallback to findFiles scan
+          const dagEntry = dagRef.current?.byId.get(pipeId);
+          let localMatch: vscode.Uri | undefined = dagEntry
+            ? vscode.Uri.parse(dagEntry.fileUri)
+            : undefined;
+
+          if (!localMatch) {
+            const all = await vscode.workspace.findFiles(
+              "**/{pipes,systems}/**",
+              "**/node_modules/**",
+            );
+            const CONFIG_EXTS = [".conf.json", ".conf.pipe", ".conf.system", ".json"];
+            localMatch = all.find((uri) => {
+              const base = uri.fsPath.split("/").at(-1) ?? "";
+              return CONFIG_EXTS.some((ext) => base === `${pipeId}${ext}`);
+            });
+          }
 
           if (localMatch) {
             await vscode.commands.executeCommand(
@@ -677,15 +699,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           const content = formatSesamJson(nodeConfig, 2, { reorderKeys });
           const nodeUri = nodeConfigProvider.store(systemId, "system", content);
 
-          const all = await vscode.workspace.findFiles(
-            "**/{pipes,systems}/**",
-            "**/node_modules/**",
-          );
-          const CONFIG_EXTS = [".conf.json", ".conf.system", ".json"];
-          const localMatch = all.find((uri) => {
-            const base = uri.fsPath.split("/").at(-1) ?? "";
-            return CONFIG_EXTS.some((ext) => base === `${systemId}${ext}`);
-          });
+          // Find local file: try system index (O(1)), fallback to findFiles scan
+          const sysEntry = systemRef.current?.get(systemId);
+          let localMatch: vscode.Uri | undefined = sysEntry
+            ? vscode.Uri.parse(sysEntry.fileUri)
+            : undefined;
+
+          if (!localMatch) {
+            const all = await vscode.workspace.findFiles(
+              "**/{pipes,systems}/**",
+              "**/node_modules/**",
+            );
+            const CONFIG_EXTS = [".conf.json", ".conf.system", ".json"];
+            localMatch = all.find((uri) => {
+              const base = uri.fsPath.split("/").at(-1) ?? "";
+              return CONFIG_EXTS.some((ext) => base === `${systemId}${ext}`);
+            });
+          }
 
           if (localMatch) {
             await vscode.commands.executeCommand(
@@ -756,43 +786,84 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
-  // Initial DAG scan
-  void buildDagFromWorkspace().then(({ index, systems }) => {
+  let _dagDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+  const _dagPendingChanges = new Map<string, { uri: vscode.Uri; deleted: boolean }>();
+
+  const applyDagResult = ({
+    index,
+    systems,
+  }: {
+    index: DagIndex;
+    systems: Map<string, SystemEntry>;
+  }): void => {
     dagRef.current = index;
     systemRef.current = systems;
     lineageProvider.refresh();
     dependentsProvider.refresh();
     systemPipesProvider.refresh();
-  });
-
-  let _dagDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-
-  const rescanDag = (): void => {
-    void buildDagFromWorkspace().then(({ index, systems }) => {
-      dagRef.current = index;
-      systemRef.current = systems;
-      lineageProvider.refresh();
-      dependentsProvider.refresh();
-      systemPipesProvider.refresh();
-    });
   };
 
-  const scheduleDagRescan = (): void => {
+  const rescanDag = (): void => {
+    void buildDagFromWorkspace().then(applyDagResult);
+  };
+
+  // Initial DAG scan (after applyDagResult is defined)
+  void buildDagFromWorkspace().then(applyDagResult);
+
+  const scheduleDagRescan = (uri: vscode.Uri, deleted = false): void => {
+    _dagPendingChanges.set(uri.toString(), { uri, deleted });
     clearTimeout(_dagDebounceTimer);
-    _dagDebounceTimer = setTimeout(() => rescanDag(), 1_500);
+    _dagDebounceTimer = setTimeout(() => {
+      const changes = new Map(_dagPendingChanges);
+      _dagPendingChanges.clear();
+
+      if (changes.size <= 3) {
+        // Incremental: patch only the changed files, then rebuild index
+        const applyIncremental = async (): Promise<void> => {
+          for (const { uri: changedUri, deleted: isDeleted } of changes.values()) {
+            const uriStr = changedUri.toString();
+            _allPipeInfos = _allPipeInfos.filter((info) => info.fileUri !== uriStr);
+
+            if (!isDeleted) {
+              try {
+                const raw = await vscode.workspace.fs.readFile(changedUri);
+                const text = Buffer.from(raw).toString("utf-8");
+                const info = extractFullPipeInfo(JSON.parse(text) as unknown, uriStr);
+
+                if (info) {
+                  _allPipeInfos.push(info);
+                }
+              } catch {
+                // File gone or malformed — treat as deleted
+              }
+            }
+          }
+
+          applyDagResult({
+            index: buildDagIndex(_allPipeInfos),
+            systems: buildSystemIndex(_allPipeInfos),
+          });
+        };
+
+        void applyIncremental();
+      } else {
+        // Many files changed at once — full rescan
+        rescanDag();
+      }
+    }, 1_500);
   };
 
   // Watch for file changes to update the graph
   const watcher = vscode.workspace.createFileSystemWatcher("**/{pipes,systems}/**/*.json");
-  watcher.onDidCreate(scheduleDagRescan);
-  watcher.onDidChange(scheduleDagRescan);
-  watcher.onDidDelete(scheduleDagRescan);
+  watcher.onDidCreate((uri) => scheduleDagRescan(uri, false));
+  watcher.onDidChange((uri) => scheduleDagRescan(uri, false));
+  watcher.onDidDelete((uri) => scheduleDagRescan(uri, true));
   context.subscriptions.push(watcher);
 
   const confWatcher = vscode.workspace.createFileSystemWatcher("**/*.conf.{json,pipe,system}");
-  confWatcher.onDidCreate(scheduleDagRescan);
-  confWatcher.onDidChange(scheduleDagRescan);
-  confWatcher.onDidDelete(scheduleDagRescan);
+  confWatcher.onDidCreate((uri) => scheduleDagRescan(uri, false));
+  confWatcher.onDidChange((uri) => scheduleDagRescan(uri, false));
+  confWatcher.onDidDelete((uri) => scheduleDagRescan(uri, true));
   context.subscriptions.push(confWatcher);
 
   // Clear the references view when a sesam config file is renamed so stale
@@ -829,6 +900,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.commands.registerCommand("dtl.refreshDag", () => {
       clearTimeout(_dagDebounceTimer);
+      _dagPendingChanges.clear();
       rescanDag();
       vscode.window.setStatusBarMessage("Sesam: DAG refreshed", 2000);
     }),
@@ -2577,6 +2649,9 @@ function getActiveConfigKind(editor: vscode.TextEditor | undefined): "system" | 
   return null;
 }
 
+/** All parsed FullPipeInfo entries — kept module-level so incremental updates can patch it. */
+let _allPipeInfos: FullPipeInfo[] = [];
+
 /** Scan all workspace JSON/conf files, extract pipe info, and build the DagIndex. */
 async function buildDagFromWorkspace(): Promise<{
   index: DagIndex;
@@ -2601,5 +2676,6 @@ async function buildDagFromWorkspace(): Promise<{
       }),
     )
   ).filter((x): x is FullPipeInfo => x !== null);
+  _allPipeInfos = infos;
   return { index: buildDagIndex(infos), systems: buildSystemIndex(infos) };
 }
