@@ -1686,6 +1686,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       NodeStatusPanel.createOrShow(undefined, "systems");
     }),
 
+    vscode.commands.registerCommand("sesam.transferBusy", () => {
+      vscode.window.showInformationMessage("Sesam: A transfer is already in progress.");
+    }),
+
     vscode.commands.registerCommand("sesam.fixWithCopilot", async () => {
       const editor = vscode.window.activeTextEditor;
 
