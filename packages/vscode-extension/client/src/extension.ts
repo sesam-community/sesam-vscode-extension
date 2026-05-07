@@ -608,11 +608,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         cancellable: false,
       },
       async () => {
+        const t0 = Date.now();
+
         try {
           const nodeConfig = await getNodeConfig(
             { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
             pipeId,
             "pipe",
+          );
+          getSesamChannel().appendLine(
+            `[DIFF] fetched '${pipeId}' from node in ${fmtElapsed(Date.now() - t0)}.`,
           );
           const reorderKeys =
             vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
@@ -688,11 +693,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         cancellable: false,
       },
       async () => {
+        const t0 = Date.now();
+
         try {
           const nodeConfig = await getNodeConfig(
             { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
             systemId,
             "system",
+          );
+          getSesamChannel().appendLine(
+            `[DIFF] fetched '${systemId}' from node in ${fmtElapsed(Date.now() - t0)}.`,
           );
           const reorderKeys =
             vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
@@ -951,6 +961,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         },
         async () => {
           void vscode.commands.executeCommand("setContext", "sesam.pipeRunning", true);
+          const t0 = Date.now();
 
           try {
             const runner = new SesamRunner();
@@ -971,7 +982,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             const result = runResult;
 
             if (result.success) {
-              vscode.window.showInformationMessage(`Sesam: Pipe '${pipeId}' started successfully.`);
+              const elapsed = fmtElapsed(Date.now() - t0);
+              getSesamChannel().appendLine(`[RUN] '${pipeId}' started in ${elapsed}.`);
+              vscode.window.showInformationMessage(
+                `Sesam: Pipe '${pipeId}' started in ${elapsed}.`,
+              );
             } else {
               const detail = result.message ?? "unknown error";
               vscode.window.showErrorMessage(`Sesam: Failed to run '${pipeId}': ${detail}`);
@@ -1049,6 +1064,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
+      const uploadStatusBar = vscode.window.setStatusBarMessage("$(sync~spin) Sesam: Uploading…");
+
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -1057,6 +1074,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         },
         async () => {
           const done = trackRequest("PUT", "upload/config");
+          const t0 = Date.now();
 
           try {
             const runner = new SesamRunner();
@@ -1067,8 +1085,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             done(result.success);
 
             if (result.success) {
+              const elapsed = fmtElapsed(Date.now() - t0);
+              getSesamChannel().appendLine(
+                `[UPLOAD] complete in ${elapsed} — ${result.pipesUploaded} pipes, ${result.systemsUploaded} systems.`,
+              );
               vscode.window.showInformationMessage(
-                `Sesam: Upload complete — ${result.pipesUploaded} pipes, ${result.systemsUploaded} systems.`,
+                `Sesam: Upload complete in ${elapsed} — ${result.pipesUploaded} pipes, ${result.systemsUploaded} systems.`,
               );
             } else {
               vscode.window.showErrorMessage(
@@ -1173,6 +1195,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 `Sesam: Upload failed: ${err instanceof Error ? err.message : String(err)}`,
               );
             }
+          } finally {
+            uploadStatusBar.dispose();
           }
         },
       );
@@ -1218,28 +1242,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      // Direct node connectivity check — logs to Sesam output channel
-      getSesamChannel().appendLine(`[DOWNLOAD] pinging node ${creds.nodeUrl} …`);
-      const ping = await pingNode(creds.nodeUrl, creds.jwt, logNodeRequest);
-      getSesamChannel().appendLine(
-        `[DOWNLOAD] ping: ${ping.status}${"message" in ping ? ` — ${ping.message}` : ""}`,
-      );
-
-      if (ping.status === "auth") {
-        vscode.window
-          .showErrorMessage(
-            "Sesam: Authentication failed — JWT may be invalid or expired.",
-            "Set JWT Token",
-          )
-          .then((action) => {
-            if (action === "Set JWT Token") {
-              void vscode.commands.executeCommand("sesam.setToken");
-            }
-          });
-
-        return;
-      }
-
       if (!opts?.skipConfirm) {
         // Fetch sync status (use cache if already loaded, otherwise fetch now)
         const syncItems = await vscode.window.withProgress(
@@ -1272,7 +1274,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           );
 
           if (diffAction === "See Local Diffs") {
-            // Data is already loaded — focus the Sync Status tree view and open diffs
             await vscode.commands.executeCommand("sesamSyncStatus.focus");
 
             const diffable = syncStatusProvider
@@ -1295,16 +1296,49 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
       }
 
+      // Show a status bar spinner immediately — the notification takes ~1s to
+      // appear, and the ping alone can take 10s on a large node.
+      const statusBarItem = vscode.window.setStatusBarMessage("$(sync~spin) Sesam: Downloading…");
+
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: "Sesam: Downloading…",
           cancellable: false,
         },
-        async () => {
+        async (progress) => {
           const done = trackRequest("GET", "download/config");
+          const t0 = Date.now();
 
           try {
+            // ── Phase 1: ping ──────────────────────────────────────────────
+            const host = creds.nodeUrl.replace(/^https?:\/\//, "");
+            progress.report({ message: `Connecting to ${host}…` });
+            getSesamChannel().appendLine(`[DOWNLOAD] connecting to node ${creds.nodeUrl}…`);
+            const pingT0 = Date.now();
+            const ping = await pingNode(creds.nodeUrl, creds.jwt, logNodeRequest);
+            const pingElapsed = fmtElapsed(Date.now() - pingT0);
+            getSesamChannel().appendLine(`[DOWNLOAD] ping ${ping.status} — ${pingElapsed}`);
+
+            if (ping.status === "auth") {
+              statusBarItem.dispose();
+              done(false);
+              vscode.window
+                .showErrorMessage(
+                  "Sesam: Authentication failed — JWT may be invalid or expired.",
+                  "Set JWT Token",
+                )
+                .then((action) => {
+                  if (action === "Set JWT Token") {
+                    void vscode.commands.executeCommand("sesam.setToken");
+                  }
+                });
+              return;
+            }
+
+            // ── Phase 2: fetch + write ─────────────────────────────────────
+            progress.report({ message: "Fetching configs from node…" });
+            getSesamChannel().appendLine(`[DOWNLOAD] fetching configs…`);
             const runner = new SesamRunner();
             const result = await runner.download(
               { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
@@ -1314,8 +1348,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               },
             );
             done(true);
+            const elapsed = fmtElapsed(Date.now() - t0);
+            getSesamChannel().appendLine(
+              `[DOWNLOAD] complete in ${elapsed} — ${result.pipesWritten} pipes, ${result.systemsWritten} systems.`,
+            );
             vscode.window.showInformationMessage(
-              `Sesam: Download complete — ${result.pipesWritten} pipes, ${result.systemsWritten} systems.`,
+              `Sesam: Download complete in ${elapsed} — ${result.pipesWritten} pipes, ${result.systemsWritten} systems.`,
             );
             await setProfileConnected();
 
@@ -1327,6 +1365,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             vscode.window.showErrorMessage(
               `Sesam: Download failed: ${err instanceof Error ? err.message : String(err)}`,
             );
+          } finally {
+            statusBarItem.dispose();
           }
         },
       );
@@ -1379,6 +1419,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       const filePath = editor.document.uri.fsPath;
 
+      const uploadFileStatusBar = vscode.window.setStatusBarMessage(
+        `$(sync~spin) Sesam: Uploading '${pipeId}'…`,
+      );
+
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -1387,6 +1431,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         },
         async () => {
           const done = trackRequest("PUT", `upload/file/${pipeId}`);
+          const t0 = Date.now();
 
           try {
             const runner = new SesamRunner();
@@ -1397,7 +1442,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             done(result.success);
 
             if (result.success) {
-              vscode.window.showInformationMessage(`Sesam: '${pipeId}' uploaded successfully.`);
+              const elapsed = fmtElapsed(Date.now() - t0);
+              getSesamChannel().appendLine(`[UPLOAD] '${pipeId}' complete in ${elapsed}.`);
+              vscode.window.showInformationMessage(`Sesam: '${pipeId}' uploaded in ${elapsed}.`);
             } else {
               vscode.window.showErrorMessage(
                 `Sesam: Upload failed: ${result.message ?? "unknown error"}`,
@@ -1438,6 +1485,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 `Sesam: Upload failed: ${err instanceof Error ? err.message : String(err)}`,
               );
             }
+          } finally {
+            uploadFileStatusBar.dispose();
           }
         },
       );
@@ -1519,6 +1568,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         },
         async () => {
           const done = trackRequest("GET", `download/file/${pipeId}`);
+          const t0 = Date.now();
 
           try {
             const runner = new SesamRunner();
@@ -1532,8 +1582,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               },
             );
             done(true);
+            const elapsed = fmtElapsed(Date.now() - t0);
+            getSesamChannel().appendLine(
+              `[DOWNLOAD] '${pipeId}' complete in ${elapsed} → ${result.filePath.replace(workspaceDir + "/", "")}`,
+            );
             vscode.window.showInformationMessage(
-              `Sesam: '${pipeId}' downloaded to ${result.filePath.replace(workspaceDir + "/", "")}.`,
+              `Sesam: '${pipeId}' downloaded in ${elapsed} to ${result.filePath.replace(workspaceDir + "/", "")}.`,
             );
             if (syncStatusProvider.isLoaded()) {
               refreshSyncStatusSilently();
@@ -2270,11 +2324,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           cancellable: false,
         },
         async () => {
+          const t0 = Date.now();
+
           try {
             const runner = new SesamRunner();
             const items = await runner.syncStatus(
               { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
               workspaceDir,
+            );
+            getSesamChannel().appendLine(
+              `[SYNC STATUS] fetched in ${fmtElapsed(Date.now() - t0)} — ${items.length} items.`,
             );
             syncStatusProvider.setItems(items);
 
@@ -2360,11 +2419,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           cancellable: false,
         },
         async () => {
+          const t0 = Date.now();
+
           try {
             const nodeConfig = await getNodeConfig(
               { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
               resolved!.syncItem.id,
               resolved!.syncItem.kind,
+            );
+            getSesamChannel().appendLine(
+              `[DIFF] fetched '${resolved!.syncItem.id}' from node in ${fmtElapsed(Date.now() - t0)}.`,
             );
             const reorderKeys =
               vscode.workspace.getConfiguration("dtl").get<boolean>("format.reorderKeys") ?? false;
@@ -2600,6 +2664,15 @@ export function deactivate(): Thenable<void> | undefined {
 // ---------------------------------------------------------------------------
 // DAG helpers (module-level so they don't close over extension context)
 // ---------------------------------------------------------------------------
+
+/** Format millisecond duration into a human-readable string, e.g. "1.2s" or "45ms". */
+function fmtElapsed(ms: number): string {
+  if (ms >= 1000) {
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+
+  return `${ms}ms`;
+}
 
 /** Extract the _id from the currently open document (if it is a pipe OR system config). */
 function getActivePipeId(editor: vscode.TextEditor | undefined): string | undefined {
