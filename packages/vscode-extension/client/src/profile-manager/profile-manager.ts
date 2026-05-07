@@ -14,9 +14,10 @@
 
 import * as vscode from "vscode";
 
-import { deleteToken, getToken, listStoredProfileNames, storeToken } from "./credential-manager";
+import { deleteToken, getToken, listStoredProfileNames } from "./credential-manager";
 import { DEFAULT_PORTAL_URL } from "../constants";
 import { getSesamChannel } from "../sesam-channel";
+import { resolveNodeUri } from "../node-root";
 
 export interface ProfileMeta {
   name: string;
@@ -487,7 +488,7 @@ export const runSwitchProfile = async (targetProfile?: string): Promise<void> =>
       },
       async () => {
         for (const folder of ["pipes", "systems"]) {
-          const folderUri = vscode.Uri.joinPath(workspaceDir, folder);
+          const folderUri = resolveNodeUri(workspaceDir, folder);
 
           try {
             await vscode.workspace.fs.delete(folderUri, { recursive: true, useTrash: false });
@@ -518,7 +519,6 @@ export const runDeleteProfile = async (): Promise<void> => {
 
   // F28: single profile per workspace — no QuickPick needed
   const profileToDelete = knownNames[0];
-  const activeProfile = getActiveProfileName();
 
   const confirmed = await vscode.window.showWarningMessage(
     `Remove profile '${profileToDelete}' from this workspace? This deletes the stored JWT and node URL.`,

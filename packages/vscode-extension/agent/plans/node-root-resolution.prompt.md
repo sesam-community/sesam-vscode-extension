@@ -58,19 +58,19 @@ correctly regardless of whether node configs live at the workspace root or insid
 
 ## Options
 
-### Option 1 — `sesam.nodeRoot` Configuration Setting
+### Option 1 — `sesam.rootFolder` Configuration Setting
 
-Add a workspace-scoped string setting `"sesam.nodeRoot"` (default `"."`) that lets users declare
+Add a workspace-scoped string setting `"sesam.rootFolder"` (default `"."`) that lets users declare
 where the node directory is relative to the workspace root.
 
 ```jsonc
 // .vscode/settings.json
 {
-  "sesam.nodeRoot": "node"   // or "." for flat layout
+  "sesam.rootFolder": "node"   // or "." for flat layout
 }
 ```
 
-All path resolution is updated to `path.join(workspaceRoot, nodeRoot, "pipes")` etc.  
+All path resolution is updated to `path.join(workspaceRoot, rootFolder, "pipes")` etc.  
 A helper `resolveNodePath(...segments: string[]): string` is introduced once and reused everywhere.
 
 **Pros**
@@ -113,11 +113,11 @@ Introduce a project-level JSON config file at the workspace root:
 ```jsonc
 // .sesamrc
 {
-  "nodeRoot": "node"
+  "rootFolder": "node"
 }
 ```
 
-The extension reads this file at activation and uses `nodeRoot` for all path resolution.  
+The extension reads this file at activation and uses `rootFolder` for all path resolution.  
 The file is committed to source control, so all team members share the same layout.
 
 **Pros**
@@ -163,10 +163,10 @@ No code changes required.
 
 Combine Options 1 and 2:
 
-1. If `sesam.nodeRoot` is explicitly set → use it unconditionally
+1. If `sesam.rootFolder` is explicitly set → use it unconditionally
 2. Else run auto-detection (probe for `pipes/` + `systems/`) → use detected path
 3. If detection finds a non-root path, show a one-time information notification:
-   > "Sesam: node configs detected at `node/`. Add `"sesam.nodeRoot": "node"` to `.vscode/settings.json` to make this explicit."
+   > "Sesam: node configs detected at `node/`. Add `"sesam.rootFolder": "node"` to `.vscode/settings.json` to make this explicit."
 
 **Pros**
 - Zero config for standard layouts, explicit override for unusual ones
@@ -220,7 +220,7 @@ All 6+ hardcoded-path call sites are updated to call `resolveNodePath` instead o
 
 | File | Change |
 |---|---|
-| `package.json` | Add `sesam.nodeRoot` setting (type: string, default: `""`, scope: `resource`) |
+| `package.json` | Add `sesam.rootFolder` setting (type: string, default: `""`, scope: `resource`) |
 | `src/shared/node-root.ts` *(new)* | `getNodeRoot()`, `resolveNodePath()`, auto-detection logic |
 | `client/src/extension.ts` | Replace all `path.join(workspaceRoot, "pipes"|"systems")` with `resolveNodePath(...)` |
 | `client/src/profile-manager.ts` | Replace hardcoded `"pipes"`, `"systems"` folder references |

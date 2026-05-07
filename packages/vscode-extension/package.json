@@ -636,6 +636,12 @@
           "default": 3,
           "description": "Folder depth to scan for pipe config files in the workspace."
         },
+        "sesam.rootFolder": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Path to the sesam node directory relative to the workspace root (e.g. `node`). Leave empty if `pipes/` and `systems/` live directly at the workspace root."
+        },
         "sesam.nodeUrl": {
           "type": "string",
           "default": "",
