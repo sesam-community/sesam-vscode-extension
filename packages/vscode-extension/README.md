@@ -26,6 +26,7 @@
   - [Credential Management](#credential-management)
   - [Copilot Agent Integration](#copilot-agent-integration)
 - [Getting Started](#getting-started)
+- [Project Layout](#project-layout)
 - [DTL Primer](#dtl-primer)
 - [Extension Settings](#extension-settings)
 - [Requirements](#requirements)
@@ -742,6 +743,47 @@ my-sesam-project/
 
 ---
 
+## Project Layout
+
+By default the extension looks for `pipes/`, `systems/`, `expected/`, and `testdata/` directly
+at the workspace root.
+
+```
+<workspace>/
+  pipes/
+  systems/
+  expected/
+  testdata/
+  variables/
+```
+
+If your project keeps those folders inside a subdirectory (e.g. `node/`),
+tell the extension where to find them:
+
+```jsonc
+// .vscode/settings.json
+{
+  "sesam.rootFolder": "node"
+}
+```
+Full example: 
+
+```
+<workspace>/
+  .vscode/
+    settings.json
+  node/
+    pipes/
+    systems/
+    expected/
+    testdata/
+    variables/
+  scripts/
+  .github/
+```
+
+---
+
 ## DTL Primer
 
 DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expressions** (composable, return a value).
@@ -794,6 +836,7 @@ DTL rules are JSON arrays of **transforms** (top-level, side-effects) and **expr
 | `dtl.format.reorderKeys` | `true` | Reorder root-level config keys to canonical order on save |
 | `dtl.trace.server` | `off` | LSP communication trace (`off`/`messages`/`verbose`) |
 | `dtl.graph.scanDepth` | `3` | Directory depth to scan for pipe/system files |
+| `sesam.rootFolder` | `""` | Subdirectory within the workspace where `pipes/`, `systems/`, etc. live (e.g. `node`). Leave empty for a flat layout. |
 | `sesam.nodeUrl` | `""` | Base URL of your Sesam node — used as a fallback when no profile nodeUrl is configured |
 | `sesam.jwt` | `""` | JWT token stored in plain text in settings. Superseded by SecretStorage — use **Sesam: Set JWT Token** instead. |
 
