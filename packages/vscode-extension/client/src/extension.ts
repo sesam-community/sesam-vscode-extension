@@ -58,6 +58,7 @@ import { disposeSesamChannel, getSesamChannel, logNodeRequest } from "./sesam-ch
 import { SesamRunner } from "./sesam-runner";
 import { createNetworkStatusBar, trackRequest } from "./network-status";
 import { NodeStatusPanel } from "./node-status/node-status-panel";
+import { resolveNodeUri, resolveNodePath } from "./node-root";
 import { ProfilesPanel } from "./profile-manager/profiles-panel";
 import {
   SyncStatusProvider,
@@ -1239,7 +1240,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             const result = await runner.download(
               { nodeUrl: creds.nodeUrl, jwtToken: creds.jwt, logger: logNodeRequest },
               {
-                outDir: workspaceDir,
+                outDir: resolveNodePath(workspaceDir),
                 formatter: (config) => formatSesamJson(config, 2, { reorderKeys: true }),
               },
             );
@@ -1457,7 +1458,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               pipeId,
               configType,
               {
-                outDir: workspaceDir,
+                outDir: resolveNodePath(workspaceDir),
                 formatter: (config) => formatSesamJson(config, 2, { reorderKeys: true }),
               },
             );
@@ -1912,7 +1913,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             : vscode.Uri.file("."));
       }
 
-      const folder = vscode.Uri.joinPath(workspaceRoot, subdir);
+      const folder = resolveNodeUri(workspaceRoot, subdir);
       // Create the subdirectory if it doesn't exist
       try {
         await vscode.workspace.fs.createDirectory(folder);
@@ -1934,7 +1935,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       async (jsonContent: string, suggestedName: string) => {
         const wsFolder = vscode.workspace.workspaceFolders?.[0];
         const defaultUri = wsFolder
-          ? vscode.Uri.joinPath(wsFolder.uri, "pipes", suggestedName)
+          ? resolveNodeUri(wsFolder.uri, "pipes", suggestedName)
           : vscode.Uri.file(suggestedName);
 
         const saveUri = await vscode.window.showSaveDialog({
@@ -2069,7 +2070,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.workspace.getWorkspaceFolder(sourceUri)?.uri ??
         vscode.workspace.workspaceFolders?.[0]?.uri ??
         vscode.Uri.file(path.dirname(sourceUri.fsPath));
-      const folder = vscode.Uri.joinPath(workspaceRoot, "pipes");
+      const folder = resolveNodeUri(workspaceRoot, "pipes");
 
       try {
         await vscode.workspace.fs.createDirectory(folder);
