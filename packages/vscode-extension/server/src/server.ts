@@ -163,22 +163,24 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 });
 
 connection.onInitialized(() => {
-  workspaceIndex.scanWorkspace(workspaceFolders);
+  void workspaceIndex.scanWorkspace(workspaceFolders);
 });
 
 connection.onDidChangeWatchedFiles((params) => {
   for (const change of params.changes) {
     const uri = change.uri;
+
     if (change.type === FileChangeType.Deleted) {
       workspaceIndex.removeFile(uri);
     } else {
-      try {
-        const fsPath = fileURLToPath(uri);
-        const text = fs.readFileSync(fsPath, "utf-8");
-        workspaceIndex.updateFile(uri, text);
-      } catch {
-        // File temporarily inaccessible — skip
-      }
+      void fs.promises
+        .readFile(fileURLToPath(uri), "utf-8")
+        .then((text) => {
+          workspaceIndex.updateFile(uri, text);
+        })
+        .catch(() => {
+          // File temporarily inaccessible — skip
+        });
     }
   }
 });

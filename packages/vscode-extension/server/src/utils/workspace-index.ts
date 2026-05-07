@@ -96,10 +96,10 @@ const indexFileText = (uri: string, text: string): void => {
   }
 };
 
-const scanDirectory = (dirPath: string): void => {
+const scanDirectoryAsync = async (dirPath: string): Promise<void> => {
   let entries: fs.Dirent[];
   try {
-    entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
   } catch {
     return;
   }
@@ -109,18 +109,21 @@ const scanDirectory = (dirPath: string): void => {
       if (SKIP_DIRS.has(entry.name)) {
         continue;
       }
-      scanDirectory(path.join(dirPath, entry.name));
+      await scanDirectoryAsync(path.join(dirPath, entry.name));
     } else if (entry.isFile()) {
       const filePath = path.join(dirPath, entry.name);
+
       if (!isSesamFile(filePath)) {
         continue;
       }
+
       let text: string;
       try {
-        text = fs.readFileSync(filePath, "utf-8");
+        text = await fs.promises.readFile(filePath, "utf-8");
       } catch {
         continue;
       }
+
       const uri = pathToFileURL(filePath).toString();
       indexFileText(uri, text);
     }
@@ -144,7 +147,7 @@ export const workspaceIndex = {
     return _fileTexts;
   },
 
-  scanWorkspace(folders: WorkspaceFolder[]): void {
+  async scanWorkspace(folders: WorkspaceFolder[]): Promise<void> {
     _pipeIndex.clear();
     _systemIndex.clear();
     _fileTexts.clear();
@@ -153,7 +156,7 @@ export const workspaceIndex = {
     for (const folder of folders) {
       try {
         const folderPath = fileURLToPath(folder.uri);
-        scanDirectory(folderPath);
+        await scanDirectoryAsync(folderPath);
       } catch {
         // Invalid URI or inaccessible folder — skip
       }

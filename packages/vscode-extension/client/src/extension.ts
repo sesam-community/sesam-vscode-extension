@@ -495,9 +495,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   context.subscriptions.push(syncStatusView);
 
-  // Populate sync status in the background shortly after activation so the
-  // tree is ready without the user having to trigger a save or explicit refresh.
-  setTimeout(() => refreshSyncStatusSilently(), 3_000);
+  // Sync status is populated on-demand (when the user runs sesam.showStatus,
+  // after a download/upload, or when the tree view is visible and a file is saved).
+  // We do NOT eagerly refresh at startup to avoid unnecessary network round-trips
+  // in large workspaces (1k+ pipes).
 
   // Silently check node reachability on load so the status bar lifecycle is
   // visible immediately without the user having to open the Node Status panel.
@@ -764,6 +765,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     systemPipesProvider.refresh();
   });
 
+  let _dagDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+
   const rescanDag = (): void => {
     void buildDagFromWorkspace().then(({ index, systems }) => {
       dagRef.current = index;
@@ -774,29 +777,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     });
   };
 
+  const scheduleDagRescan = (): void => {
+    clearTimeout(_dagDebounceTimer);
+    _dagDebounceTimer = setTimeout(() => rescanDag(), 1_500);
+  };
+
   // Watch for file changes to update the graph
   const watcher = vscode.workspace.createFileSystemWatcher("**/{pipes,systems}/**/*.json");
-  watcher.onDidCreate(() => {
-    rescanDag();
-  });
-  watcher.onDidChange(() => {
-    rescanDag();
-  });
-  watcher.onDidDelete(() => {
-    rescanDag();
-  });
+  watcher.onDidCreate(scheduleDagRescan);
+  watcher.onDidChange(scheduleDagRescan);
+  watcher.onDidDelete(scheduleDagRescan);
   context.subscriptions.push(watcher);
 
   const confWatcher = vscode.workspace.createFileSystemWatcher("**/*.conf.{json,pipe,system}");
-  confWatcher.onDidCreate(() => {
-    rescanDag();
-  });
-  confWatcher.onDidChange(() => {
-    rescanDag();
-  });
-  confWatcher.onDidDelete(() => {
-    rescanDag();
-  });
+  confWatcher.onDidCreate(scheduleDagRescan);
+  confWatcher.onDidChange(scheduleDagRescan);
+  confWatcher.onDidDelete(scheduleDagRescan);
   context.subscriptions.push(confWatcher);
 
   // Clear the references view when a sesam config file is renamed so stale
@@ -832,6 +828,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
 
     vscode.commands.registerCommand("dtl.refreshDag", () => {
+      clearTimeout(_dagDebounceTimer);
       rescanDag();
       vscode.window.setStatusBarMessage("Sesam: DAG refreshed", 2000);
     }),
@@ -2507,6 +2504,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             return;
           }
 
+          // Only refresh sync status when the user has already loaded it once
+          // (explicitly via showStatus or after a download/upload). This avoids
+          // a network round-trip on every save in large workspaces.
+          if (!syncStatusProvider.isLoaded()) {
+            return;
+          }
+
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => refreshSyncStatusSilently(), 500);
         };
@@ -2578,8 +2582,10 @@ async function buildDagFromWorkspace(): Promise<{
   index: DagIndex;
   systems: Map<string, SystemEntry>;
 }> {
+  // Scope to pipes/ and systems/ folders only — avoids scanning package.json,
+  // tsconfig.json, test fixtures, etc. in large workspaces.
   const files = await vscode.workspace.findFiles(
-    "**/*.{json,conf.pipe,conf.system,conf.json}",
+    "**/{pipes,systems}/**/*.{json,conf.pipe,conf.system,conf.json}",
     "**/node_modules/**",
   );
   const infos = (
