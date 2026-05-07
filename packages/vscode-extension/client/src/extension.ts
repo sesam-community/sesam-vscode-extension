@@ -88,6 +88,14 @@ let _provisioningPoller: { stop: () => void } | null = null;
 let _nodeStatusBar: vscode.StatusBarItem | null = null;
 let _nodeStatusBarHideTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** Synchronous guard — prevents concurrent upload/download operations. */
+let _transferInProgress = false;
+
+function setTransferInProgress(value: boolean): void {
+  _transferInProgress = value;
+  void vscode.commands.executeCommand("setContext", "sesam.transferInProgress", value);
+}
+
 const getNodeStatusBar = (): vscode.StatusBarItem => {
   if (!_nodeStatusBar) {
     _nodeStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
@@ -1025,10 +1033,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // ── Upload / Download ─────────────────────────────────────────────────
     vscode.commands.registerCommand("sesam.upload", async () => {
+      if (_transferInProgress) {
+        return;
+      }
+
+      setTransferInProgress(true);
+
       if (isSesamTestRunning()) {
         vscode.window.showWarningMessage(
           "Sesam tests are running. Please wait for them to finish.",
         );
+        setTransferInProgress(false);
         return;
       }
 
@@ -1036,6 +1051,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       if (!workspaceDir) {
         vscode.window.showWarningMessage("Sesam: No workspace folder open.");
+        setTransferInProgress(false);
         return;
       }
 
@@ -1051,16 +1067,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           await vscode.commands.executeCommand("sesam.setToken");
         }
 
+        setTransferInProgress(false);
         return;
       }
 
       if (!(await confirmIfProduction("upload all configs"))) {
+        setTransferInProgress(false);
         return;
       }
 
       const uploadReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
 
       if (!uploadReady) {
+        setTransferInProgress(false);
         return;
       }
 
@@ -1197,16 +1216,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
           } finally {
             uploadStatusBar.dispose();
+            setTransferInProgress(false);
           }
         },
       );
     }),
 
     vscode.commands.registerCommand("sesam.download", async (opts?: { skipConfirm?: boolean }) => {
+      if (_transferInProgress) {
+        return;
+      }
+
+      setTransferInProgress(true);
+
       if (isSesamTestRunning()) {
         vscode.window.showWarningMessage(
           "Sesam tests are running. Please wait for them to finish.",
         );
+        setTransferInProgress(false);
         return;
       }
 
@@ -1214,6 +1241,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       if (!workspaceDir) {
         vscode.window.showWarningMessage("Sesam: No workspace folder open.");
+        setTransferInProgress(false);
         return;
       }
 
@@ -1229,16 +1257,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           await vscode.commands.executeCommand("sesam.setToken");
         }
 
+        setTransferInProgress(false);
         return;
       }
 
       if (!(await confirmIfProduction("download all configs"))) {
+        setTransferInProgress(false);
         return;
       }
 
       const downloadReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
 
       if (!downloadReady) {
+        setTransferInProgress(false);
         return;
       }
 
@@ -1287,10 +1318,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               );
             }
 
+            setTransferInProgress(false);
             return;
           }
 
           if (diffAction !== "Download Anyway") {
+            setTransferInProgress(false);
             return;
           }
         }
@@ -1367,6 +1400,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             );
           } finally {
             statusBarItem.dispose();
+            setTransferInProgress(false);
           }
         },
       );
@@ -1374,10 +1408,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // ── Upload / Download single file ─────────────────────────────────────
     vscode.commands.registerCommand("sesam.uploadFile", async () => {
+      if (_transferInProgress) {
+        return;
+      }
+
+      setTransferInProgress(true);
+
       if (isSesamTestRunning()) {
         vscode.window.showWarningMessage(
           "Sesam tests are running. Please wait for them to finish.",
         );
+        setTransferInProgress(false);
         return;
       }
 
@@ -1389,6 +1430,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       if (!pipeId || !editor) {
         vscode.window.showWarningMessage("Sesam: No config _id found in the active document.");
+        setTransferInProgress(false);
         return;
       }
 
@@ -1404,16 +1446,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           await vscode.commands.executeCommand("sesam.setToken");
         }
 
+        setTransferInProgress(false);
         return;
       }
 
       if (!(await confirmIfProduction(`upload '${pipeId}'`))) {
+        setTransferInProgress(false);
         return;
       }
 
       const uploadReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
 
       if (!uploadReady) {
+        setTransferInProgress(false);
         return;
       }
 
@@ -1487,12 +1532,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
           } finally {
             uploadFileStatusBar.dispose();
+            setTransferInProgress(false);
           }
         },
       );
     }),
 
     vscode.commands.registerCommand("sesam.downloadFile", async () => {
+      if (_transferInProgress) {
+        return;
+      }
+
+      setTransferInProgress(true);
+
       const editor =
         vscode.window.activeTextEditor ??
         _lastSesamEditor ??
@@ -1501,6 +1553,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       if (!pipeId || !editor) {
         vscode.window.showWarningMessage("Sesam: No config _id found in the active document.");
+        setTransferInProgress(false);
         return;
       }
 
@@ -1517,12 +1570,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           await vscode.commands.executeCommand("sesam.setToken");
         }
 
+        setTransferInProgress(false);
         return;
       }
 
       const downloadReady = await ensureNodeReady(creds.nodeUrl, creds.jwt);
 
       if (!downloadReady) {
+        setTransferInProgress(false);
         return;
       }
 
@@ -1530,6 +1585,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       if (!workspaceDir) {
         vscode.window.showWarningMessage("Sesam: No workspace folder open.");
+        setTransferInProgress(false);
         return;
       }
 
@@ -1552,10 +1608,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         if (diffAction === "See Diff") {
           await vscode.commands.executeCommand("sesam.viewDiff");
+          setTransferInProgress(false);
           return;
         }
 
         if (diffAction !== "Download Anyway") {
+          setTransferInProgress(false);
           return;
         }
       }
@@ -1597,6 +1655,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             vscode.window.showErrorMessage(
               `Sesam: Download failed: ${err instanceof Error ? err.message : String(err)}`,
             );
+          } finally {
+            setTransferInProgress(false);
           }
         },
       );
