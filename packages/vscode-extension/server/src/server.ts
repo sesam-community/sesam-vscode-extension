@@ -186,6 +186,38 @@ connection.onDidChangeWatchedFiles((params) => {
 });
 
 // ---------------------------------------------------------------------------
+// Concurrency limiter — caps parallel validateDocument calls to avoid
+// saturating the event loop when many files are validated at once (e.g. on
+// config-change when 1 000+ documents are open).
+// ---------------------------------------------------------------------------
+function makeLimiter(concurrency: number): (fn: () => Promise<void>) => void {
+  let running = 0;
+  const queue: Array<() => void> = [];
+
+  const next = (): void => {
+    if (queue.length === 0 || running >= concurrency) {
+      return;
+    }
+
+    running++;
+    const task = queue.shift()!;
+    task();
+  };
+
+  return (fn: () => Promise<void>): void => {
+    queue.push(() => {
+      fn().finally(() => {
+        running--;
+        next();
+      });
+    });
+    next();
+  };
+}
+
+const limitedValidate = makeLimiter(4);
+
+// ---------------------------------------------------------------------------
 // Settings (kept in sync with VS Code configuration)
 // ---------------------------------------------------------------------------
 const documentSettings = new Map<string, Promise<DtlSettings>>();
@@ -214,7 +246,7 @@ const nodeValidationDiagnostics = new Map<string, Diagnostic[]>();
 connection.onDidChangeConfiguration(() => {
   // sesamSettingsCache = null;
   documentSettings.clear();
-  documents.all().forEach(validateDocument);
+  documents.all().forEach((doc) => limitedValidate(() => validateDocument(doc)));
 });
 
 async function getDocumentSettings(resource: string): Promise<DtlSettings> {
@@ -291,7 +323,7 @@ async function validateDocument(document: TextDocument): Promise<void> {
 
 documents.onDidChangeContent((change) => {
   workspaceIndex.updateFile(change.document.uri, change.document.getText());
-  validateDocument(change.document);
+  limitedValidate(() => validateDocument(change.document));
 });
 
 documents.onDidClose((event) => {
