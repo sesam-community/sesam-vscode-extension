@@ -49,7 +49,7 @@
 | F08 | Connector Development Tools | Phase 4 | `planned` | [impl-f08-connector-tools.prompt.md](impl-f08-connector-tools.prompt.md) |
 | F11 | Management Studio Functionalities | Phase 5 | `planned` | [impl-f11-management-studio.prompt.md](impl-f11-management-studio.prompt.md) |
 | E2E | End-to-End Tests via Playwright | Cross-cutting | `planned` | [e2e-playwright.prompt.md](../plans/e2e-playwright.prompt.md) |
-| F29 | Large Workspace Optimization (1k+ pipes) | Cross-cutting | `phase 2 implemented` | [large-workspace-optimization.prompt.md](../plans/large-workspace-optimization.prompt.md) |
+| F29 | Large Workspace Optimization (1k+ pipes) | Cross-cutting | `phase 3 O6 implemented` | [large-workspace-optimization.prompt.md](../plans/large-workspace-optimization.prompt.md) |
 
 ---
 

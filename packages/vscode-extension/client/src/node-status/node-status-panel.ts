@@ -918,6 +918,11 @@ export class NodeStatusPanel {
   let sysConfigStatus = {}; // id -> 'modified'|'node-only'|'local-only'|undefined
   let activeTab = 'pipes';
 
+  // ── Pagination ─────────────────────────────────────────────────────────
+  const PAGE_SIZE = 200;
+  let pipeOffset = PAGE_SIZE;
+  let sysOffset  = PAGE_SIZE;
+
   // ── Sync Diff ──────────────────────────────────────────────────────────
   function syncDiff() {
     if (currentFilterPipeId) {
@@ -1002,6 +1007,9 @@ export class NodeStatusPanel {
       currentSubId     = msg.subId   || '';
       currentPortalUrl = msg.portalUrl || ${JSON.stringify(DEFAULT_PORTAL_URL)};
       currentFilterPipeId = msg.filterPipeId || null;
+      // Reset pagination on fresh data load
+      pipeOffset = PAGE_SIZE;
+      sysOffset  = PAGE_SIZE;
       document.getElementById('nodeUrl').textContent = msg.nodeUrl;
       document.getElementById('refreshBtn').disabled = false;
       if (msg.filterPipeId) {
@@ -1065,7 +1073,14 @@ export class NodeStatusPanel {
     renderSysTable();
   }
 
-  function applySysFilters() { renderSysTable(); }
+  function applySysFilters() { sysOffset = PAGE_SIZE; renderSysTable(); }
+
+  function sortSysBy(key) {
+    if (sysSortKey === key) { sysSortAsc = !sysSortAsc; }
+    else { sysSortKey = key; sysSortAsc = true; }
+    sysOffset = PAGE_SIZE;
+    renderSysTable();
+  }
 
   function renderSysTable() {
     ['id','systemType','pipesIn','pipesOut'].forEach(k => {
@@ -1087,10 +1102,12 @@ export class NodeStatusPanel {
 
     showSysOverlay('table');
 
+    const visibleSys = rows.slice(0, sysOffset);
+    const remainingSys = rows.length - visibleSys.length;
     const tbody = document.getElementById('sys-tbody');
     const diffSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h11A1.5 1.5 0 0 1 15 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5ZM5.25 5.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5a.75.75 0 0 1 .75-.75Zm5.5 0a.75.75 0 0 1 .75.75v1.25h1.25a.75.75 0 0 1 0 1.5H11.5v1.25a.75.75 0 0 1-1.5 0V9h-1.25a.75.75 0 0 1 0-1.5H10V6.25a.75.75 0 0 1 .75-.75Z"/></svg>';
 
-    tbody.innerHTML = rows.map(s => {
+    tbody.innerHTML = visibleSys.map(s => {
       const safeId = escHtml(s.id);
       const safeType = escHtml(s.systemType || '—');
       const status = sysConfigStatus[s.id];
@@ -1110,7 +1127,15 @@ export class NodeStatusPanel {
         '<td class="count-cell">' + (s.pipesOut > 0 ? s.pipesOut : '<span style="opacity:.35">0</span>') + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '</tr>';
-    }).join('');
+    }).join('') +
+    (remainingSys > 0
+      ? '<tr id="sys-load-more"><td colspan="5" style="text-align:center;padding:6px"><button onclick="loadMoreSystems()" style="cursor:pointer">Load ' + Math.min(remainingSys, PAGE_SIZE) + ' more&hellip; (' + remainingSys + ' remaining)</button></td></tr>'
+      : '');
+  }
+
+  function loadMoreSystems() {
+    sysOffset += PAGE_SIZE;
+    renderSysTable();
   }
 
   function showSysOverlay(kind) {
@@ -1181,10 +1206,11 @@ export class NodeStatusPanel {
     stateFilter = state;
     document.querySelectorAll('.filter-pills button').forEach(b => b.classList.remove('active'));
     document.getElementById('pill-' + state).classList.add('active');
+    pipeOffset = PAGE_SIZE;
     renderTable();
   }
 
-  function applyFilters() { renderTable(); }
+  function applyFilters() { pipeOffset = PAGE_SIZE; renderTable(); }
 
   function sortBy(key) {
     if (sortKey === key) {
@@ -1193,6 +1219,7 @@ export class NodeStatusPanel {
       sortKey = key;
       sortAsc = true;
     }
+    pipeOffset = PAGE_SIZE;
     renderTable();
   }
 
@@ -1243,8 +1270,10 @@ export class NodeStatusPanel {
 
     showOverlay('table');
 
+    const visible = rows.slice(0, pipeOffset);
+    const remaining = rows.length - visible.length;
     const tbody = document.getElementById('tbody');
-    tbody.innerHTML = rows.map(s => {
+    tbody.innerHTML = visible.map(s => {
       const badge = badgeClass(s);
       const lastRun = s.lastRun ? fmtDate(s.lastRun) : '<span style="opacity:.45">—</span>';
       const queuedVal = s.queued > 0 ? '<span class="q-count">' + s.queued + '</span>' : '<span style="opacity:.35">0</span>';
@@ -1270,7 +1299,15 @@ export class NodeStatusPanel {
         '<td class="count-cell">' + queuedVal + '</td>' +
         '<td style="opacity:.8;white-space:nowrap">' + lastRun + '</td>' +
         '</tr>';
-    }).join('');
+    }).join('') +
+    (remaining > 0
+      ? '<tr id="pipe-load-more"><td colspan="6" style="text-align:center;padding:6px"><button onclick="loadMorePipes()" style="cursor:pointer">Load ' + Math.min(remaining, PAGE_SIZE) + ' more&hellip; (' + remaining + ' remaining)</button></td></tr>'
+      : '');
+  }
+
+  function loadMorePipes() {
+    pipeOffset += PAGE_SIZE;
+    renderTable();
   }
 
   // Single delegated listener — avoids all inline-onclick quoting issues
