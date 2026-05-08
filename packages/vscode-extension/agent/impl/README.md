@@ -50,6 +50,7 @@
 | F11 | Management Studio Functionalities | Phase 5 | `planned` | [impl-f11-management-studio.prompt.md](impl-f11-management-studio.prompt.md) |
 | E2E | End-to-End Tests via Playwright | Cross-cutting | `planned` | [e2e-playwright.prompt.md](../plans/e2e-playwright.prompt.md) |
 | F29 | Large Workspace Optimization (1k+ pipes) | Cross-cutting | `fully implemented` | [large-workspace-optimization.prompt.md](../plans/large-workspace-optimization.prompt.md) |
+| F30 | Preview Panel — Entity Search (ID / Text) | Phase 3 | `planned` | [impl-f30-preview-entity-search.prompt.md](impl-f30-preview-entity-search.prompt.md) |
 
 ---
 
