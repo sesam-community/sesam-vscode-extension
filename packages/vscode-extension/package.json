@@ -300,6 +300,11 @@
         "icon": "$(sync~spin)"
       },
       {
+        "command": "sesam.transferBusyDownload",
+        "title": "Transfer in progress…",
+        "icon": "$(sync~spin)"
+      },
+      {
         "command": "sesam.pipeStatus",
         "title": "Sesam: Show Pipe Status",
         "icon": "$(pulse)"
@@ -379,8 +384,23 @@
         },
         {
           "command": "sesam.transferBusy",
-          "when": "sesam.transferInProgress && (resourceLangId == json || resourceLangId == sesam-config || workspaceFolderCount > 0)",
+          "when": "sesam.uploadInProgress && (resourceLangId == json || resourceLangId == sesam-config)",
           "group": "navigation@4"
+        },
+        {
+          "command": "sesam.transferBusyDownload",
+          "when": "sesam.downloadInProgress && (resourceLangId == json || resourceLangId == sesam-config)",
+          "group": "navigation@5"
+        },
+        {
+          "command": "sesam.transferBusy",
+          "when": "sesam.uploadInProgress && workspaceFolderCount > 0",
+          "group": "navigation@6"
+        },
+        {
+          "command": "sesam.transferBusyDownload",
+          "when": "sesam.downloadInProgress && workspaceFolderCount > 0",
+          "group": "navigation@7"
         },
         {
           "command": "sesam.nodeStatus",
@@ -507,7 +527,7 @@
         },
         {
           "command": "sesam.upload",
-          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning && !sesam.transferInProgress",
           "group": "navigation@10"
         },
         {
@@ -517,8 +537,13 @@
         },
         {
           "command": "sesam.transferBusy",
-          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && sesam.transferInProgress",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && sesam.uploadInProgress",
           "group": "navigation@10"
+        },
+        {
+          "command": "sesam.transferBusyDownload",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && sesam.downloadInProgress",
+          "group": "navigation@11"
         },
         {
           "command": "sesam.nodeStatus",

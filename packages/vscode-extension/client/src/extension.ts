@@ -92,9 +92,19 @@ let _nodeStatusBarHideTimer: ReturnType<typeof setTimeout> | null = null;
 /** Synchronous guard — prevents concurrent upload/download operations. */
 let _transferInProgress = false;
 
-function setTransferInProgress(value: boolean): void {
+function setTransferInProgress(value: boolean, kind?: "upload" | "download"): void {
   _transferInProgress = value;
   void vscode.commands.executeCommand("setContext", "sesam.transferInProgress", value);
+  void vscode.commands.executeCommand(
+    "setContext",
+    "sesam.uploadInProgress",
+    value && kind === "upload",
+  );
+  void vscode.commands.executeCommand(
+    "setContext",
+    "sesam.downloadInProgress",
+    value && kind === "download",
+  );
   ManagerPanel.updateTransferState(value);
 }
 
@@ -1053,7 +1063,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      setTransferInProgress(true);
+      setTransferInProgress(true, "upload");
 
       if (isSesamTestRunning()) {
         vscode.window.showWarningMessage(
@@ -1243,7 +1253,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      setTransferInProgress(true);
+      setTransferInProgress(true, "download");
 
       if (isSesamTestRunning()) {
         vscode.window.showWarningMessage(
@@ -1428,7 +1438,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      setTransferInProgress(true);
+      setTransferInProgress(true, "upload");
 
       if (isSesamTestRunning()) {
         vscode.window.showWarningMessage(
@@ -1559,7 +1569,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
 
-      setTransferInProgress(true);
+      setTransferInProgress(true, "download");
 
       const editor =
         vscode.window.activeTextEditor ??
@@ -1703,6 +1713,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
 
     vscode.commands.registerCommand("sesam.transferBusy", () => {
+      vscode.window.showInformationMessage("Sesam: A transfer is already in progress.");
+    }),
+
+    vscode.commands.registerCommand("sesam.transferBusyDownload", () => {
       vscode.window.showInformationMessage("Sesam: A transfer is already in progress.");
     }),
 
