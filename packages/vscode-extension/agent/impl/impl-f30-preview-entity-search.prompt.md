@@ -226,6 +226,171 @@ CSS frameworks are used in `preview.html`.
 
 ---
 
+### Phase E — JSON Folding (Collapse / Expand) for Input and Output panes
+
+Add VS Code–style JSON folding to both panes so deeply nested entities can be collapsed to a
+single line, matching the folding behaviour of the built-in code editor.
+
+---
+
+#### Output pane
+
+The output pane (`<div id="output-box">`) is read-only and currently rendered by `colorizeJson()`
+(string → HTML string). Replace it with a new function `renderFoldableJson(value: unknown): Node`
+that builds a live DOM tree:
+
+**Rendering rules**
+
+| JSON type | Rendered as |
+|---|---|
+| Object `{}` | fold-toggle `▼`/`▶` + `{` … `}`, one key-value pair per line, indented |
+| Array `[]` | fold-toggle `▼`/`▶` + `[` … `]`, one element per line, indented |
+| String | `<span class="json-str">` — same colour as current `colorizeJson` |
+| Number / boolean / null | `<span class="json-punct">` |
+| Object key | `<span class="json-key">` |
+
+Each foldable node is a `<details>` element (or a custom `<span data-fold>` toggle):
+
+```html
+<!-- Expanded -->
+<span class="fold-toggle open" title="Collapse">▼</span>{
+  "key": "value",
+  ...
+}
+
+<!-- Collapsed -->
+<span class="fold-toggle" title="Expand">▶</span>{ … }
+```
+
+Clicking the toggle adds/removes a CSS class `collapsed` on the block; the children `<div>` and
+the closing brace are hidden via `display: none`; the inline summary `{ … }` is shown via
+`display: inline`.
+
+**Fold All / Expand All** button added to the Output pane header (next to `⧉ Copy`):
+
+```html
+<button class="copy-btn" id="fold-output-btn" onclick="toggleFoldAll('output')">⊟ Fold all</button>
+```
+
+`toggleFoldAll('output')` collapses every foldable node in the output pane; a second click
+expands them all. Button label toggles between `⊟ Fold all` and `⊞ Expand all`.
+
+---
+
+#### Input pane
+
+The input pane is an editable `<textarea>`. Full inline folding of a live textarea requires a
+gutter overlay, which is complex. Instead, implement a **dual-mode** approach:
+
+| Mode | UI | When |
+|---|---|---|
+| **Edit mode** | Current `textarea` + `input-highlight` overlay (unchanged) | Default; user can type |
+| **View mode** | Foldable tree (read-only), same renderer as output | User clicks "View" toggle |
+
+A toggle button is added to the Input pane header:
+
+```html
+<button class="copy-btn" id="view-mode-btn" onclick="toggleInputViewMode()">⊟ Fold view</button>
+```
+
+**Switching to View mode**:
+1. Snapshot the textarea value.
+2. Parse it as JSON. If invalid, stay in edit mode and show a brief warning.
+3. Hide the `input-wrapper` (`textarea` + `input-highlight`).
+4. Show a `<div id="input-fold-view">` rendered by `renderFoldableJson(parsedValue)`.
+5. Change the button label to `✎ Edit`.
+
+**Switching back to Edit mode**:
+1. Hide `#input-fold-view`.
+2. Show `input-wrapper` again.
+3. Change the button label to `⊟ Fold view`.
+4. Call `syncHighlight()` to re-render the highlight overlay.
+
+The textarea value is **never modified** by the View-mode renderer — the fold view is purely
+presentational.
+
+**Fold All / Expand All** for the input fold view works identically to the output pane, driven by
+the same `toggleFoldAll('input')` helper.
+
+---
+
+#### Shared implementation
+
+**`renderFoldableJson(value, indent = 0): DocumentFragment`**
+
+Recursive function. Produces DOM nodes (not an HTML string) to avoid `innerHTML` injection.
+Used by both panes.
+
+```
+renderFoldableJson(value, indent):
+  if typeof value === 'object' && value !== null:
+    open = value is Array ? '[' : '{'
+    close = value is Array ? ']' : '}'
+    entries = Object.entries(value)  |  array elements
+    if entries.length === 0: return text(open + close)
+    wrap = <div class="fold-block">
+    header = <span>
+    toggle = <span class="fold-toggle open">▼</span>
+    summary = <span class="fold-summary hidden">…</span>   // shown when collapsed
+    header.append(toggle, open, summary)
+    body = <div class="fold-body">
+    for each entry: body.append(renderFoldableJson(entry.value, indent+1))
+    footer = <span class="fold-close">close</span>
+    toggle.onclick = () => toggleFold(wrap)
+    wrap.append(header, body, footer)
+    return wrap
+  else:
+    return colorSpan(value)
+```
+
+**`toggleFold(wrapEl)`**: toggles class `collapsed` on `wrapEl`; hides `.fold-body` and
+`.fold-close`; shows `.fold-summary`; updates toggle to `▶` / `▼`.
+
+**CSS additions** (inside `<style>` in `preview.html`):
+
+```css
+.fold-toggle {
+  cursor: pointer;
+  user-select: none;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  margin-right: 3px;
+  display: inline-block;
+  width: 10px;
+}
+.fold-summary {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+.fold-block.collapsed > .fold-body,
+.fold-block.collapsed > .fold-close { display: none; }
+.fold-block.collapsed > span > .fold-summary { display: inline; }
+.fold-summary { display: none; }
+#input-fold-view {
+  flex: 1;
+  padding: 10px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 13px);
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  overflow: auto;
+  white-space: pre;
+  display: none;
+}
+```
+
+---
+
+#### Files Touched (Phase E)
+
+| File | Change |
+|---|---|
+| `resources/preview.html` | Add `renderFoldableJson`, `toggleFold`, `toggleFoldAll`, `toggleInputViewMode`; add fold buttons to both pane headers; add `#input-fold-view` div; add CSS for fold controls |
+
+No changes to `preview-panel.ts` or `node-client.ts` are required for Phase E.
+
+---
+
 ## Out of Scope
 
 - Jump-to-sequence / Jump-to-timestamp controls
@@ -252,5 +417,5 @@ is not unit-testable without a full integration harness).
 |---|---|
 | `client/src/node-client.ts` | Add `searchDatasetById`, `searchDatasetByText` |
 | `client/src/preview/preview-panel.ts` | Extend message types, add search handler, expose `sourceDataset` in `documentState` |
-| `resources/preview.html` | Add search bar UI |
+| `resources/preview.html` | Add search bar UI (Phase D); add foldable JSON renderer + fold controls for both panes (Phase E) |
 | `tests/node-client.test.ts` | New tests for search functions |
