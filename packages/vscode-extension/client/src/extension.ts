@@ -395,8 +395,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // ── Manager Status Bar ────────────────────────────────────────────────────
   const managerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 8);
-  managerStatusBar.text = "$(server-process) Node Management";
-  managerStatusBar.tooltip = "Open Node Management";
+  managerStatusBar.text = "$(server-process)";
+  managerStatusBar.tooltip = "Sesam: Open Node Management";
   managerStatusBar.command = "sesam.openManager";
   managerStatusBar.show();
   context.subscriptions.push(managerStatusBar);
