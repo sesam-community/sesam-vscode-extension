@@ -541,7 +541,11 @@
       // Clear entities pane and show loader
       embeddedEntities = [];
       entityIndex = 0;
-      renderEntityList();
+      document.getElementById('entity-list').innerHTML = '';
+      document.getElementById('entity-list-label').textContent = '';
+      document.getElementById('entity-list-pagination').style.display = 'none';
+      document.getElementById('entities-pane').classList.add('visible');
+      document.querySelector('.panes').classList.add('has-entities');
       showEntityListLoading(true);
 
       vscode.postMessage({ type: 'searchEntity', searchType, query });
@@ -550,6 +554,15 @@
     function clearSearch() {
       document.getElementById('search-input').value = '';
       setSearchStatus('', false);
+
+      if (entitySource === 'search') {
+        // Reload the entity list from the node using the current mode
+        entitySource = 'node';
+        pageStack = [];
+        currentCursor = undefined;
+        updateEntityModeBar();
+        vscode.postMessage({ type: 'fetchEntityPage', deleted: showDeleted });
+      }
     }
 
     function setSearchStatus(text, isError) {
@@ -1103,6 +1116,12 @@
         resetSearchBtn();
         showEntityListLoading(false);
         setSearchStatus('Search complete (0 found)', false);
+
+        // Show empty state in entity list
+        const list = document.getElementById('entity-list');
+        list.innerHTML = '<div style="padding:16px 12px;font-size:11px;opacity:0.5;font-family:var(--vscode-font-family)">No results found.</div>';
+        document.getElementById('entity-list-label').textContent = '0';
+        document.getElementById('entity-list-pagination').style.display = 'none';
         return;
       }
 

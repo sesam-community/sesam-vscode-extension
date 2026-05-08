@@ -451,7 +451,7 @@ export const searchDatasetByText = async (
       nodeUrl,
       jwt,
       datasetId,
-      { limit: pageSize, since },
+      { limit: pageSize, since, deleted: false, history: false, uncommitted: false },
       logger,
     );
 
@@ -472,7 +472,7 @@ export const searchDatasetByText = async (
     }
 
     const last = page[page.length - 1];
-    since = last["_ts"] as string | number | undefined;
+    since = last["_updated"] as number | undefined;
 
     if (since === undefined) {
       break;
