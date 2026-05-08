@@ -384,9 +384,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   createNetworkStatusBar(context);
 
   // ── Manager Status Bar ────────────────────────────────────────────────────
-  const managerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 98);
-  managerStatusBar.text = "$(cloud) Sesam";
-  managerStatusBar.tooltip = "Open Sesam Manager";
+  const managerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 8);
+  managerStatusBar.text = "$(server-process) Node Management";
+  managerStatusBar.tooltip = "Open Node Management";
   managerStatusBar.command = "sesam.openManager";
   managerStatusBar.show();
   context.subscriptions.push(managerStatusBar);

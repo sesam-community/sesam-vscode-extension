@@ -193,8 +193,8 @@
       },
       {
         "command": "sesam.openManager",
-        "title": "Sesam: Open Manager",
-        "icon": "$(cloud)"
+        "title": "Sesam: Open Node Management",
+        "icon": "$(server-process)"
       },
       {
         "command": "sesam.runPipeTests",

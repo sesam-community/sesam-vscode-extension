@@ -38,7 +38,7 @@ export class ManagerPanel {
 
     const panel = vscode.window.createWebviewPanel(
       ManagerPanel._viewType,
-      "Sesam Manager",
+      "Node Management",
       column,
       {
         enableScripts: true,
