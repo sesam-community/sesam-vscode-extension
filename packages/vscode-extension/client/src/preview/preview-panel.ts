@@ -33,7 +33,8 @@ type MessageFromWebview =
   | { type: "openSettings" }
   | { type: "copyOutput"; text: string }
   | { type: "copyInput"; text: string }
-  | { type: "searchEntity"; searchType: "id" | "text"; query: string };
+  | { type: "searchEntity"; searchType: "id" | "text"; query: string }
+  | { type: "fetchEntityPage"; cursor?: number };
 
 const DEBOUNCE_MS = 300;
 
@@ -169,6 +170,56 @@ export class PreviewPanel {
       await this._handleSearchEntity(message.searchType, message.query);
 
       return;
+    }
+
+    if (message.type === "fetchEntityPage") {
+      await this._handleFetchEntityPage(message.cursor);
+
+      return;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Entity page fetch (server-side pagination)
+  // ---------------------------------------------------------------------------
+
+  private async _handleFetchEntityPage(cursor?: number): Promise<void> {
+    const credentials = await resolveCredentials();
+
+    if (!credentials) {
+      return;
+    }
+
+    const sourceDataset = extractSourceDataset(this._document.getText());
+
+    if (!sourceDataset) {
+      return;
+    }
+
+    try {
+      const LIMIT = 30;
+      const entities = await fetchDatasetEntities(
+        credentials.nodeUrl,
+        credentials.jwt,
+        sourceDataset,
+        {
+          limit: LIMIT,
+          since: cursor,
+          reverse: true,
+          deleted: false,
+          history: false,
+          uncommitted: false,
+        },
+        logNodeRequest,
+      );
+
+      this._panel.webview.postMessage({
+        type: "entityPage",
+        entities,
+        hasMore: entities.length === LIMIT,
+      });
+    } catch {
+      // Silently ignore — webview retains the current page
     }
   }
 
@@ -380,6 +431,7 @@ export class PreviewPanel {
       loadingEntities: willLoadAsync,
       resetOutput,
       sourceDataset: extractSourceDataset(text) ?? null,
+      hasMore: false,
     });
 
     if (!willLoadAsync) {
@@ -396,6 +448,7 @@ export class PreviewPanel {
         loadingEntities: false,
         resetOutput: false,
         sourceDataset: extractSourceDataset(text) ?? null,
+        hasMore: result?.hasMore ?? false,
       });
     });
   }
@@ -403,11 +456,11 @@ export class PreviewPanel {
   /** Tries testdata first, then node source dataset. Always resolves (never throws). */
   private async _loadEntitiesAsync(
     pipeId: string,
-  ): Promise<{ entities: Entity[]; entitySource: string } | null> {
+  ): Promise<{ entities: Entity[]; entitySource: string; hasMore: boolean } | null> {
     const testdata = await this._loadTestdataEntities(pipeId);
 
     if (testdata && testdata.length > 0) {
-      return { entities: testdata as Entity[], entitySource: "testdata" };
+      return { entities: testdata as Entity[], entitySource: "testdata", hasMore: false };
     }
 
     const credentials = await resolveCredentials();
@@ -424,16 +477,18 @@ export class PreviewPanel {
     }
 
     try {
+      const LIMIT = 30;
       const entities = await fetchDatasetEntities(
         credentials.nodeUrl,
         credentials.jwt,
         sourceDataset,
-        undefined,
-        undefined,
+        { limit: LIMIT, reverse: true, deleted: false, history: false, uncommitted: false },
         logNodeRequest,
       );
 
-      return entities.length > 0 ? { entities, entitySource: "node" } : null;
+      return entities.length > 0
+        ? { entities, entitySource: "node", hasMore: entities.length === LIMIT }
+        : null;
     } catch {
       return null;
     }

@@ -304,7 +304,7 @@
       display: none;
     }
     /* Entities list pane */
-    .panes.has-entities { grid-template-columns: 200px 1fr 1fr; }
+    .panes.has-entities { grid-template-columns: 220px 1fr 1fr; }
     #entities-pane { display: none; }
     #entities-pane.visible { display: flex; }
     .entity-list {
@@ -313,14 +313,16 @@
       padding: 4px 0;
     }
     .entity-list-item {
-      padding: 4px 10px;
-      font-size: 12px;
+      padding: 3px 8px;
+      font-size: 11px;
       font-family: var(--vscode-editor-font-family, monospace);
       cursor: pointer;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
       border-left: 2px solid transparent;
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      grid-template-rows: auto auto;
+      column-gap: 4px;
+      row-gap: 0;
     }
     .entity-list-item:hover { background: var(--vscode-list-hoverBackground); }
     .entity-list-item.active {
@@ -328,6 +330,51 @@
       color: var(--vscode-list-activeSelectionForeground);
       border-left-color: var(--vscode-focusBorder);
     }
+    .eli-ordinal {
+      grid-row: 1 / 3;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      font-size: 10px;
+      opacity: 0.45;
+      user-select: none;
+      padding-right: 2px;
+    }
+    .eli-id {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+    .eli-ts {
+      font-size: 10px;
+      opacity: 0.55;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+    }
+    .entity-list-item.active .eli-ts { opacity: 0.8; }
+    .entity-list-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px;
+      border-top: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .entity-list-pagination button {
+      padding: 1px 7px;
+      cursor: pointer;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-radius: 2px;
+      font-size: 11px;
+    }
+    .entity-list-pagination button:disabled { opacity: 0.35; cursor: default; }
   </style>
 </head>
 <body>
@@ -358,6 +405,11 @@
         <span id="entity-list-label" style="font-size:10px;font-weight:normal;text-transform:none;letter-spacing:0;opacity:0.7"></span>
       </div>
       <div class="entity-list" id="entity-list"></div>
+      <div class="entity-list-pagination" id="entity-list-pagination" style="display:none">
+        <button id="el-prev-btn" onclick="entityListPrevPage()" disabled>&#9664;</button>
+        <span id="el-page-label"></span>
+        <button id="el-next-btn" onclick="entityListNextPage()">&#9654;</button>
+      </div>
     </div>
 
     <!-- Input Entity -->
@@ -422,8 +474,13 @@
 
     let embeddedEntities = [];
     let entityIndex = 0;
+    let entityPage = 0;       // current page index for client-side pagination
+    let entitySource = null;  // 'embedded' | 'testdata' | 'node' | null
+    let pageStack = [];       // cursors for server-side back navigation
+    let currentHasMore = false; // whether a next server-side page exists
+    let currentCursor = undefined; // cursor used to fetch the current server-side page
     let lastOutputText = null;
-    let inputViewMode = false; // false = edit, true = fold-view
+    let inputViewMode = false;
     let outputFoldedAll = false;
 
     // ── Search ────────────────────────────────────────────────────────────────
@@ -507,7 +564,34 @@
       runEval();
     }
 
-    function renderEntityList() {
+    function entityListPrevPage() {
+      if (entitySource === 'node') {
+        if (pageStack.length > 0) {
+          currentCursor = pageStack.pop();
+          vscode.postMessage({ type: 'fetchEntityPage', cursor: currentCursor });
+        }
+      } else {
+        if (entityPage > 0) { entityPage--; renderEntityList(); }
+      }
+    }
+
+    function entityListNextPage() {
+      if (entitySource === 'node') {
+        if (currentHasMore && embeddedEntities.length > 0) {
+          const last = embeddedEntities[embeddedEntities.length - 1];
+          const nextCursor = last ? Number(last['_updated']) : undefined;
+          pageStack.push(currentCursor);
+          currentCursor = nextCursor;
+          vscode.postMessage({ type: 'fetchEntityPage', cursor: nextCursor });
+        }
+      } else {
+        const sortedLen = embeddedEntities.length;
+        const totalPages = Math.ceil(sortedLen / ENTITY_LIST_MAX);
+        if (entityPage < totalPages - 1) { entityPage++; renderEntityList(); }
+      }
+    }
+
+    function renderEntityList(activeIdx) {
       const list = document.getElementById('entity-list');
       const label = document.getElementById('entity-list-label');
       const pane = document.getElementById('entities-pane');
@@ -524,26 +608,104 @@
       pane.classList.add('visible');
       panes.classList.add('has-entities');
 
-      const shown = Math.min(embeddedEntities.length, ENTITY_LIST_MAX);
-      label.textContent = embeddedEntities.length > ENTITY_LIST_MAX
-        ? shown + ' of ' + embeddedEntities.length
-        : String(embeddedEntities.length);
+      const pagination = document.getElementById('entity-list-pagination');
+      const pageLabel = document.getElementById('el-page-label');
+      let displayIndices;
 
+      if (entitySource === 'node') {
+        // Server-side pagination: entities are already the current page, no sorting
+        displayIndices = Array.from({ length: embeddedEntities.length }, (_, i) => i);
+
+        const hasPrev = pageStack.length > 0;
+        const hasNext = currentHasMore;
+
+        if (hasPrev || hasNext) {
+          pagination.style.display = 'flex';
+          pageLabel.textContent = 'p.' + (pageStack.length + 1);
+          document.getElementById('el-prev-btn').disabled = !hasPrev;
+          document.getElementById('el-next-btn').disabled = !hasNext;
+        } else {
+          pagination.style.display = 'none';
+        }
+
+        label.textContent = String(embeddedEntities.length);
+      } else {
+        // Client-side pagination: sort by _ts desc and slice
+        const total = embeddedEntities.length;
+        const totalPages = Math.ceil(total / ENTITY_LIST_MAX);
+
+        const allSorted = Array.from({ length: total }, (_, i) => i)
+          .sort((a, b) => {
+            const ta = Number(embeddedEntities[a]['_ts'] ?? 0);
+            const tb = Number(embeddedEntities[b]['_ts'] ?? 0);
+            return tb - ta;
+          });
+
+        if (entityPage >= totalPages) { entityPage = Math.max(0, totalPages - 1); }
+
+        const pageStart = entityPage * ENTITY_LIST_MAX;
+        displayIndices = allSorted.slice(pageStart, pageStart + ENTITY_LIST_MAX);
+
+        if (totalPages > 1) {
+          pagination.style.display = 'flex';
+          pageLabel.textContent = (entityPage + 1) + ' / ' + totalPages;
+          document.getElementById('el-prev-btn').disabled = entityPage === 0;
+          document.getElementById('el-next-btn').disabled = entityPage === totalPages - 1;
+        } else {
+          pagination.style.display = 'none';
+        }
+
+        const shown = displayIndices.length;
+        label.textContent = total > ENTITY_LIST_MAX
+          ? (pageStart + 1) + '–' + (pageStart + shown) + ' of ' + total
+          : String(total);
+      }
+
+      const active = activeIdx ?? entityIndex;
       list.innerHTML = '';
 
-      for (let i = 0; i < shown; i++) {
-        const entity = embeddedEntities[i];
-        const id = entity['_id'] != null ? String(entity['_id']) : '#' + (i + 1);
+      displayIndices.forEach((origIdx) => {
+        const entity = embeddedEntities[origIdx];
+        const id = entity['_id'] != null ? String(entity['_id']) : '#' + (origIdx + 1);
+        const ts = entity['_ts'] != null ? formatTs(entity['_ts']) : '';
+
         const item = document.createElement('div');
-        item.className = 'entity-list-item' + (i === entityIndex ? ' active' : '');
-        item.textContent = id;
-        item.title = id;
-        item.dataset.idx = String(i);
+        item.className = 'entity-list-item' + (origIdx === active ? ' active' : '');
+        item.title = id + (ts ? '\n' + ts : '');
+        item.dataset.idx = String(origIdx);
         item.addEventListener('click', () => {
-          entityIndex = i;
+          entityIndex = origIdx;
           showEntity();
         });
+
+        const ordinal = document.createElement('span');
+        ordinal.className = 'eli-ordinal';
+        ordinal.textContent = String(origIdx + 1);
+
+        const idEl = document.createElement('span');
+        idEl.className = 'eli-id';
+        idEl.textContent = id;
+
+        const tsEl = document.createElement('span');
+        tsEl.className = 'eli-ts';
+        tsEl.textContent = ts;
+
+        item.appendChild(ordinal);
+        item.appendChild(idEl);
+        item.appendChild(tsEl);
         list.appendChild(item);
+      });
+    }
+
+    function formatTs(ts) {
+      try {
+        // _ts is a Unix timestamp in microseconds in Sesam
+        const ms = typeof ts === 'number' ? Math.round(ts / 1000) : Number(ts);
+        const d = new Date(ms);
+        if (isNaN(d.getTime())) { return String(ts); }
+        return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
+      } catch {
+        return String(ts);
       }
     }
 
@@ -821,25 +983,25 @@
         resetSearchBtn();
         setSearchStatus('', false);
 
-        // If the result is already in the loaded list, select it there
-        const matchIdx = embeddedEntities.findIndex((e) => e['_id'] === msg.entity['_id']);
+        // Replace the entity list with just this one result
+        embeddedEntities = [msg.entity];
+        entityIndex = 0;
+        renderEntityList(0);
 
-        if (matchIdx !== -1) {
-          entityIndex = matchIdx;
-          showEntity();
-        } else {
-          const text = JSON.stringify(msg.entity, null, 2);
-          document.getElementById('input-entity').value = text;
-          syncHighlight();
+        // Update nav bar
+        const nav = document.getElementById('entity-nav');
+        nav.style.display = 'none';
 
-          if (inputViewMode) {
-            toggleInputViewMode(); // switch back to edit mode
-          }
+        const text = JSON.stringify(msg.entity, null, 2);
+        document.getElementById('input-entity').value = text;
+        syncHighlight();
 
-          clearOutput();
-          runEval();
+        if (inputViewMode) {
+          toggleInputViewMode();
         }
 
+        clearOutput();
+        runEval();
         return;
       }
 
@@ -880,6 +1042,11 @@
         if (msg.loadingEntities) { return; }
         embeddedEntities = msg.entities ?? [];
         entityIndex = 0;
+        entitySource = msg.entitySource ?? null;
+        pageStack = [];
+        currentCursor = undefined;
+        currentHasMore = msg.hasMore ?? false;
+        entityPage = 0;
         const nav = document.getElementById('entity-nav');
         const sourceLabel = document.getElementById('entity-source');
         nav.style.display = embeddedEntities.length > 0 ? 'flex' : 'none';
@@ -897,6 +1064,19 @@
           setErrorBanner('');
           lastOutputText = null;
         }
+        return;
+      }
+
+      if (msg.type === 'entityPage') {
+        embeddedEntities = msg.entities ?? [];
+        currentHasMore = msg.hasMore ?? false;
+        entityIndex = 0;
+        const nav = document.getElementById('entity-nav');
+        nav.style.display = embeddedEntities.length > 0 ? 'flex' : 'none';
+        renderEntityList();
+
+        if (embeddedEntities.length > 0) { showEntity(); }
+
         return;
       }
 

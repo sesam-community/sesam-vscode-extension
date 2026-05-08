@@ -299,11 +299,22 @@ export const previewPipe = async (
   return [];
 };
 
+export interface FetchEntitiesOptions {
+  limit?: number;
+  since?: string | number;
+  reverse?: boolean;
+  deleted?: boolean;
+  history?: boolean;
+  uncommitted?: boolean;
+}
+
 /**
  * Fetch entities from a dataset on the node.
  *
- * @param since  The `_ts` value of the last received entity — used as a
- *               pagination cursor. Omit for the first page.
+ * @param options.since     Opaque cursor value (`_updated` offset) for pagination.
+ * @param options.reverse   When true, returns newest entities first.
+ * @param options.deleted   When false, excludes deleted entities (default API: true).
+ * @param options.history   When false, returns only the latest version (default API: true).
  * @throws {NodeAuthError}    HTTP 401/403
  * @throws {NodeApiError}     HTTP 4xx/5xx
  * @throws {NodeNetworkError} DNS/timeout/connection failure
@@ -312,17 +323,34 @@ export const fetchDatasetEntities = async (
   nodeUrl: string,
   jwt: string,
   datasetId: string,
-  limit = 50,
-  since?: string | number,
+  options: FetchEntitiesOptions = {},
   logger?: NodeRequestLogger,
 ): Promise<Entity[]> => {
   const base = validateUrl(nodeUrl);
   const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}/entities`, base);
 
+  const { limit = 50, since, reverse, deleted, history, uncommitted } = options;
+
   url.searchParams.set("limit", String(limit));
 
   if (since !== undefined) {
     url.searchParams.set("since", String(since));
+  }
+
+  if (reverse !== undefined) {
+    url.searchParams.set("reverse", String(reverse));
+  }
+
+  if (deleted !== undefined) {
+    url.searchParams.set("deleted", String(deleted));
+  }
+
+  if (history !== undefined) {
+    url.searchParams.set("history", String(history));
+  }
+
+  if (uncommitted !== undefined) {
+    url.searchParams.set("uncommitted", String(uncommitted));
   }
 
   const responseText = await request("GET", url, jwt, undefined, undefined, logger);
@@ -383,7 +411,13 @@ export const searchDatasetByText = async (
   let since: string | number | undefined;
 
   while (scanned < maxEntities) {
-    const page = await fetchDatasetEntities(nodeUrl, jwt, datasetId, pageSize, since, logger);
+    const page = await fetchDatasetEntities(
+      nodeUrl,
+      jwt,
+      datasetId,
+      { limit: pageSize, since },
+      logger,
+    );
 
     if (page.length === 0) {
       return null;
