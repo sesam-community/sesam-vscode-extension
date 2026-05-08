@@ -450,6 +450,7 @@
       <div class="pane-header">
         <span>Input Entity (_S)</span>
         <div style="display:flex;gap:4px">
+          <button class="copy-btn" id="fold-input-all-btn" onclick="toggleFoldAll('input')" style="display:none">⊟ Fold all</button>
           <button class="copy-btn" id="view-mode-btn" onclick="toggleInputViewMode()">⊟ Fold view</button>
           <button class="copy-btn" onclick="copyInput()">⧉ Copy</button>
         </div>
@@ -460,12 +461,12 @@
         <button id="next-btn" onclick="nextEntity()">&#9654;</button>
         <span id="entity-source" class="entity-source-label"></span>
       </div>
+      <div id="input-fold-view"></div>
       <div class="input-wrapper">
         <div class="input-loading-overlay" id="input-loading-overlay">
           <div class="spinner-icon"></div>
           <span>Loading entities…</span>
         </div>
-        <div id="input-fold-view"></div>
         <div class="input-highlight" id="input-highlight"></div>
         <textarea id="input-entity" spellcheck="false" placeholder='{\n  "_id": "example-1",\n  "name": "Alice"\n}'>{
   "_id": "example-1",
@@ -518,6 +519,7 @@
     let lastOutputText = null;
     let inputViewMode = false;
     let outputFoldedAll = false;
+    let inputFoldedAll = false;
 
     // ── Search ────────────────────────────────────────────────────────────────
 
@@ -906,11 +908,13 @@
         foldView.style.display = 'block';
         btn.textContent = '✎ Edit';
         inputViewMode = true;
+        document.getElementById('fold-input-all-btn').style.display = '';
       } else {
         foldView.style.display = 'none';
         wrapper.style.display = '';
         btn.textContent = '⊟ Fold view';
         inputViewMode = false;
+        document.getElementById('fold-input-all-btn').style.display = 'none';
         syncHighlight();
       }
     }
@@ -1022,23 +1026,18 @@
         : document.getElementById('input-fold-view');
       const btn = pane === 'output'
         ? document.getElementById('fold-output-btn')
-        : null;
+        : document.getElementById('fold-input-all-btn');
       const blocks = container ? container.querySelectorAll('.fold-block') : [];
+      const isFolded = pane === 'output' ? outputFoldedAll : inputFoldedAll;
 
-      if (outputFoldedAll || pane === 'input') {
+      if (isFolded) {
         blocks.forEach((b) => b.classList.remove('collapsed'));
-
-        if (btn) {
-          btn.textContent = '⊟ Fold all';
-          outputFoldedAll = false;
-        }
+        if (btn) { btn.textContent = '⊟ Fold all'; }
+        if (pane === 'output') { outputFoldedAll = false; } else { inputFoldedAll = false; }
       } else {
         blocks.forEach((b) => b.classList.add('collapsed'));
-
-        if (btn) {
-          btn.textContent = '⊞ Expand all';
-          outputFoldedAll = true;
-        }
+        if (btn) { btn.textContent = '⊞ Expand all'; }
+        if (pane === 'output') { outputFoldedAll = true; } else { inputFoldedAll = true; }
       }
     }
 
