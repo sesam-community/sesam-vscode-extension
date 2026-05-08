@@ -7,6 +7,23 @@
 
 ---
 
+## Table of Contents
+
+- [Summary](#summary)
+- [Reference — Web Console Behaviour](#reference--web-console-behaviour)
+- [API Contracts](#api-contracts)
+- [Implementation Phases](#implementation-phases)
+  - [Phase A — Node client: `searchDatasetById`](#phase-a--node-client-searchdatasetbyid)
+  - [Phase B — Node client: `searchDatasetByText`](#phase-b--node-client-searchdatasetbytext)
+  - [Phase C — Preview panel: webview ↔ host messages](#phase-c--preview-panel-webview--host-messages)
+  - [Phase D — Webview HTML: search bar UI](#phase-d--webview-html-search-bar-ui)
+  - [Phase E — JSON Folding (Collapse / Expand) for Input and Output panes](#phase-e--json-folding-collapse--expand-for-input-and-output-panes)
+- [Out of Scope](#out-of-scope)
+- [Tests](#tests)
+- [Files Touched](#files-touched)
+
+---
+
 ## Summary
 
 Add a search bar to the **Preview panel** top bar that lets users locate a specific source entity
