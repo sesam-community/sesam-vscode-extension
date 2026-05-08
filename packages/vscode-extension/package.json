@@ -192,6 +192,11 @@
         "title": "Sesam: Show Profiles"
       },
       {
+        "command": "sesam.openManager",
+        "title": "Sesam: Open Manager",
+        "icon": "$(cloud)"
+      },
+      {
         "command": "sesam.runPipeTests",
         "title": "Sesam: Run Pipe Tests",
         "icon": "$(beaker)",

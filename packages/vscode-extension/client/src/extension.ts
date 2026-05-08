@@ -60,6 +60,7 @@ import { createNetworkStatusBar, trackRequest } from "./network-status";
 import { NodeStatusPanel } from "./node-status/node-status-panel";
 import { resolveNodeUri, resolveNodePath } from "./node-root";
 import { ProfilesPanel } from "./profile-manager/profiles-panel";
+import { ManagerPanel } from "./manager-panel";
 import {
   SyncStatusProvider,
   SesamNodeConfigProvider,
@@ -94,6 +95,7 @@ let _transferInProgress = false;
 function setTransferInProgress(value: boolean): void {
   _transferInProgress = value;
   void vscode.commands.executeCommand("setContext", "sesam.transferInProgress", value);
+  ManagerPanel.updateTransferState(value);
 }
 
 const getNodeStatusBar = (): vscode.StatusBarItem => {
@@ -374,6 +376,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // ── Network Status Bar (F23) ──────────────────────────────────────────────
   createNetworkStatusBar(context);
+
+  // ── Manager Status Bar ────────────────────────────────────────────────────
+  const managerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 98);
+  managerStatusBar.text = "$(cloud) Sesam";
+  managerStatusBar.tooltip = "Open Sesam Manager";
+  managerStatusBar.command = "sesam.openManager";
+  managerStatusBar.show();
+  context.subscriptions.push(managerStatusBar);
 
   // ── Sesam Output Channel ──────────────────────────────────────────────────
   // Write an initial line so the channel appears in the Output dropdown immediately.
@@ -1811,6 +1821,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     ),
     vscode.commands.registerCommand("sesam.showProfiles", () =>
       ProfilesPanel.createOrShow(context.extensionUri),
+    ),
+    vscode.commands.registerCommand("sesam.openManager", () =>
+      ManagerPanel.createOrShow(context.extensionUri),
     ),
     vscode.commands.registerCommand("sesam.refreshProfilesPanel", () =>
       ProfilesPanel.refreshIfOpen(),
