@@ -407,11 +407,11 @@
   </header>
 
   <div class="search-bar" id="search-bar">
-    <label class="entity-mode-option" id="mode-latest-option">
+    <label class="entity-mode-option" id="mode-latest-option" style="display:none">
       <input type="radio" name="entity-mode" value="latest" checked onchange="onEntityModeChange()">
       All latest <span class="entity-mode-count" id="mode-latest-count"></span>
     </label>
-    <label class="entity-mode-option" id="mode-deleted-option">
+    <label class="entity-mode-option" id="mode-deleted-option" style="display:none">
       <input type="radio" name="entity-mode" value="deleted" onchange="onEntityModeChange()">
       All with deleted <span class="entity-mode-count" id="mode-deleted-count"></span>
     </label>
@@ -598,14 +598,14 @@
     }
 
     function updateEntityModeBar() {
-      const modeBar = document.getElementById('entity-mode-bar');
+      const isNode = entitySource === 'node';
+      const displayVal = isNode ? '' : 'none';
 
-      if (entitySource !== 'node') {
-        modeBar.style.display = 'none';
-        return;
-      }
+      document.getElementById('mode-latest-option').style.display = displayVal;
+      document.getElementById('mode-deleted-option').style.display = displayVal;
+      document.getElementById('entity-mode-separator').style.display = isNode ? '' : 'none';
 
-      modeBar.style.display = '';
+      if (!isNode) { return; }
 
       const latestCount = document.getElementById('mode-latest-count');
       const deletedCount = document.getElementById('mode-deleted-count');
