@@ -439,11 +439,12 @@ export const searchDatasetByText = async (
   query: string,
   maxEntities = 10_000,
   logger?: NodeRequestLogger,
-): Promise<Entity | null> => {
+): Promise<Entity[]> => {
   const lowerQuery = query.toLowerCase();
   const pageSize = 200;
   let scanned = 0;
   let since: string | number | undefined;
+  const matches: Entity[] = [];
 
   while (scanned < maxEntities) {
     const page = await fetchDatasetEntities(
@@ -455,30 +456,30 @@ export const searchDatasetByText = async (
     );
 
     if (page.length === 0) {
-      return null;
+      break;
     }
 
-    const match = page.find((entity) => JSON.stringify(entity).toLowerCase().includes(lowerQuery));
-
-    if (match !== undefined) {
-      return match;
+    for (const entity of page) {
+      if (JSON.stringify(entity).toLowerCase().includes(lowerQuery)) {
+        matches.push(entity);
+      }
     }
 
     scanned += page.length;
 
     if (page.length < pageSize) {
-      return null;
+      break;
     }
 
     const last = page[page.length - 1];
     since = last["_ts"] as string | number | undefined;
 
     if (since === undefined) {
-      return null;
+      break;
     }
   }
 
-  return null;
+  return matches;
 };
 
 /**

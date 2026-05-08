@@ -98,7 +98,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 5px 10px;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -316,19 +316,18 @@
     .entity-list {
       flex: 1;
       overflow-y: auto;
-      padding: 4px 0;
+      padding: 6px 0;
     }
     .entity-list-item {
-      padding: 3px 8px;
-      font-size: 11px;
+      padding: 5px 10px;
+      font-size: 12px;
       font-family: var(--vscode-editor-font-family, monospace);
       cursor: pointer;
       border-left: 2px solid transparent;
       display: grid;
-      grid-template-columns: 28px 1fr;
-      grid-template-rows: auto auto;
-      column-gap: 4px;
-      row-gap: 0;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto;
+      row-gap: 1px;
     }
     .entity-list-item:hover { background: var(--vscode-list-hoverBackground); }
     .entity-list-item.active {
@@ -337,28 +336,27 @@
       border-left-color: var(--vscode-focusBorder);
     }
     .eli-ordinal {
-      grid-row: 1 / 3;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
+      grid-row: 1;
       font-size: 10px;
       opacity: 0.45;
       user-select: none;
-      padding-right: 2px;
+      line-height: 1.3;
     }
     .eli-id {
+      grid-row: 2;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      line-height: 1.3;
+      line-height: 1.4;
     }
     .eli-ts {
-      font-size: 10px;
+      grid-row: 3;
+      font-size: 11px;
       opacity: 0.55;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      line-height: 1.2;
+      line-height: 1.3;
     }
     .entity-list-item.active .eli-ts { opacity: 0.8; }
     .entity-list-pagination {
@@ -434,7 +432,12 @@
         <span id="entity-list-label" style="font-size:10px;font-weight:normal;text-transform:none;letter-spacing:0;opacity:0.7"></span>
       </div>
 
-      <div class="entity-list" id="entity-list"></div>
+      <div style="flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column">
+        <div class="entity-list" id="entity-list"></div>
+        <div class="input-loading-overlay" id="entity-list-loading">
+          <div class="spinner-icon"></div>
+        </div>
+      </div>
       <div class="entity-list-pagination" id="entity-list-pagination" style="display:none">
         <button id="el-prev-btn" onclick="entityListPrevPage()" disabled>&#9664;</button>
         <span id="el-page-label"></span>
@@ -518,6 +521,11 @@
 
     // ── Search ────────────────────────────────────────────────────────────────
 
+    function showEntityListLoading(show) {
+      const el = document.getElementById('entity-list-loading');
+      el.classList.toggle('visible', show);
+    }
+
     function doSearch() {
       const query = document.getElementById('search-input').value.trim();
 
@@ -529,6 +537,13 @@
       setSearchStatus('', false);
       document.getElementById('search-btn').disabled = true;
       document.getElementById('search-btn').textContent = '…';
+
+      // Clear entities pane and show loader
+      embeddedEntities = [];
+      entityIndex = 0;
+      renderEntityList();
+      showEntityListLoading(true);
+
       vscode.postMessage({ type: 'searchEntity', searchType, query });
     }
 
@@ -750,9 +765,9 @@
 
         if (entitySource === 'node' && totalForMode > 0) {
           // Ordinal counts down from the dataset total for the current mode
-          ordinal.textContent = String(totalForMode - pageStack.length * ENTITY_LIST_MAX - origIdx);
+          ordinal.textContent = '#' + String(totalForMode - pageStack.length * ENTITY_LIST_MAX - origIdx);
         } else {
-          ordinal.textContent = String(origIdx + 1);
+          ordinal.textContent = '#' + String(origIdx + 1);
         }
 
         const idEl = document.createElement('span');
@@ -776,7 +791,9 @@
         const ms = typeof ts === 'number' ? Math.round(ts / 1000) : Number(ts);
         const d = new Date(ms);
         if (isNaN(d.getTime())) { return String(ts); }
-        return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
+        const pad = (n) => String(n).padStart(2, '0');
+        return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear()
+          + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
       } catch {
         return String(ts);
       }
@@ -1054,33 +1071,38 @@
 
       if (msg.type === 'searchResult') {
         resetSearchBtn();
-        setSearchStatus('', false);
+        showEntityListLoading(false);
+        setSearchStatus('Search complete (' + msg.entities.length + ' found)', false);
 
-        // Replace the entity list with just this one result
-        embeddedEntities = [msg.entity];
+        embeddedEntities = msg.entities;
         entityIndex = 0;
-        renderEntityList(0);
+        entitySource = 'search';
+        pageStack = [];
+        currentCursor = undefined;
+        currentHasMore = false;
+        entityPage = 0;
+        updateEntityModeBar();
 
-        // Update nav bar
+        const label = document.getElementById('entity-list-label');
+        label.textContent = msg.entities.length > 0 ? String(msg.entities.length) : '';
+
         const nav = document.getElementById('entity-nav');
         nav.style.display = 'none';
 
-        const text = JSON.stringify(msg.entity, null, 2);
-        document.getElementById('input-entity').value = text;
-        syncHighlight();
+        renderEntityList(0);
 
-        if (inputViewMode) {
-          toggleInputViewMode();
+        if (embeddedEntities.length > 0) {
+          entityIndex = 0;
+          showEntity();
         }
 
-        clearOutput();
-        runEval();
         return;
       }
 
       if (msg.type === 'searchNoMatch') {
         resetSearchBtn();
-        setSearchStatus('No match found', false);
+        showEntityListLoading(false);
+        setSearchStatus('Search complete (0 found)', false);
         return;
       }
 
@@ -1091,6 +1113,7 @@
 
       if (msg.type === 'searchError') {
         resetSearchBtn();
+        showEntityListLoading(false);
         setSearchStatus(msg.message ?? 'Search error', true);
         return;
       }

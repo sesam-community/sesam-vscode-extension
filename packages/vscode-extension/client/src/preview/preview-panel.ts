@@ -283,12 +283,12 @@ export class PreviewPanel {
         );
 
         if (results.length > 0) {
-          this._panel.webview.postMessage({ type: "searchResult", entity: results[0] });
+          this._panel.webview.postMessage({ type: "searchResult", entities: results });
         } else {
           this._panel.webview.postMessage({ type: "searchNoMatch" });
         }
       } else {
-        const match = await searchDatasetByText(
+        const matches = await searchDatasetByText(
           credentials.nodeUrl,
           credentials.jwt,
           sourceDataset,
@@ -297,8 +297,8 @@ export class PreviewPanel {
           logNodeRequest,
         );
 
-        if (match !== null) {
-          this._panel.webview.postMessage({ type: "searchResult", entity: match });
+        if (matches.length > 0) {
+          this._panel.webview.postMessage({ type: "searchResult", entities: matches });
         } else {
           this._panel.webview.postMessage({ type: "searchNoMatch" });
         }
@@ -476,9 +476,7 @@ export class PreviewPanel {
   }
 
   /** Tries testdata first, then node source dataset. Always resolves (never throws). */
-  private async _loadEntitiesAsync(
-    pipeId: string,
-  ): Promise<{
+  private async _loadEntitiesAsync(pipeId: string): Promise<{
     entities: Entity[];
     entitySource: string;
     hasMore: boolean;
