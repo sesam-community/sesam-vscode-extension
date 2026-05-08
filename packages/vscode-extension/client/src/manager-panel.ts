@@ -19,6 +19,7 @@ export class ManagerPanel {
   static currentPanel: ManagerPanel | undefined;
   private static readonly _viewType = "sesamManager";
   private static _transferInProgress = false;
+  private static _nodeProvisioning = false;
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
@@ -42,6 +43,10 @@ export class ManagerPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode.Uri.file(extensionUri.fsPath),
+          vscode.Uri.file(vscode.env.appRoot),
+        ],
       },
     );
 
@@ -50,6 +55,11 @@ export class ManagerPanel {
 
   static updateTransferState(inProgress: boolean): void {
     ManagerPanel._transferInProgress = inProgress;
+    ManagerPanel.currentPanel?._sendState();
+  }
+
+  static setNodeProvisioning(provisioning: boolean): void {
+    ManagerPanel._nodeProvisioning = provisioning;
     ManagerPanel.currentPanel?._sendState();
   }
 
@@ -101,6 +111,7 @@ export class ManagerPanel {
     this._panel.webview.postMessage({
       type: "state",
       transferInProgress: ManagerPanel._transferInProgress,
+      nodeProvisioning: ManagerPanel._nodeProvisioning,
     });
   }
 
@@ -118,6 +129,28 @@ export class ManagerPanel {
   private _buildHtml(): string {
     const htmlPath = path.join(this._extensionUri.fsPath, "resources", "manager-panel.html");
 
-    return fs.readFileSync(htmlPath, "utf8");
+    // Resolve the codicon font that ships with VS Code itself so icons match
+    // the ones used in the file explorer toolbar.
+    const codiconFontPath = path.join(
+      vscode.env.appRoot,
+      "node_modules",
+      "@vscode",
+      "codicons",
+      "dist",
+      "codicon.ttf",
+    );
+    const codiconFontUri = this._panel.webview.asWebviewUri(vscode.Uri.file(codiconFontPath));
+    const webviewUri = this._panel.webview;
+    const csp = [
+      `default-src 'none'`,
+      `font-src ${webviewUri.cspSource}`,
+      `style-src 'unsafe-inline'`,
+      `script-src 'unsafe-inline'`,
+    ].join("; ");
+
+    return fs
+      .readFileSync(htmlPath, "utf8")
+      .replace("{{codiconFontUri}}", codiconFontUri.toString())
+      .replace("{{csp}}", csp);
   }
 }

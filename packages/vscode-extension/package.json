@@ -306,7 +306,7 @@
       },
       {
         "command": "sesam.nodeStatus",
-        "title": "Sesam: Open Node Status Panel",
+        "title": "Sesam: Open Pipes Status Panel",
         "icon": "$(server)"
       },
       {

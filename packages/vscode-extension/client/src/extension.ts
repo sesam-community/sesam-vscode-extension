@@ -146,6 +146,7 @@ const showNodeStatus = (stage: NodeStatusStage): void => {
     // the file-explorer icon when-clauses (!sesam.nodeProvisioning) become visible.
     void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
     PreviewPanel.currentPanel?.setNodeProvisioning(false);
+    ManagerPanel.setNodeProvisioning(false);
 
     if (_provisioningPoller) {
       _provisioningPoller.stop();
@@ -199,6 +200,7 @@ const startPollerIfNeeded = (nodeUrl: string, jwt: string): void => {
 
   void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", true);
   PreviewPanel.currentPanel?.setNodeProvisioning(true);
+  ManagerPanel.setNodeProvisioning(true);
 
   showNodeStatus("provisioning");
 
@@ -217,6 +219,7 @@ const startPollerIfNeeded = (nodeUrl: string, jwt: string): void => {
       showNodeStatus("connected");
       void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
       PreviewPanel.currentPanel?.setNodeProvisioning(false);
+      ManagerPanel.setNodeProvisioning(false);
       void vscode.window.showInformationMessage(
         "Sesam: Node is ready. You can now run pipes and use live preview.",
       );
@@ -276,6 +279,7 @@ const ensureNodeReady = async (nodeUrl: string, jwt: string): Promise<boolean> =
 
     void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", true);
     PreviewPanel.currentPanel?.setNodeProvisioning(true);
+    ManagerPanel.setNodeProvisioning(true);
 
     showNodeStatus("provisioning");
 
@@ -294,6 +298,7 @@ const ensureNodeReady = async (nodeUrl: string, jwt: string): Promise<boolean> =
         showNodeStatus("connected");
         void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
         PreviewPanel.currentPanel?.setNodeProvisioning(false);
+        ManagerPanel.setNodeProvisioning(false);
         resolve(true);
       },
     );
@@ -370,6 +375,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     void vscode.commands.executeCommand("setContext", "sesam.nodeProvisioning", false);
     PreviewPanel.currentPanel?.setNodeProvisioning(false);
+    ManagerPanel.setNodeProvisioning(false);
     setNodeConnected(false);
     showNodeStatus("checking");
   };
