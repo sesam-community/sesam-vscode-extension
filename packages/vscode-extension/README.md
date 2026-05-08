@@ -20,6 +20,7 @@
   - [Pipe Preview](#pipe-preview) — live server-side evaluation with syntax-highlighted output
   - [Node Integration — Upload & Download](#node-integration--upload--download)
   - [Node Integration — Run Pipe](#node-integration--run-pipe)
+  - [Node Management Panel](#node-management-panel)
   - [Node Status](#node-status)
   - [Sync Status & Diff View](#sync-status--diff-view)
   - [New Sesam Config File](#new-sesam-config-file)
@@ -377,6 +378,17 @@ Download only the config for the pipe/system open in the active editor.
 - Command: **Sesam: Download File**.
 - Shows a confirmation dialog before overwriting the local file.
 
+#### Transfer spinners
+
+While a transfer is in progress, the real Upload and Download buttons are hidden and replaced by **per-operation spinner icons** so you always know which operation is running:
+
+| Slot | Idle | Upload running | Download running |
+|---|---|---|---|
+| Upload | `$(arrow-up)` | `$(sync~spin)` | `$(arrow-up)` |
+| Download | `$(arrow-down)` | `$(arrow-down)` | `$(sync~spin)` |
+
+This applies in both the **editor title bar** and the **File Explorer toolbar**. All other node commands are also disabled for the duration of the transfer.
+
 ---
 
 ### Node Integration — Run Pipe
@@ -404,6 +416,25 @@ A shared status bar item (bottom-left) tracks the node connection lifecycle and 
 | Connected | `$(check) Sesam: Connected` | Default |
 
 Each stage shows an informative **tooltip** on hover. The **Connected** state auto-hides after 2.5 seconds.
+
+---
+
+### Node Management Panel
+
+A quick-access panel that consolidates the four most common node operations in one place.
+
+**How to open:** click the **`$(server-process)`** icon in the VS Code status bar (bottom-left, tooltip: `Sesam: Open Node Management`) — or run **Sesam: Open Node Management** from the Command Palette.
+
+The panel opens beside the active editor and contains four buttons:
+
+| Button | Equivalent command |
+|---|---|
+| Upload | `Sesam: Upload` |
+| Download | `Sesam: Download` |
+| Pipes Status | `Sesam: Node Status` |
+| System Status | `Sesam: System Status` |
+
+All four buttons are disabled automatically while a transfer is in progress or while node provisioning is underway. A banner at the top of the panel indicates when the node is busy.
 
 ---
 
@@ -721,6 +752,7 @@ my-sesam-project/
 | `Sesam: Download` | `Ctrl+Shift+D` | Download all configs from the node (overwrites local files) |
 | `Sesam: Upload File` | — | Upload only the active config file to the node |
 | `Sesam: Download File` | — | Download only the active pipe/system config from the node |
+| `Sesam: Open Node Management` | — | Open the Node Management panel (Upload / Download / Pipes Status / System Status) |
 | `Sesam: Revert Config` | — | Overwrite local file with the node version (inline button on Modified sync items) |
 | `Sesam: Refresh Pipe DAG` | — | Rescan workspace and refresh Lineage / Dependents / System Pipes sidebars |
 | `DTL: Open Documentation` | — | Open the Sesam DTL docs in a browser |
