@@ -331,6 +331,88 @@ export const fetchDatasetEntities = async (
 };
 
 /**
+ * Search for entities in a dataset by entity ID.
+ *
+ * API: GET {nodeUrl}/api/datasets/{datasetId}/search?id={encodedEntityId}
+ *
+ * @returns Array of matching entities (empty = no match).
+ * @throws {NodeAuthError}    HTTP 401/403
+ * @throws {NodeApiError}     HTTP 4xx/5xx
+ * @throws {NodeNetworkError} DNS/timeout/connection failure
+ */
+export const searchDatasetById = async (
+  nodeUrl: string,
+  jwt: string,
+  datasetId: string,
+  entityId: string,
+  logger?: NodeRequestLogger,
+): Promise<Entity[]> => {
+  const base = validateUrl(nodeUrl);
+  const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}/search`, base);
+
+  url.searchParams.set("id", entityId);
+
+  const responseText = await request("GET", url, jwt, undefined, undefined, logger);
+
+  return JSON.parse(responseText) as Entity[];
+};
+
+/**
+ * Search for the first entity in a dataset whose JSON contains `query` as a
+ * case-insensitive substring. Pages through
+ * GET {nodeUrl}/api/datasets/{datasetId}/entities (200 per page) until a
+ * match is found or `maxEntities` are exhausted.
+ *
+ * @param maxEntities  Safety cap on total entities scanned (default 10 000).
+ * @returns The first matching entity, or `null` if no match is found.
+ * @throws {NodeAuthError}    HTTP 401/403
+ * @throws {NodeApiError}     HTTP 4xx/5xx
+ * @throws {NodeNetworkError} DNS/timeout/connection failure
+ */
+export const searchDatasetByText = async (
+  nodeUrl: string,
+  jwt: string,
+  datasetId: string,
+  query: string,
+  maxEntities = 10_000,
+  logger?: NodeRequestLogger,
+): Promise<Entity | null> => {
+  const lowerQuery = query.toLowerCase();
+  const pageSize = 200;
+  let scanned = 0;
+  let since: string | number | undefined;
+
+  while (scanned < maxEntities) {
+    const page = await fetchDatasetEntities(nodeUrl, jwt, datasetId, pageSize, since, logger);
+
+    if (page.length === 0) {
+      return null;
+    }
+
+    const match = page.find((entity) => JSON.stringify(entity).toLowerCase().includes(lowerQuery));
+
+    if (match !== undefined) {
+      return match;
+    }
+
+    scanned += page.length;
+
+    if (page.length < pageSize) {
+      return null;
+    }
+
+    const last = page[page.length - 1];
+    since = last["_ts"] as string | number | undefined;
+
+    if (since === undefined) {
+      return null;
+    }
+  }
+
+  return null;
+};
+
+/**
  * Lightweight connectivity + auth check.
  * GETs /api/config and returns `"ok"`, `"auth"`, or `"network"`.
  *

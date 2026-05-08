@@ -235,6 +235,74 @@
       background: #3a2e00;
       border-top: 1px solid #5c4700;
     }
+    /* Search bar */
+    .search-bar {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--vscode-sideBar-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .search-bar.visible { display: flex; }
+    .search-radio-group { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .search-radio-group label { display: flex; align-items: center; gap: 3px; cursor: pointer; }
+    .search-input {
+      flex: 1;
+      min-width: 120px;
+      height: 22px;
+      padding: 0 6px;
+      font-size: 12px;
+      font-family: var(--vscode-font-family);
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, #555);
+      border-radius: 2px;
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--vscode-focusBorder); }
+    .search-status {
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+      white-space: nowrap;
+    }
+    .search-status.error { color: #f48771; }
+    /* Fold controls */
+    .fold-toggle {
+      cursor: pointer;
+      user-select: none;
+      font-size: 10px;
+      color: var(--vscode-descriptionForeground);
+      margin-right: 3px;
+      display: inline-block;
+      width: 10px;
+    }
+    .fold-summary { color: var(--vscode-descriptionForeground); font-style: italic; display: none; }
+    .fold-key { color: rgb(80, 250, 123); }
+    .fold-str { color: rgb(241, 250, 140); }
+    .fold-prim { color: rgb(189, 147, 249); }
+    body.vscode-light .fold-key { color: rgb(49, 132, 149); }
+    body.vscode-light .fold-str { color: rgb(3, 106, 7); }
+    body.vscode-light .fold-prim { color: rgb(88, 92, 246); }
+    .fold-block { display: block; }
+    .fold-block.collapsed > .fold-body,
+    .fold-block.collapsed > .fold-close { display: none; }
+    .fold-block.collapsed .fold-summary { display: inline; }
+    .fold-block.collapsed .fold-toggle::before { content: '\25B6'; }
+    .fold-block:not(.collapsed) .fold-toggle::before { content: '\25BC'; }
+    #input-fold-view {
+      flex: 1;
+      padding: 10px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: var(--vscode-editor-font-size, 13px);
+      background: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
+      overflow: auto;
+      white-space: pre;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -246,12 +314,26 @@
     </div>
   </header>
 
+  <div class="search-bar" id="search-bar">
+    <div class="search-radio-group">
+      <label><input type="radio" name="search-type" value="id" checked> Id</label>
+      <label><input type="radio" name="search-type" value="text"> Text</label>
+    </div>
+    <input class="search-input" id="search-input" type="text" placeholder="Search entities…">
+    <button class="btn btn-primary" id="search-btn" onclick="doSearch()">Search</button>
+    <button class="btn btn-secondary" id="search-clear-btn" onclick="clearSearch()" title="Clear">✕</button>
+    <span class="search-status" id="search-status"></span>
+  </div>
+
   <div class="panes">
     <!-- Input Entity -->
     <div class="pane">
       <div class="pane-header">
         <span>Input Entity (_S)</span>
-        <button class="copy-btn" onclick="copyInput()">⧉ Copy</button>
+        <div style="display:flex;gap:4px">
+          <button class="copy-btn" id="view-mode-btn" onclick="toggleInputViewMode()">⊟ Fold view</button>
+          <button class="copy-btn" onclick="copyInput()">⧉ Copy</button>
+        </div>
       </div>
       <div id="entity-nav" class="entity-nav">
         <button id="prev-btn" onclick="prevEntity()">&#9664;</button>
@@ -264,6 +346,7 @@
           <div class="spinner-icon"></div>
           <span>Loading entities…</span>
         </div>
+        <div id="input-fold-view"></div>
         <div class="input-highlight" id="input-highlight"></div>
         <textarea id="input-entity" spellcheck="false" placeholder='{\n  "_id": "example-1",\n  "name": "Alice"\n}'>{
   "_id": "example-1",
@@ -277,7 +360,10 @@
     <div class="pane">
       <div class="pane-header">
         <span>Output Entity (_T)</span>
-        <button class="copy-btn" id="copy-output-btn" onclick="copyOutput()">⧉ Copy</button>
+        <div style="display:flex;gap:4px">
+          <button class="copy-btn" id="fold-output-btn" onclick="toggleFoldAll('output')" style="display:none">⊟ Fold all</button>
+          <button class="copy-btn" id="copy-output-btn" onclick="copyOutput()">⧉ Copy</button>
+        </div>
       </div>
       <div class="output-wrapper">
         <div class="output-box" id="output-box" style="color: var(--vscode-descriptionForeground);">
@@ -301,6 +387,48 @@
     let embeddedEntities = [];
     let entityIndex = 0;
     let lastOutputText = null;
+    let inputViewMode = false; // false = edit, true = fold-view
+    let outputFoldedAll = false;
+
+    // ── Search ────────────────────────────────────────────────────────────────
+
+    function doSearch() {
+      const query = document.getElementById('search-input').value.trim();
+
+      if (!query) {
+        return;
+      }
+
+      const searchType = document.querySelector('input[name="search-type"]:checked').value;
+      setSearchStatus('', false);
+      document.getElementById('search-btn').disabled = true;
+      document.getElementById('search-btn').textContent = '…';
+      vscode.postMessage({ type: 'searchEntity', searchType, query });
+    }
+
+    function clearSearch() {
+      document.getElementById('search-input').value = '';
+      setSearchStatus('', false);
+    }
+
+    function setSearchStatus(text, isError) {
+      const el = document.getElementById('search-status');
+      el.textContent = text;
+      el.className = 'search-status' + (isError ? ' error' : '');
+    }
+
+    function resetSearchBtn() {
+      const btn = document.getElementById('search-btn');
+      btn.disabled = false;
+      btn.textContent = 'Search';
+    }
+
+    document.getElementById('search-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doSearch();
+      }
+    });
 
     // ── Entity navigation ────────────────────────────────────────────────────
 
@@ -404,6 +532,165 @@
       return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
+    // ── Input fold-view mode ─────────────────────────────────────────────────
+
+    function toggleInputViewMode() {
+      const wrapper = document.querySelector('.input-wrapper');
+      const foldView = document.getElementById('input-fold-view');
+      const btn = document.getElementById('view-mode-btn');
+
+      if (!inputViewMode) {
+        let parsed;
+
+        try {
+          parsed = JSON.parse(document.getElementById('input-entity').value);
+        } catch {
+          setSearchStatus('Input is not valid JSON', true);
+          return;
+        }
+
+        foldView.innerHTML = '';
+        foldView.appendChild(renderFoldableJson(parsed, 0));
+        wrapper.style.display = 'none';
+        foldView.style.display = 'block';
+        btn.textContent = '✎ Edit';
+        inputViewMode = true;
+      } else {
+        foldView.style.display = 'none';
+        wrapper.style.display = '';
+        btn.textContent = '⊟ Fold view';
+        inputViewMode = false;
+        syncHighlight();
+      }
+    }
+
+    // ── Foldable JSON renderer ───────────────────────────────────────────────
+
+    function renderFoldableJson(value, indent) {
+      const frag = document.createDocumentFragment();
+
+      if (value === null || typeof value !== 'object') {
+        frag.appendChild(colorPrimitive(value));
+        return frag;
+      }
+
+      const isArray = Array.isArray(value);
+      const entries = isArray
+        ? value.map((v, i) => [i, v])
+        : Object.entries(value);
+      const open = isArray ? '[' : '{';
+      const close = isArray ? ']' : '}';
+
+      if (entries.length === 0) {
+        const empty = document.createTextNode(open + close);
+        frag.appendChild(empty);
+        return frag;
+      }
+
+      const block = document.createElement('div');
+      block.className = 'fold-block';
+
+      // header line: toggle + open bracket + summary
+      const headerLine = document.createElement('span');
+      const toggle = document.createElement('span');
+      toggle.className = 'fold-toggle';
+      toggle.title = 'Collapse';
+      toggle.addEventListener('click', () => toggleFold(block));
+
+      const openText = document.createTextNode(open);
+      const summary = document.createElement('span');
+      summary.className = 'fold-summary';
+      summary.textContent = ' … ' + close;
+
+      headerLine.appendChild(toggle);
+      headerLine.appendChild(openText);
+      headerLine.appendChild(summary);
+
+      // body
+      const body = document.createElement('div');
+      body.className = 'fold-body';
+      body.style.paddingLeft = '14px';
+
+      entries.forEach(([key, val], idx) => {
+        const line = document.createElement('div');
+
+        if (!isArray) {
+          const keySpan = document.createElement('span');
+          keySpan.className = 'fold-key';
+          keySpan.textContent = JSON.stringify(String(key));
+          line.appendChild(keySpan);
+          line.appendChild(document.createTextNode(': '));
+        }
+
+        line.appendChild(renderFoldableJson(val, indent + 1));
+
+        if (idx < entries.length - 1) {
+          line.appendChild(document.createTextNode(','));
+        }
+
+        body.appendChild(line);
+      });
+
+      const closeLine = document.createElement('span');
+      closeLine.className = 'fold-close';
+      closeLine.textContent = close;
+
+      block.appendChild(headerLine);
+      block.appendChild(body);
+      block.appendChild(closeLine);
+      frag.appendChild(block);
+      return frag;
+    }
+
+    function colorPrimitive(value) {
+      const span = document.createElement('span');
+
+      if (typeof value === 'string') {
+        span.className = 'fold-str';
+        span.textContent = JSON.stringify(value);
+      } else {
+        span.className = 'fold-prim';
+        span.textContent = String(value);
+      }
+
+      return span;
+    }
+
+    function toggleFold(blockEl) {
+      blockEl.classList.toggle('collapsed');
+      const toggle = blockEl.querySelector('.fold-toggle');
+
+      if (toggle) {
+        toggle.title = blockEl.classList.contains('collapsed') ? 'Expand' : 'Collapse';
+      }
+    }
+
+    function toggleFoldAll(pane) {
+      const container = pane === 'output'
+        ? document.getElementById('output-box')
+        : document.getElementById('input-fold-view');
+      const btn = pane === 'output'
+        ? document.getElementById('fold-output-btn')
+        : null;
+      const blocks = container ? container.querySelectorAll('.fold-block') : [];
+
+      if (outputFoldedAll || pane === 'input') {
+        blocks.forEach((b) => b.classList.remove('collapsed'));
+
+        if (btn) {
+          btn.textContent = '⊟ Fold all';
+          outputFoldedAll = false;
+        }
+      } else {
+        blocks.forEach((b) => b.classList.add('collapsed'));
+
+        if (btn) {
+          btn.textContent = '⊞ Expand all';
+          outputFoldedAll = true;
+        }
+      }
+    }
+
     function colorizeJson(json) {
       // Tokenize JSON into: keys (green), string values (yellow),
       // and everything else — numbers, booleans, null, brackets, braces,
@@ -444,8 +731,49 @@
     window.addEventListener('message', (event) => {
       const msg = event.data;
 
+      if (msg.type === 'searchResult') {
+        resetSearchBtn();
+        setSearchStatus('', false);
+        const text = JSON.stringify(msg.entity, null, 2);
+        document.getElementById('input-entity').value = text;
+        syncHighlight();
+
+        if (inputViewMode) {
+          toggleInputViewMode(); // switch back to edit mode
+        }
+
+        clearOutput();
+        runEval();
+        return;
+      }
+
+      if (msg.type === 'searchNoMatch') {
+        resetSearchBtn();
+        setSearchStatus('No match found', false);
+        return;
+      }
+
+      if (msg.type === 'searchLoading') {
+        setSearchStatus('Searching…', false);
+        return;
+      }
+
+      if (msg.type === 'searchError') {
+        resetSearchBtn();
+        setSearchStatus(msg.message ?? 'Search error', true);
+        return;
+      }
+
       if (msg.type === 'documentState') {
         document.getElementById('file-name').textContent = msg.fileName;
+
+        const searchBar = document.getElementById('search-bar');
+
+        if (msg.sourceDataset) {
+          searchBar.classList.add('visible');
+        } else {
+          searchBar.classList.remove('visible');
+        }
         const inputLoader = document.getElementById('input-loading-overlay');
         if (msg.loadingEntities) {
           inputLoader.classList.add('visible');
@@ -503,9 +831,13 @@
           statusBar.textContent = '✓ Entity discarded.';
           lastOutputText = null;
         } else {
-          const text = JSON.stringify(msg.output.length === 1 ? msg.output[0] : msg.output, null, 2);
-          outputBox.innerHTML = colorizeJson(text);
+          const outputValue = msg.output.length === 1 ? msg.output[0] : msg.output;
+          const text = JSON.stringify(outputValue, null, 2);
+          outputBox.innerHTML = '';
+          outputBox.appendChild(renderFoldableJson(outputValue, 0));
           lastOutputText = text;
+          document.getElementById('fold-output-btn').style.display = '';
+          outputFoldedAll = false;
           statusBar.className = 'status-bar ok';
           const count = msg.output.length;
           statusBar.textContent = '✓ ' + count + (count === 1 ? ' entity.' : ' entities.');

@@ -12,7 +12,12 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { resolveCredentials } from "../profile-manager/credential-resolver";
-import { fetchDatasetEntities, previewPipe } from "../node-client";
+import {
+  fetchDatasetEntities,
+  previewPipe,
+  searchDatasetById,
+  searchDatasetByText,
+} from "../node-client";
 import { fetchNodeStatusHint } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
 import { trackRequest } from "../network-status";
@@ -27,7 +32,8 @@ type MessageFromWebview =
   | { type: "evaluate"; inputJson: string }
   | { type: "openSettings" }
   | { type: "copyOutput"; text: string }
-  | { type: "copyInput"; text: string };
+  | { type: "copyInput"; text: string }
+  | { type: "searchEntity"; searchType: "id" | "text"; query: string };
 
 const DEBOUNCE_MS = 300;
 
@@ -157,6 +163,78 @@ export class PreviewPanel {
       await vscode.env.clipboard.writeText(message.text);
 
       return;
+    }
+
+    if (message.type === "searchEntity") {
+      await this._handleSearchEntity(message.searchType, message.query);
+
+      return;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Entity search
+  // ---------------------------------------------------------------------------
+
+  private async _handleSearchEntity(searchType: "id" | "text", query: string): Promise<void> {
+    const credentials = await resolveCredentials();
+
+    if (!credentials) {
+      this._panel.webview.postMessage({
+        type: "searchError",
+        message: "No credentials configured. Use 'Sesam: Set JWT Token' to set up a profile.",
+      });
+
+      return;
+    }
+
+    const sourceDataset = extractSourceDataset(this._document.getText());
+
+    if (!sourceDataset) {
+      this._panel.webview.postMessage({
+        type: "searchError",
+        message: "Entity search is only available for dataset or binary sources.",
+      });
+
+      return;
+    }
+
+    this._panel.webview.postMessage({ type: "searchLoading" });
+
+    try {
+      if (searchType === "id") {
+        const results = await searchDatasetById(
+          credentials.nodeUrl,
+          credentials.jwt,
+          sourceDataset,
+          query,
+          logNodeRequest,
+        );
+
+        if (results.length > 0) {
+          this._panel.webview.postMessage({ type: "searchResult", entity: results[0] });
+        } else {
+          this._panel.webview.postMessage({ type: "searchNoMatch" });
+        }
+      } else {
+        const match = await searchDatasetByText(
+          credentials.nodeUrl,
+          credentials.jwt,
+          sourceDataset,
+          query,
+          undefined,
+          logNodeRequest,
+        );
+
+        if (match !== null) {
+          this._panel.webview.postMessage({ type: "searchResult", entity: match });
+        } else {
+          this._panel.webview.postMessage({ type: "searchNoMatch" });
+        }
+      }
+    } catch (err) {
+      const base = toLiveError(err);
+      this._panel.webview.postMessage({ type: "searchError", message: base.message });
     }
   }
 
@@ -301,6 +379,7 @@ export class PreviewPanel {
       entitySource: embeddedEntities && embeddedEntities.length > 0 ? "embedded" : null,
       loadingEntities: willLoadAsync,
       resetOutput,
+      sourceDataset: extractSourceDataset(text) ?? null,
     });
 
     if (!willLoadAsync) {
@@ -316,6 +395,7 @@ export class PreviewPanel {
         entitySource: result?.entitySource ?? null,
         loadingEntities: false,
         resetOutput: false,
+        sourceDataset: extractSourceDataset(text) ?? null,
       });
     });
   }
