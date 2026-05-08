@@ -239,14 +239,20 @@
     .search-bar {
       display: none;
       align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
+      gap: 8px;
+      padding: 7px 12px;
       background: var(--vscode-sideBar-background);
       border-bottom: 1px solid var(--vscode-panel-border);
       flex-shrink: 0;
       flex-wrap: wrap;
     }
     .search-bar.visible { display: flex; }
+    .search-bar-separator {
+      width: 1px;
+      height: 16px;
+      background: var(--vscode-panel-border);
+      flex-shrink: 0;
+    }
     .search-radio-group { display: flex; align-items: center; gap: 8px; font-size: 12px; }
     .search-radio-group label { display: flex; align-items: center; gap: 3px; cursor: pointer; }
     .search-input {
@@ -375,6 +381,20 @@
       font-size: 11px;
     }
     .entity-list-pagination button:disabled { opacity: 0.35; cursor: default; }
+    .entity-mode-option {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .entity-mode-option input[type="radio"] { cursor: pointer; margin: 0; }
+    .entity-mode-count {
+      opacity: 0.65;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
@@ -387,6 +407,15 @@
   </header>
 
   <div class="search-bar" id="search-bar">
+    <label class="entity-mode-option" id="mode-latest-option">
+      <input type="radio" name="entity-mode" value="latest" checked onchange="onEntityModeChange()">
+      All latest <span class="entity-mode-count" id="mode-latest-count"></span>
+    </label>
+    <label class="entity-mode-option" id="mode-deleted-option">
+      <input type="radio" name="entity-mode" value="deleted" onchange="onEntityModeChange()">
+      All with deleted <span class="entity-mode-count" id="mode-deleted-count"></span>
+    </label>
+    <div class="search-bar-separator" id="entity-mode-separator" style="display:none"></div>
     <div class="search-radio-group">
       <label><input type="radio" name="search-type" value="id" checked> Id</label>
       <label><input type="radio" name="search-type" value="text"> Text</label>
@@ -404,6 +433,7 @@
         <span>Entities</span>
         <span id="entity-list-label" style="font-size:10px;font-weight:normal;text-transform:none;letter-spacing:0;opacity:0.7"></span>
       </div>
+
       <div class="entity-list" id="entity-list"></div>
       <div class="entity-list-pagination" id="entity-list-pagination" style="display:none">
         <button id="el-prev-btn" onclick="entityListPrevPage()" disabled>&#9664;</button>
@@ -479,6 +509,9 @@
     let pageStack = [];       // cursors for server-side back navigation
     let currentHasMore = false; // whether a next server-side page exists
     let currentCursor = undefined; // cursor used to fetch the current server-side page
+    let datasetTotalCount = 0;    // runtime.count-index-exists
+    let datasetDeletedCount = 0;  // runtime.count-index-deleted
+    let showDeleted = false;      // current mode: false = latest only, true = with deleted
     let lastOutputText = null;
     let inputViewMode = false;
     let outputFoldedAll = false;
@@ -564,11 +597,41 @@
       runEval();
     }
 
+    function updateEntityModeBar() {
+      const modeBar = document.getElementById('entity-mode-bar');
+
+      if (entitySource !== 'node') {
+        modeBar.style.display = 'none';
+        return;
+      }
+
+      modeBar.style.display = '';
+
+      const latestCount = document.getElementById('mode-latest-count');
+      const deletedCount = document.getElementById('mode-deleted-count');
+
+      latestCount.textContent = datasetTotalCount > 0 ? '(' + datasetTotalCount + ')' : '';
+      deletedCount.textContent = (datasetTotalCount > 0 || datasetDeletedCount > 0)
+        ? '(' + (datasetTotalCount + datasetDeletedCount) + ' / ' + datasetDeletedCount + ' deleted)'
+        : '';
+
+      // Sync radio to current state
+      const radios = document.querySelectorAll('input[name="entity-mode"]');
+      radios.forEach((r) => { r.checked = (r.value === 'deleted') === showDeleted; });
+    }
+
+    function onEntityModeChange() {
+      showDeleted = document.querySelector('input[name="entity-mode"]:checked').value === 'deleted';
+      pageStack = [];
+      currentCursor = undefined;
+      vscode.postMessage({ type: 'fetchEntityPage', deleted: showDeleted });
+    }
+
     function entityListPrevPage() {
       if (entitySource === 'node') {
         if (pageStack.length > 0) {
           currentCursor = pageStack.pop();
-          vscode.postMessage({ type: 'fetchEntityPage', cursor: currentCursor });
+          vscode.postMessage({ type: 'fetchEntityPage', cursor: currentCursor, deleted: showDeleted });
         }
       } else {
         if (entityPage > 0) { entityPage--; renderEntityList(); }
@@ -582,7 +645,7 @@
           const nextCursor = last ? Number(last['_updated']) : undefined;
           pageStack.push(currentCursor);
           currentCursor = nextCursor;
-          vscode.postMessage({ type: 'fetchEntityPage', cursor: nextCursor });
+          vscode.postMessage({ type: 'fetchEntityPage', cursor: nextCursor, deleted: showDeleted });
         }
       } else {
         const sortedLen = embeddedEntities.length;
@@ -611,6 +674,7 @@
       const pagination = document.getElementById('entity-list-pagination');
       const pageLabel = document.getElementById('el-page-label');
       let displayIndices;
+      let totalForMode = 0; // used for ordinal calculation in node mode
 
       if (entitySource === 'node') {
         // Server-side pagination: entities are already the current page, no sorting
@@ -621,13 +685,16 @@
 
         if (hasPrev || hasNext) {
           pagination.style.display = 'flex';
-          pageLabel.textContent = 'p.' + (pageStack.length + 1);
+          const totalForLabel = showDeleted ? datasetTotalCount + datasetDeletedCount : datasetTotalCount;
+          const totalPages = totalForLabel > 0 ? Math.ceil(totalForLabel / ENTITY_LIST_MAX) : '?';
+          pageLabel.textContent = 'page ' + (pageStack.length + 1) + ' / ' + totalPages;
           document.getElementById('el-prev-btn').disabled = !hasPrev;
           document.getElementById('el-next-btn').disabled = !hasNext;
         } else {
           pagination.style.display = 'none';
         }
 
+        totalForMode = showDeleted ? datasetTotalCount + datasetDeletedCount : datasetTotalCount;
         label.textContent = String(embeddedEntities.length);
       } else {
         // Client-side pagination: sort by _ts desc and slice
@@ -680,7 +747,13 @@
 
         const ordinal = document.createElement('span');
         ordinal.className = 'eli-ordinal';
-        ordinal.textContent = String(origIdx + 1);
+
+        if (entitySource === 'node' && totalForMode > 0) {
+          // Ordinal counts down from the dataset total for the current mode
+          ordinal.textContent = String(totalForMode - pageStack.length * ENTITY_LIST_MAX - origIdx);
+        } else {
+          ordinal.textContent = String(origIdx + 1);
+        }
 
         const idEl = document.createElement('span');
         idEl.className = 'eli-id';
@@ -1047,6 +1120,13 @@
         currentCursor = undefined;
         currentHasMore = msg.hasMore ?? false;
         entityPage = 0;
+        showDeleted = false;
+
+        // Update dataset stats and mode bar
+        if (msg.totalCount != null) { datasetTotalCount = msg.totalCount; }
+        if (msg.deletedCount != null) { datasetDeletedCount = msg.deletedCount; }
+        updateEntityModeBar();
+
         const nav = document.getElementById('entity-nav');
         const sourceLabel = document.getElementById('entity-source');
         nav.style.display = embeddedEntities.length > 0 ? 'flex' : 'none';
@@ -1068,6 +1148,11 @@
       }
 
       if (msg.type === 'entityPage') {
+        // Update stats only when provided (first page requests include them)
+        if (msg.totalCount != null) { datasetTotalCount = msg.totalCount; }
+        if (msg.deletedCount != null) { datasetDeletedCount = msg.deletedCount; }
+        updateEntityModeBar();
+
         embeddedEntities = msg.entities ?? [];
         currentHasMore = msg.hasMore ?? false;
         entityIndex = 0;

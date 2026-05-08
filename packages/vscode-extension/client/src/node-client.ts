@@ -299,6 +299,41 @@ export const previewPipe = async (
   return [];
 };
 
+export interface DatasetStats {
+  /** Number of non-deleted entities (`runtime.count-index-exists`). */
+  totalCount: number;
+  /** Number of deleted entities (`runtime.count-index-deleted`). */
+  deletedCount: number;
+}
+
+/**
+ * Fetch dataset metadata with counts from `GET /api/datasets/{id}?verbose=true`.
+ *
+ * @throws {NodeAuthError}    HTTP 401/403
+ * @throws {NodeApiError}     HTTP 4xx/5xx
+ * @throws {NodeNetworkError} DNS/timeout/connection failure
+ */
+export const fetchDatasetStats = async (
+  nodeUrl: string,
+  jwt: string,
+  datasetId: string,
+  logger?: NodeRequestLogger,
+): Promise<DatasetStats> => {
+  const base = validateUrl(nodeUrl);
+  const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}`, base);
+
+  url.searchParams.set("verbose", "true");
+
+  const responseText = await request("GET", url, jwt, undefined, undefined, logger);
+  const data = JSON.parse(responseText) as Record<string, unknown>;
+  const runtime = (data["runtime"] ?? {}) as Record<string, unknown>;
+
+  return {
+    totalCount: Number(runtime["count-index-exists"] ?? 0),
+    deletedCount: Number(runtime["count-index-deleted"] ?? 0),
+  };
+};
+
 export interface FetchEntitiesOptions {
   limit?: number;
   since?: string | number;

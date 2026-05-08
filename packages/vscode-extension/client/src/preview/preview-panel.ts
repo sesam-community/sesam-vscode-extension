@@ -14,6 +14,7 @@ import * as vscode from "vscode";
 import { resolveCredentials } from "../profile-manager/credential-resolver";
 import {
   fetchDatasetEntities,
+  fetchDatasetStats,
   previewPipe,
   searchDatasetById,
   searchDatasetByText,
@@ -22,7 +23,7 @@ import { fetchNodeStatusHint } from "../portal-client";
 import { logNodeRequest } from "../sesam-channel";
 import { trackRequest } from "../network-status";
 
-import type { Entity } from "../node-client";
+import type { DatasetStats, Entity } from "../node-client";
 
 // ---------------------------------------------------------------------------
 // Message types
@@ -34,7 +35,7 @@ type MessageFromWebview =
   | { type: "copyOutput"; text: string }
   | { type: "copyInput"; text: string }
   | { type: "searchEntity"; searchType: "id" | "text"; query: string }
-  | { type: "fetchEntityPage"; cursor?: number };
+  | { type: "fetchEntityPage"; cursor?: number; deleted: boolean };
 
 const DEBOUNCE_MS = 300;
 
@@ -173,7 +174,7 @@ export class PreviewPanel {
     }
 
     if (message.type === "fetchEntityPage") {
-      await this._handleFetchEntityPage(message.cursor);
+      await this._handleFetchEntityPage(message.cursor, message.deleted);
 
       return;
     }
@@ -183,7 +184,10 @@ export class PreviewPanel {
   // Entity page fetch (server-side pagination)
   // ---------------------------------------------------------------------------
 
-  private async _handleFetchEntityPage(cursor?: number): Promise<void> {
+  private async _handleFetchEntityPage(
+    cursor: number | undefined,
+    deleted: boolean,
+  ): Promise<void> {
     const credentials = await resolveCredentials();
 
     if (!credentials) {
@@ -197,26 +201,42 @@ export class PreviewPanel {
     }
 
     try {
-      const LIMIT = 30;
-      const entities = await fetchDatasetEntities(
-        credentials.nodeUrl,
-        credentials.jwt,
-        sourceDataset,
-        {
-          limit: LIMIT,
-          since: cursor,
-          reverse: true,
-          deleted: false,
-          history: false,
-          uncommitted: false,
-        },
-        logNodeRequest,
-      );
+      const LIMIT = 50;
+
+      // Fetch stats only for the first page (no cursor) to avoid extra calls on every page turn
+      const statsPromise =
+        cursor === undefined
+          ? fetchDatasetStats(
+              credentials.nodeUrl,
+              credentials.jwt,
+              sourceDataset,
+              logNodeRequest,
+            ).catch(() => null)
+          : Promise.resolve(null);
+
+      const [entities, stats] = await Promise.all([
+        fetchDatasetEntities(
+          credentials.nodeUrl,
+          credentials.jwt,
+          sourceDataset,
+          {
+            limit: LIMIT,
+            since: cursor,
+            reverse: true,
+            deleted,
+            history: false,
+            uncommitted: false,
+          },
+          logNodeRequest,
+        ),
+        statsPromise,
+      ]);
 
       this._panel.webview.postMessage({
         type: "entityPage",
         entities,
         hasMore: entities.length === LIMIT,
+        ...(stats !== null && { totalCount: stats.totalCount, deletedCount: stats.deletedCount }),
       });
     } catch {
       // Silently ignore — webview retains the current page
@@ -449,6 +469,8 @@ export class PreviewPanel {
         resetOutput: false,
         sourceDataset: extractSourceDataset(text) ?? null,
         hasMore: result?.hasMore ?? false,
+        totalCount: result?.datasetStats?.totalCount ?? null,
+        deletedCount: result?.datasetStats?.deletedCount ?? null,
       });
     });
   }
@@ -456,11 +478,21 @@ export class PreviewPanel {
   /** Tries testdata first, then node source dataset. Always resolves (never throws). */
   private async _loadEntitiesAsync(
     pipeId: string,
-  ): Promise<{ entities: Entity[]; entitySource: string; hasMore: boolean } | null> {
+  ): Promise<{
+    entities: Entity[];
+    entitySource: string;
+    hasMore: boolean;
+    datasetStats: DatasetStats | null;
+  } | null> {
     const testdata = await this._loadTestdataEntities(pipeId);
 
     if (testdata && testdata.length > 0) {
-      return { entities: testdata as Entity[], entitySource: "testdata", hasMore: false };
+      return {
+        entities: testdata as Entity[],
+        entitySource: "testdata",
+        hasMore: false,
+        datasetStats: null,
+      };
     }
 
     const credentials = await resolveCredentials();
@@ -477,17 +509,26 @@ export class PreviewPanel {
     }
 
     try {
-      const LIMIT = 30;
-      const entities = await fetchDatasetEntities(
-        credentials.nodeUrl,
-        credentials.jwt,
-        sourceDataset,
-        { limit: LIMIT, reverse: true, deleted: false, history: false, uncommitted: false },
-        logNodeRequest,
-      );
+      const LIMIT = 50;
+
+      const [entities, datasetStats] = await Promise.all([
+        fetchDatasetEntities(
+          credentials.nodeUrl,
+          credentials.jwt,
+          sourceDataset,
+          { limit: LIMIT, reverse: true, deleted: false, history: false, uncommitted: false },
+          logNodeRequest,
+        ),
+        fetchDatasetStats(
+          credentials.nodeUrl,
+          credentials.jwt,
+          sourceDataset,
+          logNodeRequest,
+        ).catch(() => null),
+      ]);
 
       return entities.length > 0
-        ? { entities, entitySource: "node", hasMore: entities.length === LIMIT }
+        ? { entities, entitySource: "node", hasMore: entities.length === LIMIT, datasetStats }
         : null;
     } catch {
       return null;
