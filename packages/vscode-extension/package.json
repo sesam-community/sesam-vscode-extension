@@ -192,6 +192,11 @@
         "title": "Sesam: Show Profiles"
       },
       {
+        "command": "sesam.openManager",
+        "title": "Sesam: Open Node Management",
+        "icon": "$(server-process)"
+      },
+      {
         "command": "sesam.runPipeTests",
         "title": "Sesam: Run Pipe Tests",
         "icon": "$(beaker)",
@@ -290,13 +295,23 @@
         "icon": "$(arrow-down)"
       },
       {
+        "command": "sesam.transferBusy",
+        "title": "Transfer in progress…",
+        "icon": "$(sync~spin)"
+      },
+      {
+        "command": "sesam.transferBusyDownload",
+        "title": "Transfer in progress…",
+        "icon": "$(sync~spin)"
+      },
+      {
         "command": "sesam.pipeStatus",
         "title": "Sesam: Show Pipe Status",
         "icon": "$(pulse)"
       },
       {
         "command": "sesam.nodeStatus",
-        "title": "Sesam: Open Node Status Panel",
+        "title": "Sesam: Open Pipes Status Panel",
         "icon": "$(server)"
       },
       {
@@ -349,22 +364,42 @@
         },
         {
           "command": "sesam.uploadFile",
-          "when": "(resourceLangId == json || resourceLangId == sesam-config) && !sesam.nodeProvisioning",
+          "when": "(resourceLangId == json || resourceLangId == sesam-config) && !sesam.nodeProvisioning && !sesam.transferInProgress",
           "group": "navigation@4"
         },
         {
           "command": "sesam.downloadFile",
-          "when": "(resourceLangId == json || resourceLangId == sesam-config) && !sesam.nodeProvisioning",
+          "when": "(resourceLangId == json || resourceLangId == sesam-config) && !sesam.nodeProvisioning && !sesam.transferInProgress",
           "group": "navigation@5"
         },
         {
           "command": "sesam.upload",
-          "when": "workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "when": "workspaceFolderCount > 0 && !sesam.nodeProvisioning && !sesam.transferInProgress",
           "group": "navigation@6"
         },
         {
           "command": "sesam.download",
-          "when": "workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "when": "workspaceFolderCount > 0 && !sesam.nodeProvisioning && !sesam.transferInProgress",
+          "group": "navigation@7"
+        },
+        {
+          "command": "sesam.transferBusy",
+          "when": "sesam.uploadInProgress && (resourceLangId == json || resourceLangId == sesam-config)",
+          "group": "navigation@4"
+        },
+        {
+          "command": "sesam.transferBusyDownload",
+          "when": "sesam.downloadInProgress && (resourceLangId == json || resourceLangId == sesam-config)",
+          "group": "navigation@5"
+        },
+        {
+          "command": "sesam.transferBusy",
+          "when": "sesam.uploadInProgress && workspaceFolderCount > 0",
+          "group": "navigation@6"
+        },
+        {
+          "command": "sesam.transferBusyDownload",
+          "when": "sesam.downloadInProgress && workspaceFolderCount > 0",
           "group": "navigation@7"
         },
         {
@@ -401,12 +436,12 @@
         },
         {
           "command": "sesam.uploadFile",
-          "when": "resourceLangId == sesam-config",
+          "when": "resourceLangId == sesam-config && !sesam.transferInProgress",
           "group": "2_workspace@99"
         },
         {
           "command": "sesam.downloadFile",
-          "when": "resourceLangId == sesam-config",
+          "when": "resourceLangId == sesam-config && !sesam.transferInProgress",
           "group": "2_workspace@99"
         }
       ],
@@ -492,12 +527,22 @@
         },
         {
           "command": "sesam.upload",
-          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning && !sesam.transferInProgress",
           "group": "navigation@10"
         },
         {
           "command": "sesam.download",
-          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && !sesam.nodeProvisioning && !sesam.transferInProgress",
+          "group": "navigation@11"
+        },
+        {
+          "command": "sesam.transferBusy",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && sesam.uploadInProgress",
+          "group": "navigation@10"
+        },
+        {
+          "command": "sesam.transferBusyDownload",
+          "when": "view == workbench.explorer.fileView && workspaceFolderCount > 0 && sesam.downloadInProgress",
           "group": "navigation@11"
         },
         {

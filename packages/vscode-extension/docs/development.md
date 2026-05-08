@@ -51,6 +51,7 @@ pnpm install
 │   ├── tsconfig.json                   # TypeScript config for the extension host (targets VS Code API, no emit — Vite handles bundling)
 │   └── src/
 │       ├── extension.ts                # Extension entry point: activates the LSP client, registers sidebar tree views and preview command
+│       ├── manager-panel.ts            # Node Management WebviewPanel: Upload / Download / Pipes Status / System Status shortcuts; disabled during transfers and provisioning
 │       ├── graph/
 │       │   ├── pipe-dag-builder.ts     # Pure functions: workspace scan, FullPipeInfo/DagIndex data types, buildDagIndex, buildSystemIndex
 │       │   ├── dag-tree-item.ts        # Shared DagTreeItem class and makeItem factory used by Lineage and Dependents views

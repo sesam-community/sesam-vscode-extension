@@ -1,6 +1,6 @@
 # Large Workspace Optimization (1k+ pipes)
 
-> **Status**: `planned`
+> **Status**: `fully implemented`
 > **Rollout Phase**: Cross-cutting
 > **Tracking**: [README.md](../impl/README.md)
 

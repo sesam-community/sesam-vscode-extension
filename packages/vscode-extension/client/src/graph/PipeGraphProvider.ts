@@ -164,7 +164,12 @@ export class PipeGraphProvider implements vscode.TreeDataProvider<PipeTreeItem> 
 
     // Find all JSON files
     // const globDepth = Array.from({ length: scanDepth }, (_, i) => "*").join("/");
-    const files = await vscode.workspace.findFiles(`**/*.json`, `**/node_modules/**`);
+    // Scope to pipes/ and systems/ folders to avoid scanning package.json,
+    // tsconfig.json, and other non-Sesam JSON files in large workspaces.
+    const files = await vscode.workspace.findFiles(
+      `**/{pipes,systems}/**/*.json`,
+      `**/node_modules/**`,
+    );
 
     // Also find .dtl files
     const dtlFiles = await vscode.workspace.findFiles("**/*.dtl", "**/node_modules/**");

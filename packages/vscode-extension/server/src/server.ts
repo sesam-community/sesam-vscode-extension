@@ -163,25 +163,59 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 });
 
 connection.onInitialized(() => {
-  workspaceIndex.scanWorkspace(workspaceFolders);
+  void workspaceIndex.scanWorkspace(workspaceFolders);
 });
 
 connection.onDidChangeWatchedFiles((params) => {
   for (const change of params.changes) {
     const uri = change.uri;
+
     if (change.type === FileChangeType.Deleted) {
       workspaceIndex.removeFile(uri);
     } else {
-      try {
-        const fsPath = fileURLToPath(uri);
-        const text = fs.readFileSync(fsPath, "utf-8");
-        workspaceIndex.updateFile(uri, text);
-      } catch {
-        // File temporarily inaccessible — skip
-      }
+      void fs.promises
+        .readFile(fileURLToPath(uri), "utf-8")
+        .then((text) => {
+          workspaceIndex.updateFile(uri, text);
+        })
+        .catch(() => {
+          // File temporarily inaccessible — skip
+        });
     }
   }
 });
+
+// ---------------------------------------------------------------------------
+// Concurrency limiter — caps parallel validateDocument calls to avoid
+// saturating the event loop when many files are validated at once (e.g. on
+// config-change when 1 000+ documents are open).
+// ---------------------------------------------------------------------------
+function makeLimiter(concurrency: number): (fn: () => Promise<void>) => void {
+  let running = 0;
+  const queue: Array<() => void> = [];
+
+  const next = (): void => {
+    if (queue.length === 0 || running >= concurrency) {
+      return;
+    }
+
+    running++;
+    const task = queue.shift()!;
+    task();
+  };
+
+  return (fn: () => Promise<void>): void => {
+    queue.push(() => {
+      fn().finally(() => {
+        running--;
+        next();
+      });
+    });
+    next();
+  };
+}
+
+const limitedValidate = makeLimiter(4);
 
 // ---------------------------------------------------------------------------
 // Settings (kept in sync with VS Code configuration)
@@ -212,7 +246,7 @@ const nodeValidationDiagnostics = new Map<string, Diagnostic[]>();
 connection.onDidChangeConfiguration(() => {
   // sesamSettingsCache = null;
   documentSettings.clear();
-  documents.all().forEach(validateDocument);
+  documents.all().forEach((doc) => limitedValidate(() => validateDocument(doc)));
 });
 
 async function getDocumentSettings(resource: string): Promise<DtlSettings> {
@@ -289,7 +323,7 @@ async function validateDocument(document: TextDocument): Promise<void> {
 
 documents.onDidChangeContent((change) => {
   workspaceIndex.updateFile(change.document.uri, change.document.getText());
-  validateDocument(change.document);
+  limitedValidate(() => validateDocument(change.document));
 });
 
 documents.onDidClose((event) => {
