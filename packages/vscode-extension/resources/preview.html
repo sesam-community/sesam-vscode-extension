@@ -706,6 +706,15 @@
       btn.textContent = '■ Stop';
       btn.onclick = stopSearch;
 
+      // Clear input and output panes
+      const inputEl = document.getElementById('input-entity');
+      inputEl.value = '';
+      syncHighlight();
+      document.getElementById('entity-nav').style.display = 'none';
+      clearOutput();
+      document.getElementById('fold-output-btn').style.display = 'none';
+      setSpinner(false);
+
       // Clear entities pane and show loader
       embeddedEntities = [];
       entityIndex = 0;
