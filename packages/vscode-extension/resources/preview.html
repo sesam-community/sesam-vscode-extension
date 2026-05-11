@@ -452,8 +452,8 @@
       <label><input type="radio" name="search-type" value="text"> Text</label>
     </div>
     <input class="search-input" id="search-input" type="text" placeholder="Search entities…">
-    <button class="btn btn-primary" id="search-btn" onclick="doSearch()">Search</button>
     <button class="btn btn-secondary" id="search-clear-btn" onclick="clearSearch()" title="Clear">✕</button>
+    <button class="btn btn-primary" id="search-btn" onclick="doSearch()">Search</button>
     <span class="search-status" id="search-status"></span>
   </div>
 
@@ -702,8 +702,9 @@
 
       const searchType = document.querySelector('input[name="search-type"]:checked').value;
       setSearchStatus('', false);
-      document.getElementById('search-btn').disabled = true;
-      document.getElementById('search-btn').textContent = '…';
+      const btn = document.getElementById('search-btn');
+      btn.textContent = '■ Stop';
+      btn.onclick = stopSearch;
 
       // Clear entities pane and show loader
       embeddedEntities = [];
@@ -740,8 +741,14 @@
 
     function resetSearchBtn() {
       const btn = document.getElementById('search-btn');
-      btn.disabled = false;
       btn.textContent = 'Search';
+      btn.onclick = doSearch;
+    }
+
+    function stopSearch() {
+      vscode.postMessage({ type: 'stopSearch' });
+      resetSearchBtn();
+      setSearchStatus('Stopping\u2026', false);
     }
 
     document.getElementById('search-input').addEventListener('keydown', (e) => {
@@ -983,6 +990,8 @@
 
     function runEval() {
       const inputJson = document.getElementById('input-entity').value;
+      document.getElementById('status-bar').className = 'status-bar loading';
+      setSpinner(true);
       vscode.postMessage({ type: 'evaluate', inputJson });
     }
 
@@ -1052,6 +1061,9 @@
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    let _evalTimerInterval = null;
+    let _evalStartMs = 0;
+
     function setErrorBanner(html) {
       const banner = document.getElementById('error-banner');
       banner.innerHTML = html;
@@ -1060,10 +1072,20 @@
 
     function setSpinner(visible) {
       const overlay = document.getElementById('spinner');
+      overlay.classList.toggle('visible', visible);
+
+      clearInterval(_evalTimerInterval);
+      _evalTimerInterval = null;
+
       if (visible) {
-        overlay.classList.add('visible');
-      } else {
-        overlay.classList.remove('visible');
+        _evalStartMs = Date.now();
+        const statusBar = document.getElementById('status-bar');
+        const tick = () => {
+          const s = ((Date.now() - _evalStartMs) / 1000).toFixed(1);
+          statusBar.textContent = '\u27f3 Evaluating on node\u2026 ' + s + 's';
+        };
+        tick();
+        _evalTimerInterval = setInterval(tick, 100);
       }
     }
 
@@ -1186,32 +1208,6 @@
         if (btn) { btn.textContent = '⊞ Expand all'; }
         outputFoldedAll = true;
       }
-    }
-
-    function colorizeJson(json) {
-      const re = /(" ?(?:\\u[0-9a-fA-F]{4}|\\[^u]|[^\\"])*")( ?\s*:)?|\b(true|false)\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|[{}\[\],]/g;
-      let out = '';
-      let last = 0;
-      let m;
-      while ((m = re.exec(json)) !== null) {
-        out += escHtml(json.slice(last, m.index));
-        last = re.lastIndex;
-        const token = m[0];
-        if (m[1] !== undefined) {
-          if (m[2] !== undefined) {
-            out += '<span class="json-key">' + escHtml(m[1]) + '</span>'
-                 + '<span class="json-punct json-structural">' + escHtml(m[2]) + '</span>';
-          } else {
-            out += '<span class="json-str">' + escHtml(token) + '</span>';
-          }
-        } else if (token === 'null' || token === '{' || token === '}' || token === '[' || token === ']' || token === ',') {
-          out += '<span class="json-punct json-structural">' + escHtml(token) + '</span>';
-        } else {
-          out += '<span class="json-punct">' + escHtml(token) + '</span>';
-        }
-      }
-      out += escHtml(json.slice(last));
-      return out;
     }
 
     function colorizeJson(json) {
@@ -1379,7 +1375,6 @@
         setSpinner(true);
         setErrorBanner('');
         document.getElementById('status-bar').className = 'status-bar loading';
-        document.getElementById('status-bar').textContent = '⟳ Evaluating on node…';
         document.getElementById('warnings-box').style.display = 'none';
         document.getElementById('warnings-box').innerHTML = '';
         return;
@@ -1459,6 +1454,21 @@
           warningsBox.style.display = 'none';
           warningsBox.innerHTML = '';
         }
+        return;
+      }
+
+      if (msg.type === 'searchStopped') {
+        resetSearchBtn();
+        showEntityListLoading(false);
+        setSearchStatus('Search stopped.', false);
+        return;
+      }
+
+      if (msg.type === 'evalStopped') {
+        setSpinner(false);
+        const statusBar = document.getElementById('status-bar');
+        statusBar.className = 'status-bar';
+        statusBar.textContent = 'Evaluation stopped.';
         return;
       }
 

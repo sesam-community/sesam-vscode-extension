@@ -31,6 +31,8 @@ import type { DatasetStats, Entity } from "../node-client";
 
 type MessageFromWebview =
   | { type: "evaluate"; inputJson: string }
+  | { type: "stopEvaluation" }
+  | { type: "stopSearch" }
   | { type: "openSettings" }
   | { type: "copyOutput"; text: string }
   | { type: "copyInput"; text: string }
@@ -51,6 +53,8 @@ export class PreviewPanel {
   private _document: vscode.TextDocument;
   private _nodeProvisioning = false;
   private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  private _evalController: AbortController | undefined;
+  private _searchController: AbortController | undefined;
   private _lastOutputJson: string | undefined;
   private _disposables: vscode.Disposable[] = [];
 
@@ -147,6 +151,16 @@ export class PreviewPanel {
   private async _handleMessage(message: MessageFromWebview): Promise<void> {
     if (message.type === "evaluate") {
       await this._runLiveEvaluation(message.inputJson);
+      return;
+    }
+
+    if (message.type === "stopEvaluation") {
+      this._evalController?.abort();
+      return;
+    }
+
+    if (message.type === "stopSearch") {
+      this._searchController?.abort();
       return;
     }
 
@@ -272,6 +286,10 @@ export class PreviewPanel {
 
     this._panel.webview.postMessage({ type: "searchLoading" });
 
+    this._searchController?.abort();
+    this._searchController = new AbortController();
+    const searchSignal = this._searchController.signal;
+
     try {
       if (searchType === "id") {
         const results = await searchDatasetById(
@@ -280,6 +298,7 @@ export class PreviewPanel {
           sourceDataset,
           query,
           logNodeRequest,
+          searchSignal,
         );
 
         if (results.length > 0) {
@@ -295,6 +314,7 @@ export class PreviewPanel {
           query,
           undefined,
           logNodeRequest,
+          searchSignal,
         );
 
         if (match !== null) {
@@ -304,6 +324,11 @@ export class PreviewPanel {
         }
       }
     } catch (err) {
+      if (searchSignal.aborted) {
+        this._panel.webview.postMessage({ type: "searchStopped" });
+        return;
+      }
+
       const base = toLiveError(err);
       this._panel.webview.postMessage({ type: "searchError", message: base.message });
     }
@@ -375,6 +400,10 @@ export class PreviewPanel {
 
     this._panel.webview.postMessage({ type: "loading" });
 
+    this._evalController?.abort();
+    this._evalController = new AbortController();
+    const { signal } = this._evalController;
+
     try {
       const doneTrack = trackRequest("POST", `preview/${pipeId}`);
       let outputEntities: Awaited<ReturnType<typeof previewPipe>>;
@@ -387,6 +416,7 @@ export class PreviewPanel {
           pipeConfig,
           [inputEntity],
           logNodeRequest,
+          signal,
         );
         doneTrack(true);
       } catch (previewErr) {
@@ -414,6 +444,11 @@ export class PreviewPanel {
 
       this._panel.webview.postMessage({ type: "liveResult", output });
     } catch (err) {
+      if (signal.aborted) {
+        this._panel.webview.postMessage({ type: "evalStopped" });
+        return;
+      }
+
       const base = toLiveError(err);
       let message = base.message;
 

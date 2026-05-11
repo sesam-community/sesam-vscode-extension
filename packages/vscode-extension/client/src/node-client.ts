@@ -101,6 +101,7 @@ const request = (
   body?: string,
   contentType = "application/json",
   logger?: NodeRequestLogger,
+  signal?: AbortSignal,
 ): Promise<string> =>
   new Promise((resolve, reject) => {
     const startMs = Date.now();
@@ -182,6 +183,17 @@ const request = (
       reject(new NodeNetworkError(msg));
     });
 
+    if (signal) {
+      signal.addEventListener(
+        "abort",
+        () => {
+          req.destroy();
+          reject(new NodeNetworkError("Request cancelled."));
+        },
+        { once: true },
+      );
+    }
+
     if (body !== undefined) {
       req.write(body, "utf8");
     }
@@ -242,6 +254,7 @@ export const previewPipe = async (
   pipeConfig: Record<string, unknown>,
   inputEntities: Entity[],
   logger?: NodeRequestLogger,
+  signal?: AbortSignal,
 ): Promise<Entity[]> => {
   const base = validateUrl(nodeUrl);
   const url = new URL(`/api/pipes/${encodeURIComponent(pipeId)}/preview`, base);
@@ -261,6 +274,7 @@ export const previewPipe = async (
     formBody,
     "application/x-www-form-urlencoded",
     logger,
+    signal,
   );
 
   const parsed: unknown = JSON.parse(responseText);
@@ -360,6 +374,7 @@ export const fetchDatasetEntities = async (
   datasetId: string,
   options: FetchEntitiesOptions = {},
   logger?: NodeRequestLogger,
+  signal?: AbortSignal,
 ): Promise<Entity[]> => {
   const base = validateUrl(nodeUrl);
   const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}/entities`, base);
@@ -388,7 +403,7 @@ export const fetchDatasetEntities = async (
     url.searchParams.set("uncommitted", String(uncommitted));
   }
 
-  const responseText = await request("GET", url, jwt, undefined, undefined, logger);
+  const responseText = await request("GET", url, jwt, undefined, undefined, logger, signal);
 
   return JSON.parse(responseText) as Entity[];
 };
@@ -409,13 +424,14 @@ export const searchDatasetById = async (
   datasetId: string,
   entityId: string,
   logger?: NodeRequestLogger,
+  signal?: AbortSignal,
 ): Promise<Entity[]> => {
   const base = validateUrl(nodeUrl);
   const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}/search`, base);
 
   url.searchParams.set("id", entityId);
 
-  const responseText = await request("GET", url, jwt, undefined, undefined, logger);
+  const responseText = await request("GET", url, jwt, undefined, undefined, logger, signal);
 
   return JSON.parse(responseText) as Entity[];
 };
@@ -439,6 +455,7 @@ export const searchDatasetByText = async (
   query: string,
   maxEntities = 10_000,
   logger?: NodeRequestLogger,
+  signal?: AbortSignal,
 ): Promise<Entity | null> => {
   const lowerQuery = query.toLowerCase();
   const pageSize = 200;
@@ -459,6 +476,7 @@ export const searchDatasetByText = async (
         uncommitted: false,
       },
       logger,
+      signal,
     );
 
     if (page.length === 0) {
