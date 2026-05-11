@@ -341,16 +341,6 @@
     .fold-block.collapsed .fold-summary { display: inline; }
     .fold-block.collapsed .fold-toggle::before { content: '\25B6'; }
     .fold-block:not(.collapsed) .fold-toggle::before { content: '\25BC'; }
-    #input-fold-view {
-      flex: 1;
-      padding: 10px;
-      font-family: var(--vscode-editor-font-family, monospace);
-      font-size: var(--vscode-editor-font-size, 13px);
-      background: var(--vscode-editor-background);
-      color: var(--vscode-editor-foreground);
-      overflow: auto;
-      white-space: pre;
-    }
     /* Entities list pane */
     .panes.has-entities { grid-template-columns: 220px 1fr 1fr; }
     #entities-pane { display: none; }
@@ -508,7 +498,7 @@
           <span>Loading entities…</span>
         </div>
         <div class="input-highlight" id="input-highlight"></div>
-        <textarea id="input-entity" spellcheck="false" placeholder='{\n  "_id": "example-1",\n  "name": "Alice"\n}'>{
+        <textarea id="input-entity" spellcheck="false" placeholder='{&#10;  "_id": "example-1",&#10;  "name": "Alice"&#10;}'>{
   "_id": "example-1",
   "name": "Alice",
   "status": "active"
@@ -541,14 +531,7 @@
   <div class="error-banner" id="error-banner"></div>
   <div class="status-bar" id="status-bar">Ready.</div>
 
-  <!-- In-pane find widget (Ctrl+S) -->
-  <div id="find-widget" class="find-widget" style="display:none">
-    <span id="find-label" class="find-label"></span>
-    <input id="find-input-box" class="find-input" type="text" placeholder="Find…">
-    <span id="find-counter" class="find-counter"></span>
-    <button class="find-btn" onclick="findNavigate(-1)" title="Previous (Shift+Enter)">↑</button>
-    <button class="find-btn" onclick="findNavigate(1)" title="Next (Enter)">↓</button>
-  <!-- In-pane find widget (Ctrl+S) -->
+  <!-- In-pane find widget (Ctrl+F on output) -->
   <div id="find-widget" class="find-widget" style="display:none">
     <span id="find-label" class="find-label"></span>
     <input id="find-input-box" class="find-input" type="text" placeholder="Find…">
@@ -608,9 +591,7 @@
         return;
       }
 
-      const container = findTarget === 'input'
-        ? document.getElementById('input-fold-view')
-        : document.getElementById('output-box');
+      const container = document.getElementById('output-box');
 
       findNodes = highlightInContainer(container, query);
       findIdx = 0;
@@ -1208,11 +1189,32 @@
     }
 
     function colorizeJson(json) {
-      // Tokenize JSON into: keys (green), string values (yellow),
-      // and everything else — numbers, booleans, null, brackets, braces,
-      // commas, colons (purple in dark / blue in light).
-      // Structural tokens (braces, brackets, commas, colons, null) also carry
-      // the `json-structural` class so light mode can colour them separately.
+      const re = /(" ?(?:\\u[0-9a-fA-F]{4}|\\[^u]|[^\\"])*")( ?\s*:)?|\b(true|false)\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|[{}\[\],]/g;
+      let out = '';
+      let last = 0;
+      let m;
+      while ((m = re.exec(json)) !== null) {
+        out += escHtml(json.slice(last, m.index));
+        last = re.lastIndex;
+        const token = m[0];
+        if (m[1] !== undefined) {
+          if (m[2] !== undefined) {
+            out += '<span class="json-key">' + escHtml(m[1]) + '</span>'
+                 + '<span class="json-punct json-structural">' + escHtml(m[2]) + '</span>';
+          } else {
+            out += '<span class="json-str">' + escHtml(token) + '</span>';
+          }
+        } else if (token === 'null' || token === '{' || token === '}' || token === '[' || token === ']' || token === ',') {
+          out += '<span class="json-punct json-structural">' + escHtml(token) + '</span>';
+        } else {
+          out += '<span class="json-punct">' + escHtml(token) + '</span>';
+        }
+      }
+      out += escHtml(json.slice(last));
+      return out;
+    }
+
+    function colorizeJson(json) {
       const re = /("(?:\\u[0-9a-fA-F]{4}|\\[^u]|[^\\"])*")(\s*:)?|\b(true|false)\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|[{}\[\],]/g;
       let out = '';
       let last = 0;
@@ -1222,19 +1224,15 @@
         last = re.lastIndex;
         const token = m[0];
         if (m[1] !== undefined) {
-          // quoted string
           if (m[2] !== undefined) {
-            // object key + colon
             out += '<span class="json-key">' + escHtml(m[1]) + '</span>'
                  + '<span class="json-punct json-structural">' + escHtml(m[2]) + '</span>';
           } else {
             out += '<span class="json-str">' + escHtml(token) + '</span>';
           }
         } else if (token === 'null' || token === '{' || token === '}' || token === '[' || token === ']' || token === ',') {
-          // structural: braces, brackets, commas, null
           out += '<span class="json-punct json-structural">' + escHtml(token) + '</span>';
         } else {
-          // boolean, number — value punctuation
           out += '<span class="json-punct">' + escHtml(token) + '</span>';
         }
       }
