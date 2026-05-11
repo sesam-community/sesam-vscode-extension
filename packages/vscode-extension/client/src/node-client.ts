@@ -439,19 +439,25 @@ export const searchDatasetByText = async (
   query: string,
   maxEntities = 10_000,
   logger?: NodeRequestLogger,
-): Promise<Entity[]> => {
+): Promise<Entity | null> => {
   const lowerQuery = query.toLowerCase();
   const pageSize = 200;
   let scanned = 0;
   let since: string | number | undefined;
-  const matches: Entity[] = [];
 
   while (scanned < maxEntities) {
+    const remaining = maxEntities - scanned;
     const page = await fetchDatasetEntities(
       nodeUrl,
       jwt,
       datasetId,
-      { limit: pageSize, since, deleted: false, history: false, uncommitted: false },
+      {
+        limit: Math.min(pageSize, remaining),
+        since,
+        deleted: false,
+        history: false,
+        uncommitted: false,
+      },
       logger,
     );
 
@@ -459,10 +465,10 @@ export const searchDatasetByText = async (
       break;
     }
 
-    for (const entity of page) {
-      if (JSON.stringify(entity).toLowerCase().includes(lowerQuery)) {
-        matches.push(entity);
-      }
+    const match = page.find((entity) => JSON.stringify(entity).toLowerCase().includes(lowerQuery));
+
+    if (match !== undefined) {
+      return match;
     }
 
     scanned += page.length;
@@ -472,14 +478,14 @@ export const searchDatasetByText = async (
     }
 
     const last = page[page.length - 1];
-    since = last["_updated"] as number | undefined;
+    since = (last["_updated"] ?? last["_ts"]) as number | undefined;
 
     if (since === undefined) {
       break;
     }
   }
 
-  return matches;
+  return null;
 };
 
 /**

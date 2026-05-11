@@ -288,7 +288,7 @@ export class PreviewPanel {
           this._panel.webview.postMessage({ type: "searchNoMatch" });
         }
       } else {
-        const matches = await searchDatasetByText(
+        const match = await searchDatasetByText(
           credentials.nodeUrl,
           credentials.jwt,
           sourceDataset,
@@ -297,8 +297,8 @@ export class PreviewPanel {
           logNodeRequest,
         );
 
-        if (matches.length > 0) {
-          this._panel.webview.postMessage({ type: "searchResult", entities: matches });
+        if (match !== null) {
+          this._panel.webview.postMessage({ type: "searchResult", entities: [match] });
         } else {
           this._panel.webview.postMessage({ type: "searchNoMatch" });
         }
