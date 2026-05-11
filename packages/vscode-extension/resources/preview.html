@@ -109,15 +109,15 @@
     }
     .copy-btn {
       font-size: 11px;
-      padding: 1px 6px;
+      padding: 2px 8px;
       cursor: pointer;
-      background: transparent;
-      color: var(--vscode-descriptionForeground);
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      opacity: 0.6;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: 1px solid var(--vscode-button-border, transparent);
+      border-radius: 3px;
+      opacity: 1;
     }
-    .copy-btn:hover { opacity: 1; background: var(--vscode-button-secondaryBackground); }
+    .copy-btn:hover { background: var(--vscode-button-secondaryHoverBackground, #3a3d41); }
     /* Shared font/padding for both the textarea and its highlight overlay */
     textarea, .output-box, .input-highlight {
       flex: 1;
@@ -215,6 +215,49 @@
       text-decoration: underline;
       margin-left: 8px;
     }
+    .find-widget {
+      position: fixed;
+      top: 44px;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 8px;
+      background: var(--vscode-editorWidget-background, #252526);
+      border: 1px solid var(--vscode-editorWidget-border, #454545);
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+      z-index: 200;
+      font-size: 12px;
+    }
+    .find-input {
+      width: 190px;
+      height: 22px;
+      padding: 0 6px;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, #555);
+      border-radius: 2px;
+      outline: none;
+      font-size: 12px;
+      font-family: var(--vscode-font-family);
+    }
+    .find-input:focus { border-color: var(--vscode-focusBorder); }
+    .find-label { font-size: 10px; opacity: 0.55; white-space: nowrap; }
+    .find-counter { font-size: 11px; opacity: 0.6; white-space: nowrap; min-width: 48px; text-align: center; }
+    .find-btn {
+      background: transparent;
+      border: none;
+      color: var(--vscode-foreground);
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 2px;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+    .find-btn:hover { background: var(--vscode-toolbar-hoverBackground); opacity: 1; }
+    mark.find-hl { background: rgba(255, 214, 0, 0.35); color: inherit; border-radius: 1px; }
+    mark.find-hl.find-current { background: rgba(255, 140, 0, 0.75); color: #000; }
     .status-bar {
       padding: 4px 12px;
       font-size: 11px;
@@ -307,7 +350,6 @@
       color: var(--vscode-editor-foreground);
       overflow: auto;
       white-space: pre;
-      display: none;
     }
     /* Entities list pane */
     .panes.has-entities { grid-template-columns: 220px 1fr 1fr; }
@@ -324,6 +366,7 @@
       font-family: var(--vscode-editor-font-family, monospace);
       cursor: pointer;
       border-left: 2px solid transparent;
+      border-bottom: 1px solid var(--vscode-panel-border);
       display: grid;
       grid-template-columns: 1fr;
       grid-template-rows: auto auto auto;
@@ -450,9 +493,7 @@
       <div class="pane-header">
         <span>Input Entity (_S)</span>
         <div style="display:flex;gap:4px">
-          <button class="copy-btn" id="fold-input-all-btn" onclick="toggleFoldAll('input')" style="display:none">⊟ Fold all</button>
-          <button class="copy-btn" id="view-mode-btn" onclick="toggleInputViewMode()">⊟ Fold view</button>
-          <button class="copy-btn" onclick="copyInput()">⧉ Copy</button>
+          <button class="copy-btn" onclick="copyInput()" title="Copy to clipboard">⧉ Copy</button>
         </div>
       </div>
       <div id="entity-nav" class="entity-nav">
@@ -461,7 +502,6 @@
         <button id="next-btn" onclick="nextEntity()">&#9654;</button>
         <span id="entity-source" class="entity-source-label"></span>
       </div>
-      <div id="input-fold-view"></div>
       <div class="input-wrapper">
         <div class="input-loading-overlay" id="input-loading-overlay">
           <div class="spinner-icon"></div>
@@ -481,8 +521,8 @@
       <div class="pane-header">
         <span>Output Entity (_T)</span>
         <div style="display:flex;gap:4px">
-          <button class="copy-btn" id="fold-output-btn" onclick="toggleFoldAll('output')" style="display:none">⊟ Fold all</button>
-          <button class="copy-btn" id="copy-output-btn" onclick="copyOutput()">⧉ Copy</button>
+          <button class="copy-btn" id="fold-output-btn" onclick="toggleFoldAll('output')" style="display:none" title="Collapse all ranges">⊟ Fold all</button>
+          <button class="copy-btn" id="copy-output-btn" onclick="copyOutput()" title="Copy to clipboard">⧉ Copy</button>
         </div>
       </div>
       <div class="output-wrapper">
@@ -501,6 +541,23 @@
   <div class="error-banner" id="error-banner"></div>
   <div class="status-bar" id="status-bar">Ready.</div>
 
+  <!-- In-pane find widget (Ctrl+S) -->
+  <div id="find-widget" class="find-widget" style="display:none">
+    <span id="find-label" class="find-label"></span>
+    <input id="find-input-box" class="find-input" type="text" placeholder="Find…">
+    <span id="find-counter" class="find-counter"></span>
+    <button class="find-btn" onclick="findNavigate(-1)" title="Previous (Shift+Enter)">↑</button>
+    <button class="find-btn" onclick="findNavigate(1)" title="Next (Enter)">↓</button>
+  <!-- In-pane find widget (Ctrl+S) -->
+  <div id="find-widget" class="find-widget" style="display:none">
+    <span id="find-label" class="find-label"></span>
+    <input id="find-input-box" class="find-input" type="text" placeholder="Find…">
+    <span id="find-counter" class="find-counter"></span>
+    <button class="find-btn" onclick="findNavigate(-1)" title="Previous (Shift+Enter)">↑</button>
+    <button class="find-btn" onclick="findNavigate(1)" title="Next (Enter)">↓</button>
+    <button class="find-btn" onclick="closeFindWidget()" title="Close (Escape)">✕</button>
+  </div>
+
   <script>
     const vscode = acquireVsCodeApi();
 
@@ -517,9 +574,136 @@
     let datasetDeletedCount = 0;  // runtime.count-index-deleted
     let showDeleted = false;      // current mode: false = latest only, true = with deleted
     let lastOutputText = null;
-    let inputViewMode = false;
     let outputFoldedAll = false;
-    let inputFoldedAll = false;
+
+    // ── In-pane find widget ──────────────────────────────────────────────────
+
+    let findTarget = null; // 'input' | 'output'
+    let findNodes = [];    // array of <mark> elements
+    let findIdx = 0;
+
+    function openFindWidget(target) {
+      findTarget = target;
+      document.getElementById('find-label').textContent = target === 'input' ? 'Input  ' : 'Output  ';
+      document.getElementById('find-widget').style.display = 'flex';
+      const inp = document.getElementById('find-input-box');
+      inp.focus();
+      inp.select();
+      runFind();
+    }
+
+    function closeFindWidget() {
+      clearFindHighlights();
+      document.getElementById('find-widget').style.display = 'none';
+      document.getElementById('find-counter').textContent = '';
+      findTarget = null;
+    }
+
+    function runFind() {
+      const query = document.getElementById('find-input-box').value;
+      clearFindHighlights();
+
+      if (!query || !findTarget) {
+        document.getElementById('find-counter').textContent = '';
+        return;
+      }
+
+      const container = findTarget === 'input'
+        ? document.getElementById('input-fold-view')
+        : document.getElementById('output-box');
+
+      findNodes = highlightInContainer(container, query);
+      findIdx = 0;
+      updateFindCurrent();
+      updateFindCounter();
+    }
+
+    function clearFindHighlights() {
+      document.querySelectorAll('mark.find-hl').forEach((m) => {
+        const parent = m.parentNode;
+
+        while (m.firstChild) {
+          parent.insertBefore(m.firstChild, m);
+        }
+
+        parent.removeChild(m);
+        parent.normalize();
+      });
+      findNodes = [];
+    }
+
+    function highlightInContainer(container, query) {
+      const marks = [];
+      const lq = query.toLowerCase();
+      walkTextNodes(container, (node) => {
+        const text = node.textContent;
+        const lower = text.toLowerCase();
+        const parts = [];
+        let idx = 0;
+        let pos;
+
+        while ((pos = lower.indexOf(lq, idx)) !== -1) {
+          if (pos > idx) { parts.push(document.createTextNode(text.slice(idx, pos))); }
+          const mark = document.createElement('mark');
+          mark.className = 'find-hl';
+          mark.textContent = text.slice(pos, pos + query.length);
+          parts.push(mark);
+          marks.push(mark);
+          idx = pos + query.length;
+        }
+
+        if (parts.length === 0) { return; }
+
+        if (idx < text.length) { parts.push(document.createTextNode(text.slice(idx))); }
+
+        const parent = node.parentNode;
+        parts.forEach((p) => parent.insertBefore(p, node));
+        parent.removeChild(node);
+      });
+      return marks;
+    }
+
+    function walkTextNodes(node, fn) {
+      if (node.nodeName === 'MARK') { return; }
+
+      if (node.nodeType === Node.TEXT_NODE) {
+        fn(node);
+        return;
+      }
+
+      Array.from(node.childNodes).forEach((child) => walkTextNodes(child, fn));
+    }
+
+    function updateFindCurrent() {
+      findNodes.forEach((m, i) => m.classList.toggle('find-current', i === findIdx));
+
+      if (findNodes[findIdx]) {
+        findNodes[findIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
+    function updateFindCounter() {
+      document.getElementById('find-counter').textContent =
+        findNodes.length === 0 ? 'No results' : (findIdx + 1) + ' / ' + findNodes.length;
+    }
+
+    function findNavigate(dir) {
+      if (findNodes.length === 0) { return; }
+      findIdx = (findIdx + dir + findNodes.length) % findNodes.length;
+      updateFindCurrent();
+      updateFindCounter();
+    }
+
+    document.getElementById('find-input-box').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        findNavigate(e.shiftKey ? -1 : 1);
+      } else if (e.key === 'Escape') {
+        closeFindWidget();
+      }
+    });
+
+    document.getElementById('find-input-box').addEventListener('input', runFind);
 
     // ── Search ────────────────────────────────────────────────────────────────
 
@@ -826,6 +1010,11 @@
         e.preventDefault();
         runEval();
       }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        openFindWidget('input');
+      }
     });
 
     // Keep highlight overlay in sync with textarea content and scroll
@@ -846,6 +1035,22 @@
 
     // Initial render
     syncHighlight();
+
+    // Ctrl+S on output-box opens find widget for output
+    document.getElementById('output-box').setAttribute('tabindex', '0');
+    document.getElementById('output-box').addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        openFindWidget('output');
+      }
+    });
+
+    // Global Escape closes find widget
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('find-widget').style.display !== 'none') {
+        closeFindWidget();
+      }
+    });
 
     function openSettings() {
       vscode.postMessage({ type: 'openSettings' });
@@ -883,40 +1088,6 @@
 
     function escHtml(str) {
       return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
-
-    // ── Input fold-view mode ─────────────────────────────────────────────────
-
-    function toggleInputViewMode() {
-      const wrapper = document.querySelector('.input-wrapper');
-      const foldView = document.getElementById('input-fold-view');
-      const btn = document.getElementById('view-mode-btn');
-
-      if (!inputViewMode) {
-        let parsed;
-
-        try {
-          parsed = JSON.parse(document.getElementById('input-entity').value);
-        } catch {
-          setSearchStatus('Input is not valid JSON', true);
-          return;
-        }
-
-        foldView.innerHTML = '';
-        foldView.appendChild(renderFoldableJson(parsed, 0));
-        wrapper.style.display = 'none';
-        foldView.style.display = 'block';
-        btn.textContent = '✎ Edit';
-        inputViewMode = true;
-        document.getElementById('fold-input-all-btn').style.display = '';
-      } else {
-        foldView.style.display = 'none';
-        wrapper.style.display = '';
-        btn.textContent = '⊟ Fold view';
-        inputViewMode = false;
-        document.getElementById('fold-input-all-btn').style.display = 'none';
-        syncHighlight();
-      }
     }
 
     // ── Foldable JSON renderer ───────────────────────────────────────────────
@@ -1021,23 +1192,18 @@
     }
 
     function toggleFoldAll(pane) {
-      const container = pane === 'output'
-        ? document.getElementById('output-box')
-        : document.getElementById('input-fold-view');
-      const btn = pane === 'output'
-        ? document.getElementById('fold-output-btn')
-        : document.getElementById('fold-input-all-btn');
+      const container = document.getElementById('output-box');
+      const btn = document.getElementById('fold-output-btn');
       const blocks = container ? container.querySelectorAll('.fold-block') : [];
-      const isFolded = pane === 'output' ? outputFoldedAll : inputFoldedAll;
 
-      if (isFolded) {
+      if (outputFoldedAll) {
         blocks.forEach((b) => b.classList.remove('collapsed'));
         if (btn) { btn.textContent = '⊟ Fold all'; }
-        if (pane === 'output') { outputFoldedAll = false; } else { inputFoldedAll = false; }
+        outputFoldedAll = false;
       } else {
         blocks.forEach((b) => b.classList.add('collapsed'));
         if (btn) { btn.textContent = '⊞ Expand all'; }
-        if (pane === 'output') { outputFoldedAll = true; } else { inputFoldedAll = true; }
+        outputFoldedAll = true;
       }
     }
 

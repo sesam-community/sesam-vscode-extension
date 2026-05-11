@@ -543,7 +543,7 @@ export class PreviewPanel {
 
     try {
       const raw = await vscode.workspace.fs.readFile(matches[0]);
-      const parsed: unknown = JSON.parse(Buffer.from(raw).toString("utf8"));
+      const parsed: unknown = JSON.parse(new TextDecoder().decode(raw));
 
       if (Array.isArray(parsed)) {
         return parsed as Entity[];
