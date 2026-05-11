@@ -1298,6 +1298,12 @@
         return;
       }
 
+      if (msg.type === 'searchProgress') {
+        const pctStr = msg.pct !== null ? ' (' + msg.pct + '%)' : '';
+        setSearchStatus('Searching…' + pctStr, false);
+        return;
+      }
+
       if (msg.type === 'searchError') {
         resetSearchBtn();
         showEntityListLoading(false);

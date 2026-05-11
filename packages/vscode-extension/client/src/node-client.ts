@@ -456,6 +456,7 @@ export const searchDatasetByText = async (
   maxEntities = 10_000,
   logger?: NodeRequestLogger,
   signal?: AbortSignal,
+  onProgress?: (scanned: number) => void,
 ): Promise<Entity | null> => {
   const lowerQuery = query.toLowerCase();
   const pageSize = 200;
@@ -490,6 +491,7 @@ export const searchDatasetByText = async (
     }
 
     scanned += page.length;
+    onProgress?.(scanned);
 
     if (page.length < pageSize) {
       break;

@@ -307,6 +307,15 @@ export class PreviewPanel {
           this._panel.webview.postMessage({ type: "searchNoMatch" });
         }
       } else {
+        const stats = await fetchDatasetStats(
+          credentials.nodeUrl,
+          credentials.jwt,
+          sourceDataset,
+          logNodeRequest,
+        ).catch(() => null);
+
+        const total = stats?.totalCount ?? 0;
+
         const match = await searchDatasetByText(
           credentials.nodeUrl,
           credentials.jwt,
@@ -315,6 +324,10 @@ export class PreviewPanel {
           undefined,
           logNodeRequest,
           searchSignal,
+          (scanned) => {
+            const pct = total > 0 ? Math.round((scanned * 100) / total) : null;
+            this._panel.webview.postMessage({ type: "searchProgress", scanned, total, pct });
+          },
         );
 
         if (match !== null) {
