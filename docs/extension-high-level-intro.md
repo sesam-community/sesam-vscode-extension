@@ -72,12 +72,12 @@ The project is built with Copilot-driven development in mind. Everything is docu
 
 | File / Folder | Purpose |
 |---|---|
-| `.github/copilot-instructions.md` | Project-wide conventions injected into every Copilot session (coding style, import order, architecture rules) |
-| `agent/sesam-extension-plan.prompt.md` | Top-level product plan — the "source of truth" for _what_ the extension should become |
-| `agent/impl/README.md` | Feature tracking table (~30 features), each with a status badge |
-| `agent/impl/impl-fXX-*.prompt.md` | Per-feature design specs; Copilot reads these before implementing |
-| `agent/plans/*.prompt.md` | Freeform planning docs for cross-cutting concerns (release, E2E tests, large workspace optimization, etc.) |
-| `.agents/skills/` | Reusable Copilot skill files loaded on demand |
+| [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) | Project-wide conventions injected into every Copilot session (coding style, import order, architecture rules) |
+| [`agent/sesam-extension-plan.prompt.md`](../packages/vscode-extension/agent/sesam-extension-plan.prompt.md) | Top-level product plan — the "source of truth" for _what_ the extension should become |
+| [`agent/impl/README.md`](../packages/vscode-extension/agent/impl/README.md) | Feature tracking table (~30 features), each with a status badge |
+| [`agent/impl/impl-fXX-*.prompt.md`](../packages/vscode-extension/agent/impl/) | Per-feature design specs; Copilot reads these before implementing |
+| [`agent/plans/*.prompt.md`](../packages/vscode-extension/agent/plans/) | Freeform planning docs for cross-cutting concerns (release, E2E tests, large workspace optimization, etc.) |
+| [`.agents/skills/`](../.agents/skills/) | Reusable Copilot skill files loaded on demand |
 
 ### Available skills
 
