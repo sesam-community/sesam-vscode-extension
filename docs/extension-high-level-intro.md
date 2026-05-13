@@ -4,6 +4,20 @@
 
 ---
 
+## Table of Contents
+
+- [What It Is](#what-it-is)
+- [Core Capabilities](#core-capabilities)
+- [Architecture in a Nutshell](#architecture-in-a-nutshell)
+- [Agentic Coding Workflow](#agentic-coding-workflow)
+  - [Key files](#key-files)
+  - [Available skills](#available-skills)
+  - [Typical agentic flow](#typical-agentic-flow)
+- [Feature Status Snapshot](#feature-status-snapshot)
+- [Quick Start for Contributors](#quick-start-for-contributors)
+
+---
+
 ## What It Is
 
 - A **VS Code extension** providing first-class IDE support for [Sesam](https://docs.sesam.io) — a DataHub / integration platform
