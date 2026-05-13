@@ -315,10 +315,8 @@ export class PreviewPanel {
         ).catch(() => null);
 
         const total = stats?.totalCount ?? 0;
-        const pageSize = 200;
-        const totalRequests = total > 0 ? Math.ceil(total / pageSize) : 0;
 
-        const match = await searchDatasetByText(
+        const matches = await searchDatasetByText(
           credentials.nodeUrl,
           credentials.jwt,
           sourceDataset,
@@ -326,17 +324,17 @@ export class PreviewPanel {
           undefined,
           logNodeRequest,
           searchSignal,
-          (requestsDone) => {
-            const pct =
-              totalRequests > 0
-                ? Math.min(100, Math.round((requestsDone * 100) / totalRequests))
-                : null;
+          (pct) => {
             this._panel.webview.postMessage({ type: "searchProgress", pct });
           },
+          total,
         );
 
-        if (match !== null) {
-          this._panel.webview.postMessage({ type: "searchResult", entities: [match] });
+        // Signal 100% completion before sending results
+        this._panel.webview.postMessage({ type: "searchProgress", pct: 100 });
+
+        if (matches.length > 0) {
+          this._panel.webview.postMessage({ type: "searchResult", entities: matches });
         } else {
           this._panel.webview.postMessage({ type: "searchNoMatch" });
         }

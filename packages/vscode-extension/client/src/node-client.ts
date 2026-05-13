@@ -456,13 +456,16 @@ export const searchDatasetByText = async (
   maxEntities = 10_000,
   logger?: NodeRequestLogger,
   signal?: AbortSignal,
-  onProgress?: (requestsDone: number) => void,
-): Promise<Entity | null> => {
+  onProgress?: (pct: number) => void,
+  total?: number,
+): Promise<Entity[]> => {
   const lowerQuery = query.toLowerCase();
   const pageSize = 200;
+  const totalPages = total && total > 0 ? Math.ceil(Math.min(total, maxEntities) / pageSize) : 0;
   let scanned = 0;
-  let requestsDone = 0;
+  let pagesDone = 0;
   let since: string | number | undefined;
+  const matches: Entity[] = [];
 
   while (scanned < maxEntities) {
     const remaining = maxEntities - scanned;
@@ -485,16 +488,18 @@ export const searchDatasetByText = async (
       break;
     }
 
-    requestsDone += 1;
-    onProgress?.(requestsDone);
+    pagesDone += 1;
 
-    const match = page.find((entity) => JSON.stringify(entity).toLowerCase().includes(lowerQuery));
-
-    if (match !== undefined) {
-      return match;
+    for (const entity of page) {
+      if (JSON.stringify(entity).toLowerCase().includes(lowerQuery)) {
+        matches.push(entity);
+      }
     }
 
     scanned += page.length;
+
+    const pct = totalPages > 0 ? Math.min(99, Math.round((pagesDone * 100) / totalPages)) : null;
+    onProgress?.(pct ?? pagesDone);
 
     if (page.length < pageSize) {
       break;
@@ -508,7 +513,7 @@ export const searchDatasetByText = async (
     }
   }
 
-  return null;
+  return matches;
 };
 
 /**
