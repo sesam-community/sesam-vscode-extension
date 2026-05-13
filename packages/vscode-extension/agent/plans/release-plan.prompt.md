@@ -12,20 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+---
+
+## [0.2.0] — 2026-05-13
+
+The reliability and productivity release. Profiles are now fully workspace-scoped so switching
+between projects never leaks credentials. Large workspaces with 1 000+ pipes stay responsive
+thanks to debounced DAG rebuilds. The preview panel gains entity search, paginated browsing, and
+an in-pane find widget.
+
 ### Added
 
-- **F24**: Live Updates via Socket.IO — `NodeStatusPanel` connects to the Sesam node over
-  Socket.IO (`socket.io-client`) for real-time `pipes_updated` / `pipes_added` / `pipes_deleted`
-  push events; 30 s `setInterval` polling removed entirely; **no polling fallback** — when live
-  updates are unavailable the Refresh button is shown instead; green **● Live** / grey **○ Paused** /
-  connection badge with per-state tooltip in the toolbar; user toggle to pause/resume the
-  connection; JWT/auth errors surface a VS Code warning notification; provisioning poller triggered
-  on `connect_error` when the node is sleeping; filter pills are now client-side only (no network
-  request on click); shared node status bar item shows **Checking node → Node hibernated →
-  Starting provisioning → Trying to connect → Connected** lifecycle with amber warning background
-  on in-progress stages and per-stage hover tooltips
-- **F25**: Credential Safety — node hostname shown in the status bar; destructive commands
-  (upload, wipe, sync) blocked with a confirmation modal when targeting a production node
 - **F06**: Status / Diff View — Sesam Sync Status tree view in the Explorer sidebar showing
   which pipes and systems are **Modified**, **Remote Only**, or **Local Only** compared to the
   connected node; inline diff editor (node ↔ local) per item; `sesam.showStatus` command;
@@ -35,6 +34,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Config Status columns; `sesam.systemStatus` command; download commands warn when local changes
   would be overwritten and offer "See Local Diffs"; sync status auto-populates 3 s after activation
   and auto-refreshes on file save (debounced) and after download
+- **F26**: Safe Profile Switching — switching profiles is blocked if any open document has unsaved
+  edits (with a notification listing the dirty files) or if the workspace git repository has
+  uncommitted working-tree or index changes; the Node Status panel is torn down cleanly after a
+  successful switch to prevent stale node-state UI bleeding across profiles
+- **F27**: Autocomplete & Hover Improvements — `hops` and `apply-hops` now complete with a
+  multi-line snippet containing linked tab stops for `datasets`, `where`, and `return`; `comment`
+  completes with a text-argument placeholder; reference strings (e.g. `"dataset"`, `"system"`)
+  are syntax-highlighted in a distinct colour; `hops` / `apply-hops` doc URLs fixed to include
+  proper anchors; new `hops-recursive` VS Code snippet with `recurse`, `exclude_root`, and
+  `max-depth` tab stops
+- **F28**: Workspace-Scoped Profiles — profile name registry and JWT `SecretStorage` keys are now
+  namespaced per workspace folder; profiles added in one VS Code window no longer appear in
+  another; automatic one-time migration moves existing global credentials into the correct
+  workspace-scoped slot
+- **F29**: Large Workspace Optimization — DAG rebuild debounced to 300 ms (coalescing rapid
+  file-change bursts into a single pass); `buildDagFromWorkspace` glob narrowed to
+  `**/*.{conf.pipe,conf.system,conf.json}` to skip non-Sesam JSON files; tree-view refresh
+  and sync-status refresh gated behind the debounce; extension host no longer saturated in
+  workspaces with 1 000+ pipe config files
+- **F30**: Preview Panel — Entity Search & Pagination — search bar in the preview panel header
+  lets users locate source entities by **ID** (exact match via `/search?id=…`) or **Text**
+  (full-dataset substring scan with live `N%` progress); paginated entity list (50 per page) with
+  Previous / Next navigation and `page N / total` label; Latest / Deleted radio toggle with
+  per-mode entity counts from dataset stats; ordinal `#N` numbering per entity; in-pane **find
+  widget** (Ctrl+S) for highlighting text in the input or output JSON panes
+
+### Changed
+
+- **F24**: Live Updates via Socket.IO — added **○ Paused** badge + user toggle to pause/resume
+  the connection; JWT/auth errors now surface as a VS Code warning notification; provisioning
+  poller triggered on `connect_error` when the node is sleeping; filter pills moved to
+  client-side-only (no network request on click); node status bar item now cycles through
+  **Checking node → Node hibernated → Starting provisioning → Trying to connect → Connected**
+  with amber warning background on in-progress stages and per-stage hover tooltips
+- **F25**: Credential Safety — `.sesamprofile` lockfile validated on workspace open to confirm
+  the active profile targets the correct node; confirmation modal added for destructive commands
+  when a node hostname mismatch is detected
+
+### Fixed
+
+- Preview panel: text search now collects **all** matching entities instead of stopping at the
+  first match
+- Preview panel: entity list column no longer disappears while a search request is in flight
+- Preview panel: entity timestamps displayed in **local time** (was UTC)
+- Preview panel: input-entity fold view overlay remains correctly visible when fold mode is active
+- Download success: completion message is written to the Sesam output channel only — no toast
+  notification
 
 ---
 
@@ -146,7 +192,8 @@ and the full pipe graph sidebar shipped ahead of schedule alongside the core MVP
 > for the Sesam Management Studio web UI, including subscription management, secret management,
 > and execution monitoring.
 
-[unreleased]: https://github.com/datanav/sesam-ts/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/datanav/sesam-ts/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/datanav/sesam-ts/compare/v0.1.0...v0.2.0
 [0.4.0]: https://github.com/datanav/sesam-ts/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/datanav/sesam-ts/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/datanav/sesam-ts/compare/v0.1.0...v0.2.0

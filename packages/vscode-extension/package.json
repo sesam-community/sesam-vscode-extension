@@ -2,7 +2,7 @@
   "name": "dtl-language-support",
   "displayName": "Sesam",
   "description": "Data Transformation Language (DTL) support for Sesam pipe configurations",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "bouvet",
   "icon": "fileicons/sesam-logo.png",
   "license": "MIT",
