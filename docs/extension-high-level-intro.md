@@ -100,6 +100,9 @@ The project is built with Copilot-driven development in mind. Everything is docu
 3. Ask Copilot: _"Implement F19 using the impl-feature skill"_
 4. Agent reads the spec, implements, writes tests, updates `README.md` status to `implemented`
 
+A common shortcut is simply asking: **"What's next?"**
+The agent then reads [`agent/impl/README.md`](../packages/vscode-extension/agent/impl/README.md), finds the highest-priority feature still marked `planned`, reads its spec, and proposes (or immediately starts) the implementation — no manual lookup needed.
+
 ---
 
 ## Feature Status Snapshot
