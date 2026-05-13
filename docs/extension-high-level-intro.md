@@ -57,7 +57,7 @@
 | Layer | Path | Responsibility |
 |---|---|---|
 | **Client** | `client/src/` | VS Code API, commands, UI, webviews |
-| **LSP Server** | `server/src/` | Completions, hover, diagnostics, formatting, outline — runs as a separate Node.js process, communicates with the client via IPC |
+| **LSP Server** (`Language Server Protocol`) | `server/src/` | Completions, hover, diagnostics, formatting, outline — runs as a separate Node.js process, communicates with the client via IPC |
 | **Shared** | `src/shared/` | `dtl-registry.ts`, `dtl-evaluator.ts`, `config-formatter.ts` — no VS Code deps, imported by both client and server |
 
 > `config-formatter.ts` is imported by **both** client and server — never add VS Code API dependencies to it.
