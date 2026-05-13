@@ -16,6 +16,8 @@
   - [Available skills](#available-skills)
   - [Typical agentic flow](#typical-agentic-flow)
 - [Feature Status Snapshot](#feature-status-snapshot)
+- [Development Statistics](#development-statistics)
+- [Agentic Coding Insights](#agentic-coding-insights)
 - [Quick Start for Contributors](#quick-start-for-contributors)
 
 ---
@@ -117,6 +119,37 @@ You can also target a specific feature: _"Implement F19 using the impl-feature s
 | **Phase 5 — Management Studio** | Full Studio parity in VS Code | Planned |
 
 Full table: [`agent/impl/README.md`](../packages/vscode-extension/agent/impl/README.md)
+
+---
+
+## Development Statistics
+
+> Numbers as of May 2026, ~2 months after project start (March 2026).
+
+| Metric | Value |
+|---|---|
+| Project started | March 2026 |
+| Total commits | 549 |
+| Contributors | 1 (solo) |
+| TypeScript source files | 77 (extension) + 26 (`@sesam/core`) = **103** |
+| Test files | 21 |
+| DTL functions in registry | ~429 entries, 2,513 lines (`dtl-registry.ts`) |
+| Features tracked | ~30 |
+| Features implemented | ~25 |
+| Planning / spec prompt files | 37 (`agent/impl/` + `agent/plans/`) |
+
+---
+
+## Agentic Coding Insights
+
+This project was built almost entirely through **Copilot agent sessions** — not just code generation, but structured AI-driven development. Key observations:
+
+- **Spec-first discipline pays off** — writing `impl-fXX-*.prompt.md` before coding forces clarity on scope. The agent rarely went off-track when given a tight spec.
+- **Skills as reusable prompts** — packaging common workflows (TDD, LSP handler, DTL function) into `.agents/skills/` meant each new feature started from a consistent baseline, not from scratch.
+- **`README.md` as a live contract** — the feature tracking table in `agent/impl/README.md` doubled as the agent's task queue. "What's next?" became a reliable entrypoint that needed no human translation.
+- **One developer, ~550 commits in 2 months** — the velocity only made sense with agentic coding. The agent handled boilerplate, test scaffolding, and LSP wiring while the developer stayed at the design level.
+- **Trust boundaries matter** — the agent was trusted for implementation but the developer reviewed every diff. Architectural decisions (layer placement, shared code rules) were encoded in `copilot-instructions.md` so the agent wouldn't drift.
+- **Context files are load-bearing** — `copilot-instructions.md`, the skill files, and the spec files are not documentation after the fact. They are the mechanism that makes the agent work correctly.
 
 ---
 
