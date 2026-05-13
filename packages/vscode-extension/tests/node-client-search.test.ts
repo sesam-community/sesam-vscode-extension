@@ -166,19 +166,20 @@ describe("searchDatasetByText", () => {
 
   afterEach(() => server.close());
 
-  it("returns the first matching entity on a single-page result", async () => {
+  it("returns all matching entities on a single-page result", async () => {
     const page: Entity[] = [
       { _id: "e1", _ts: 1, name: "Alice" },
       { _id: "e2", _ts: 2, name: "Bob" },
     ];
     server.respond(200, page);
+    server.respond(200, []);
 
     const result = await searchDatasetByText(nodeUrl, JWT, DS, "alice");
 
-    expect(result).toEqual(page[0]);
+    expect(result).toEqual([page[0]]);
   });
 
-  it("returns null when no entity matches", async () => {
+  it("returns empty array when no entity matches", async () => {
     const page: Entity[] = [
       { _id: "e1", _ts: 1, name: "Alice" },
       { _id: "e2", _ts: 2, name: "Bob" },
@@ -188,7 +189,7 @@ describe("searchDatasetByText", () => {
 
     const result = await searchDatasetByText(nodeUrl, JWT, DS, "charlie");
 
-    expect(result).toBeNull();
+    expect(result).toEqual([]);
   });
 
   it("paginates and finds a match on page 2", async () => {
@@ -204,7 +205,7 @@ describe("searchDatasetByText", () => {
 
     const result = await searchDatasetByText(nodeUrl, JWT, DS, "needle");
 
-    expect(result).toEqual(page2[0]);
+    expect(result).toEqual([page2[0]]);
   });
 
   it("stops scanning once maxEntities is reached", async () => {
@@ -225,16 +226,16 @@ describe("searchDatasetByText", () => {
 
     const result = await searchDatasetByText(nodeUrl, JWT, DS, "needle", 100);
 
-    expect(result).toBeNull();
+    expect(result).toEqual([]);
     expect(requestCount).toBe(1);
   });
 
-  it("returns null when the dataset is empty", async () => {
+  it("returns empty array when the dataset is empty", async () => {
     server.respond(200, []);
 
     const result = await searchDatasetByText(nodeUrl, JWT, DS, "anything");
 
-    expect(result).toBeNull();
+    expect(result).toEqual([]);
   });
 
   it("propagates NodeApiError on server error", async () => {
