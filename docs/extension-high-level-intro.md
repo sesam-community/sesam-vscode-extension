@@ -9,6 +9,8 @@
 - [What It Is](#what-it-is)
 - [Core Capabilities](#core-capabilities)
 - [Architecture in a Nutshell](#architecture-in-a-nutshell)
+  - [Monorepo packages](#monorepo-packages)
+  - [Inside the extension](#inside-the-extension)
 - [Agentic Coding Workflow](#agentic-coding-workflow)
   - [Key files](#key-files)
   - [Available skills](#available-skills)
@@ -42,12 +44,21 @@
 
 ## Architecture in a Nutshell
 
+### Monorepo packages
+
+| Package | Name | Role |
+|---|---|---|
+| `packages/core/` | `@sesam/core` | Pure TypeScript library for all Sesam node operations (upload, download, run, test, diff, …). No CLI deps — all functions return typed objects. Bundled inside the VSIX so no `pip install` is ever needed. |
+| `packages/cli/` | `@sesam/cli` | Thin shell around `@sesam/core` using `commander`. Drop-in terminal replacement for `sesam-py`. NOT bundled in the VSIX — published separately for terminal users. |
+| `packages/vscode-extension/` | `dtl-language-support` | The VS Code extension itself (publisher: `bouvet`, distributed as a VSIX via GitHub Releases). |
+
+### Inside the extension
+
 | Layer | Path | Responsibility |
 |---|---|---|
 | **Client** | `client/src/` | VS Code API, commands, UI, webviews |
-| **LSP Server** | `server/src/` | Completions, hover, diagnostics, formatting, outline — separate Node.js process |
-| **Shared** | `src/shared/` | `dtl-registry.ts`, `dtl-evaluator.ts`, `config-formatter.ts` — no VS Code deps, used by both layers |
-| **`@sesam/core`** | `packages/core/` | Bundled inside the VSIX; eliminates the Python `sesam-py` dependency entirely |
+| **LSP Server** | `server/src/` | Completions, hover, diagnostics, formatting, outline — runs as a separate Node.js process, communicates with the client via IPC |
+| **Shared** | `src/shared/` | `dtl-registry.ts`, `dtl-evaluator.ts`, `config-formatter.ts` — no VS Code deps, imported by both client and server |
 
 > `config-formatter.ts` is imported by **both** client and server — never add VS Code API dependencies to it.
 
