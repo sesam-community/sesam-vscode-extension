@@ -101,6 +101,7 @@ const request = (
   body?: string,
   contentType = "application/json",
   logger?: NodeRequestLogger,
+  signal?: AbortSignal,
 ): Promise<string> =>
   new Promise((resolve, reject) => {
     const startMs = Date.now();
@@ -182,6 +183,17 @@ const request = (
       reject(new NodeNetworkError(msg));
     });
 
+    if (signal) {
+      signal.addEventListener(
+        "abort",
+        () => {
+          req.destroy();
+          reject(new NodeNetworkError("Request cancelled."));
+        },
+        { once: true },
+      );
+    }
+
     if (body !== undefined) {
       req.write(body, "utf8");
     }
@@ -242,6 +254,7 @@ export const previewPipe = async (
   pipeConfig: Record<string, unknown>,
   inputEntities: Entity[],
   logger?: NodeRequestLogger,
+  signal?: AbortSignal,
 ): Promise<Entity[]> => {
   const base = validateUrl(nodeUrl);
   const url = new URL(`/api/pipes/${encodeURIComponent(pipeId)}/preview`, base);
@@ -261,6 +274,7 @@ export const previewPipe = async (
     formBody,
     "application/x-www-form-urlencoded",
     logger,
+    signal,
   );
 
   const parsed: unknown = JSON.parse(responseText);
@@ -299,11 +313,57 @@ export const previewPipe = async (
   return [];
 };
 
+export interface DatasetStats {
+  /** Number of non-deleted entities (`runtime.count-index-exists`). */
+  totalCount: number;
+  /** Number of deleted entities (`runtime.count-index-deleted`). */
+  deletedCount: number;
+}
+
+/**
+ * Fetch dataset metadata with counts from `GET /api/datasets/{id}?verbose=true`.
+ *
+ * @throws {NodeAuthError}    HTTP 401/403
+ * @throws {NodeApiError}     HTTP 4xx/5xx
+ * @throws {NodeNetworkError} DNS/timeout/connection failure
+ */
+export const fetchDatasetStats = async (
+  nodeUrl: string,
+  jwt: string,
+  datasetId: string,
+  logger?: NodeRequestLogger,
+): Promise<DatasetStats> => {
+  const base = validateUrl(nodeUrl);
+  const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}`, base);
+
+  url.searchParams.set("verbose", "true");
+
+  const responseText = await request("GET", url, jwt, undefined, undefined, logger);
+  const data = JSON.parse(responseText) as Record<string, unknown>;
+  const runtime = (data["runtime"] ?? {}) as Record<string, unknown>;
+
+  return {
+    totalCount: Number(runtime["count-index-exists"] ?? 0),
+    deletedCount: Number(runtime["count-index-deleted"] ?? 0),
+  };
+};
+
+export interface FetchEntitiesOptions {
+  limit?: number;
+  since?: string | number;
+  reverse?: boolean;
+  deleted?: boolean;
+  history?: boolean;
+  uncommitted?: boolean;
+}
+
 /**
  * Fetch entities from a dataset on the node.
  *
- * @param since  The `_ts` value of the last received entity — used as a
- *               pagination cursor. Omit for the first page.
+ * @param options.since     Opaque cursor value (`_updated` offset) for pagination.
+ * @param options.reverse   When true, returns newest entities first.
+ * @param options.deleted   When false, excludes deleted entities (default API: true).
+ * @param options.history   When false, returns only the latest version (default API: true).
  * @throws {NodeAuthError}    HTTP 401/403
  * @throws {NodeApiError}     HTTP 4xx/5xx
  * @throws {NodeNetworkError} DNS/timeout/connection failure
@@ -312,12 +372,14 @@ export const fetchDatasetEntities = async (
   nodeUrl: string,
   jwt: string,
   datasetId: string,
-  limit = 50,
-  since?: string | number,
+  options: FetchEntitiesOptions = {},
   logger?: NodeRequestLogger,
+  signal?: AbortSignal,
 ): Promise<Entity[]> => {
   const base = validateUrl(nodeUrl);
   const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}/entities`, base);
+
+  const { limit = 50, since, reverse, deleted, history, uncommitted } = options;
 
   url.searchParams.set("limit", String(limit));
 
@@ -325,9 +387,133 @@ export const fetchDatasetEntities = async (
     url.searchParams.set("since", String(since));
   }
 
-  const responseText = await request("GET", url, jwt, undefined, undefined, logger);
+  if (reverse !== undefined) {
+    url.searchParams.set("reverse", String(reverse));
+  }
+
+  if (deleted !== undefined) {
+    url.searchParams.set("deleted", String(deleted));
+  }
+
+  if (history !== undefined) {
+    url.searchParams.set("history", String(history));
+  }
+
+  if (uncommitted !== undefined) {
+    url.searchParams.set("uncommitted", String(uncommitted));
+  }
+
+  const responseText = await request("GET", url, jwt, undefined, undefined, logger, signal);
 
   return JSON.parse(responseText) as Entity[];
+};
+
+/**
+ * Search for entities in a dataset by entity ID.
+ *
+ * API: GET {nodeUrl}/api/datasets/{datasetId}/search?id={encodedEntityId}
+ *
+ * @returns Array of matching entities (empty = no match).
+ * @throws {NodeAuthError}    HTTP 401/403
+ * @throws {NodeApiError}     HTTP 4xx/5xx
+ * @throws {NodeNetworkError} DNS/timeout/connection failure
+ */
+export const searchDatasetById = async (
+  nodeUrl: string,
+  jwt: string,
+  datasetId: string,
+  entityId: string,
+  logger?: NodeRequestLogger,
+  signal?: AbortSignal,
+): Promise<Entity[]> => {
+  const base = validateUrl(nodeUrl);
+  const url = new URL(`/api/datasets/${encodeURIComponent(datasetId)}/search`, base);
+
+  url.searchParams.set("id", entityId);
+
+  const responseText = await request("GET", url, jwt, undefined, undefined, logger, signal);
+
+  return JSON.parse(responseText) as Entity[];
+};
+
+/**
+ * Search for the first entity in a dataset whose JSON contains `query` as a
+ * case-insensitive substring. Pages through
+ * GET {nodeUrl}/api/datasets/{datasetId}/entities (200 per page) until a
+ * match is found or `maxEntities` are exhausted.
+ *
+ * @param maxEntities  Safety cap on total entities scanned (default 10 000).
+ * @returns The first matching entity, or `null` if no match is found.
+ * @throws {NodeAuthError}    HTTP 401/403
+ * @throws {NodeApiError}     HTTP 4xx/5xx
+ * @throws {NodeNetworkError} DNS/timeout/connection failure
+ */
+export const searchDatasetByText = async (
+  nodeUrl: string,
+  jwt: string,
+  datasetId: string,
+  query: string,
+  maxEntities = 10_000,
+  logger?: NodeRequestLogger,
+  signal?: AbortSignal,
+  onProgress?: (pct: number) => void,
+  total?: number,
+): Promise<Entity[]> => {
+  const lowerQuery = query.toLowerCase();
+  const pageSize = 200;
+  const totalPages = total && total > 0 ? Math.ceil(Math.min(total, maxEntities) / pageSize) : 0;
+  let scanned = 0;
+  let pagesDone = 0;
+  let since: string | number | undefined;
+  const matches: Entity[] = [];
+
+  while (scanned < maxEntities) {
+    const remaining = maxEntities - scanned;
+    const page = await fetchDatasetEntities(
+      nodeUrl,
+      jwt,
+      datasetId,
+      {
+        limit: Math.min(pageSize, remaining),
+        since,
+        deleted: false,
+        history: false,
+        uncommitted: false,
+      },
+      logger,
+      signal,
+    );
+
+    if (page.length === 0) {
+      break;
+    }
+
+    pagesDone += 1;
+
+    for (const entity of page) {
+      if (JSON.stringify(entity).toLowerCase().includes(lowerQuery)) {
+        matches.push(entity);
+      }
+    }
+
+    scanned += page.length;
+
+    const pct = totalPages > 0 ? Math.min(99, Math.round((pagesDone * 100) / totalPages)) : null;
+    onProgress?.(pct ?? pagesDone);
+
+    if (page.length < pageSize) {
+      break;
+    }
+
+    const last = page[page.length - 1];
+    since = (last["_updated"] ?? last["_ts"]) as number | undefined;
+
+    if (since === undefined) {
+      break;
+    }
+  }
+
+  return matches;
 };
 
 /**

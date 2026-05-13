@@ -98,7 +98,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 5px 10px;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -109,15 +109,15 @@
     }
     .copy-btn {
       font-size: 11px;
-      padding: 1px 6px;
+      padding: 2px 8px;
       cursor: pointer;
-      background: transparent;
-      color: var(--vscode-descriptionForeground);
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      opacity: 0.6;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: 1px solid var(--vscode-button-border, transparent);
+      border-radius: 3px;
+      opacity: 1;
     }
-    .copy-btn:hover { opacity: 1; background: var(--vscode-button-secondaryBackground); }
+    .copy-btn:hover { background: var(--vscode-button-secondaryHoverBackground, #3a3d41); }
     /* Shared font/padding for both the textarea and its highlight overlay */
     textarea, .output-box, .input-highlight {
       flex: 1;
@@ -215,6 +215,49 @@
       text-decoration: underline;
       margin-left: 8px;
     }
+    .find-widget {
+      position: fixed;
+      top: 44px;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 8px;
+      background: var(--vscode-editorWidget-background, #252526);
+      border: 1px solid var(--vscode-editorWidget-border, #454545);
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+      z-index: 200;
+      font-size: 12px;
+    }
+    .find-input {
+      width: 190px;
+      height: 22px;
+      padding: 0 6px;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, #555);
+      border-radius: 2px;
+      outline: none;
+      font-size: 12px;
+      font-family: var(--vscode-font-family);
+    }
+    .find-input:focus { border-color: var(--vscode-focusBorder); }
+    .find-label { font-size: 10px; opacity: 0.55; white-space: nowrap; }
+    .find-counter { font-size: 11px; opacity: 0.6; white-space: nowrap; min-width: 48px; text-align: center; }
+    .find-btn {
+      background: transparent;
+      border: none;
+      color: var(--vscode-foreground);
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 2px;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+    .find-btn:hover { background: var(--vscode-toolbar-hoverBackground); opacity: 1; }
+    mark.find-hl { background: rgba(255, 214, 0, 0.35); color: inherit; border-radius: 1px; }
+    mark.find-hl.find-current { background: rgba(255, 140, 0, 0.75); color: #000; }
     .status-bar {
       padding: 4px 12px;
       font-size: 11px;
@@ -235,6 +278,148 @@
       background: #3a2e00;
       border-top: 1px solid #5c4700;
     }
+    /* Search bar */
+    .search-bar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      background: var(--vscode-sideBar-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .search-bar.visible { display: flex; }
+    .search-bar-separator {
+      width: 1px;
+      height: 16px;
+      background: var(--vscode-panel-border);
+      flex-shrink: 0;
+    }
+    .search-radio-group { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .search-radio-group label { display: flex; align-items: center; gap: 3px; cursor: pointer; }
+    .search-input {
+      flex: 1;
+      min-width: 120px;
+      height: 22px;
+      padding: 0 6px;
+      font-size: 12px;
+      font-family: var(--vscode-font-family);
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, #555);
+      border-radius: 2px;
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--vscode-focusBorder); }
+    /* Fold controls */
+    .fold-toggle {
+      cursor: pointer;
+      user-select: none;
+      font-size: 10px;
+      color: var(--vscode-descriptionForeground);
+      margin-right: 3px;
+      display: inline-block;
+      width: 10px;
+    }
+    .fold-summary { color: var(--vscode-descriptionForeground); font-style: italic; display: none; }
+    .fold-key { color: rgb(80, 250, 123); }
+    .fold-str { color: rgb(241, 250, 140); }
+    .fold-prim { color: rgb(189, 147, 249); }
+    body.vscode-light .fold-key { color: rgb(49, 132, 149); }
+    body.vscode-light .fold-str { color: rgb(3, 106, 7); }
+    body.vscode-light .fold-prim { color: rgb(88, 92, 246); }
+    .fold-block { display: block; }
+    .fold-block.collapsed > .fold-body,
+    .fold-block.collapsed > .fold-close { display: none; }
+    .fold-block.collapsed .fold-summary { display: inline; }
+    .fold-block.collapsed .fold-toggle::before { content: '\25B6'; }
+    .fold-block:not(.collapsed) .fold-toggle::before { content: '\25BC'; }
+    /* Entities list pane */
+    .panes.has-entities { grid-template-columns: 220px 1fr 1fr; }
+    #entities-pane { display: none; }
+    #entities-pane.visible { display: flex; }
+    .entity-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0;
+    }
+    .entity-list-item {
+      padding: 5px 10px;
+      font-size: 12px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      cursor: pointer;
+      border-left: 2px solid transparent;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto;
+      row-gap: 1px;
+    }
+    .entity-list-item:hover { background: var(--vscode-list-hoverBackground); }
+    .entity-list-item.active {
+      background: var(--vscode-list-activeSelectionBackground);
+      color: var(--vscode-list-activeSelectionForeground);
+      border-left-color: var(--vscode-focusBorder);
+    }
+    .eli-ordinal {
+      grid-row: 1;
+      font-size: 10px;
+      opacity: 0.45;
+      user-select: none;
+      line-height: 1.3;
+    }
+    .eli-id {
+      grid-row: 2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.4;
+    }
+    .eli-ts {
+      grid-row: 3;
+      font-size: 11px;
+      opacity: 0.55;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+    .entity-list-item.active .eli-ts { opacity: 0.8; }
+    .entity-list-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px;
+      border-top: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .entity-list-pagination button {
+      padding: 1px 7px;
+      cursor: pointer;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-radius: 2px;
+      font-size: 11px;
+    }
+    .entity-list-pagination button:disabled { opacity: 0.35; cursor: default; }
+    .entity-mode-option {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .entity-mode-option input[type="radio"] { cursor: pointer; margin: 0; }
+    .entity-mode-count {
+      opacity: 0.65;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
@@ -246,12 +431,53 @@
     </div>
   </header>
 
+  <div class="search-bar" id="search-bar">
+    <label class="entity-mode-option" id="mode-latest-option" style="display:none">
+      <input type="radio" name="entity-mode" value="latest" checked onchange="onEntityModeChange()">
+      All latest <span class="entity-mode-count" id="mode-latest-count"></span>
+    </label>
+    <label class="entity-mode-option" id="mode-deleted-option" style="display:none">
+      <input type="radio" name="entity-mode" value="deleted" onchange="onEntityModeChange()">
+      All with deleted <span class="entity-mode-count" id="mode-deleted-count"></span>
+    </label>
+    <div class="search-bar-separator" id="entity-mode-separator" style="display:none"></div>
+    <div class="search-radio-group">
+      <label><input type="radio" name="search-type" value="id" checked> Id</label>
+      <label><input type="radio" name="search-type" value="text"> Text</label>
+    </div>
+    <input class="search-input" id="search-input" type="text" placeholder="Search entities…">
+    <button class="btn btn-secondary" id="search-clear-btn" onclick="clearSearch()" title="Clear">✕</button>
+    <button class="btn btn-primary" id="search-btn" onclick="doSearch()">Search</button>
+  </div>
+
   <div class="panes">
+    <!-- Entities list -->
+    <div class="pane" id="entities-pane">
+      <div class="pane-header">
+        <span>Entities</span>
+        <span id="entity-list-label" style="font-size:10px;font-weight:normal;text-transform:none;letter-spacing:0;opacity:0.7"></span>
+      </div>
+
+      <div style="flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column">
+        <div class="entity-list" id="entity-list"></div>
+        <div class="input-loading-overlay" id="entity-list-loading">
+          <div class="spinner-icon"></div>
+        </div>
+      </div>
+      <div class="entity-list-pagination" id="entity-list-pagination" style="display:none">
+        <button id="el-prev-btn" onclick="entityListPrevPage()" disabled>&#9664;</button>
+        <span id="el-page-label"></span>
+        <button id="el-next-btn" onclick="entityListNextPage()">&#9654;</button>
+      </div>
+    </div>
+
     <!-- Input Entity -->
     <div class="pane">
       <div class="pane-header">
         <span>Input Entity (_S)</span>
-        <button class="copy-btn" onclick="copyInput()">⧉ Copy</button>
+        <div style="display:flex;gap:4px">
+          <button class="copy-btn" onclick="copyInput()" title="Copy to clipboard">⧉ Copy</button>
+        </div>
       </div>
       <div id="entity-nav" class="entity-nav">
         <button id="prev-btn" onclick="prevEntity()">&#9664;</button>
@@ -265,7 +491,7 @@
           <span>Loading entities…</span>
         </div>
         <div class="input-highlight" id="input-highlight"></div>
-        <textarea id="input-entity" spellcheck="false" placeholder='{\n  "_id": "example-1",\n  "name": "Alice"\n}'>{
+        <textarea id="input-entity" spellcheck="false" placeholder='{&#10;  "_id": "example-1",&#10;  "name": "Alice"&#10;}'>{
   "_id": "example-1",
   "name": "Alice",
   "status": "active"
@@ -277,7 +503,10 @@
     <div class="pane">
       <div class="pane-header">
         <span>Output Entity (_T)</span>
-        <button class="copy-btn" id="copy-output-btn" onclick="copyOutput()">⧉ Copy</button>
+        <div style="display:flex;gap:4px">
+          <button class="copy-btn" id="fold-output-btn" onclick="toggleFoldAll('output')" style="display:none" title="Collapse all ranges">⊟ Fold all</button>
+          <button class="copy-btn" id="copy-output-btn" onclick="copyOutput()" title="Copy to clipboard">⧉ Copy</button>
+        </div>
       </div>
       <div class="output-wrapper">
         <div class="output-box" id="output-box" style="color: var(--vscode-descriptionForeground);">
@@ -295,12 +524,246 @@
   <div class="error-banner" id="error-banner"></div>
   <div class="status-bar" id="status-bar">Ready.</div>
 
+  <!-- In-pane find widget (Ctrl+F on output) -->
+  <div id="find-widget" class="find-widget" style="display:none">
+    <span id="find-label" class="find-label"></span>
+    <input id="find-input-box" class="find-input" type="text" placeholder="Find…">
+    <span id="find-counter" class="find-counter"></span>
+    <button class="find-btn" onclick="findNavigate(-1)" title="Previous (Shift+Enter)">↑</button>
+    <button class="find-btn" onclick="findNavigate(1)" title="Next (Enter)">↓</button>
+    <button class="find-btn" onclick="closeFindWidget()" title="Close (Escape)">✕</button>
+  </div>
+
   <script>
     const vscode = acquireVsCodeApi();
 
+    const ENTITY_LIST_MAX = 50;
+
     let embeddedEntities = [];
     let entityIndex = 0;
+    let entityPage = 0;       // current page index for client-side pagination
+    let entitySource = null;  // 'embedded' | 'testdata' | 'node' | null
+    let pageStack = [];       // cursors for server-side back navigation
+    let currentHasMore = false; // whether a next server-side page exists
+    let currentCursor = undefined; // cursor used to fetch the current server-side page
+    let datasetTotalCount = 0;    // runtime.count-index-exists
+    let datasetDeletedCount = 0;  // runtime.count-index-deleted
+    let showDeleted = false;      // current mode: false = latest only, true = with deleted
     let lastOutputText = null;
+    let outputFoldedAll = false;
+
+    // ── In-pane find widget ──────────────────────────────────────────────────
+
+    let findTarget = null; // 'input' | 'output'
+    let findNodes = [];    // array of <mark> elements
+    let findIdx = 0;
+
+    function openFindWidget(target) {
+      findTarget = target;
+      document.getElementById('find-label').textContent = target === 'input' ? 'Input  ' : 'Output  ';
+      document.getElementById('find-widget').style.display = 'flex';
+      const inp = document.getElementById('find-input-box');
+      inp.focus();
+      inp.select();
+      runFind();
+    }
+
+    function closeFindWidget() {
+      clearFindHighlights();
+      document.getElementById('find-widget').style.display = 'none';
+      document.getElementById('find-counter').textContent = '';
+      findTarget = null;
+    }
+
+    function runFind() {
+      const query = document.getElementById('find-input-box').value;
+      clearFindHighlights();
+
+      if (!query || !findTarget) {
+        document.getElementById('find-counter').textContent = '';
+        return;
+      }
+
+      const container = document.getElementById('output-box');
+
+      findNodes = highlightInContainer(container, query);
+      findIdx = 0;
+      updateFindCurrent();
+      updateFindCounter();
+    }
+
+    function clearFindHighlights() {
+      document.querySelectorAll('mark.find-hl').forEach((m) => {
+        const parent = m.parentNode;
+
+        while (m.firstChild) {
+          parent.insertBefore(m.firstChild, m);
+        }
+
+        parent.removeChild(m);
+        parent.normalize();
+      });
+      findNodes = [];
+    }
+
+    function highlightInContainer(container, query) {
+      const marks = [];
+      const lq = query.toLowerCase();
+      walkTextNodes(container, (node) => {
+        const text = node.textContent;
+        const lower = text.toLowerCase();
+        const parts = [];
+        let idx = 0;
+        let pos;
+
+        while ((pos = lower.indexOf(lq, idx)) !== -1) {
+          if (pos > idx) { parts.push(document.createTextNode(text.slice(idx, pos))); }
+          const mark = document.createElement('mark');
+          mark.className = 'find-hl';
+          mark.textContent = text.slice(pos, pos + query.length);
+          parts.push(mark);
+          marks.push(mark);
+          idx = pos + query.length;
+        }
+
+        if (parts.length === 0) { return; }
+
+        if (idx < text.length) { parts.push(document.createTextNode(text.slice(idx))); }
+
+        const parent = node.parentNode;
+        parts.forEach((p) => parent.insertBefore(p, node));
+        parent.removeChild(node);
+      });
+      return marks;
+    }
+
+    function walkTextNodes(node, fn) {
+      if (node.nodeName === 'MARK') { return; }
+
+      if (node.nodeType === Node.TEXT_NODE) {
+        fn(node);
+        return;
+      }
+
+      Array.from(node.childNodes).forEach((child) => walkTextNodes(child, fn));
+    }
+
+    function updateFindCurrent() {
+      findNodes.forEach((m, i) => m.classList.toggle('find-current', i === findIdx));
+
+      if (findNodes[findIdx]) {
+        findNodes[findIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
+    function updateFindCounter() {
+      document.getElementById('find-counter').textContent =
+        findNodes.length === 0 ? 'No results' : (findIdx + 1) + ' / ' + findNodes.length;
+    }
+
+    function findNavigate(dir) {
+      if (findNodes.length === 0) { return; }
+      findIdx = (findIdx + dir + findNodes.length) % findNodes.length;
+      updateFindCurrent();
+      updateFindCounter();
+    }
+
+    document.getElementById('find-input-box').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        findNavigate(e.shiftKey ? -1 : 1);
+      } else if (e.key === 'Escape') {
+        closeFindWidget();
+      }
+    });
+
+    document.getElementById('find-input-box').addEventListener('input', runFind);
+
+    // ── Search ────────────────────────────────────────────────────────────────
+
+    function showEntityListLoading(show) {
+      const el = document.getElementById('entity-list-loading');
+      el.classList.toggle('visible', show);
+    }
+
+    function doSearch() {
+      const query = document.getElementById('search-input').value.trim();
+
+      if (!query) {
+        return;
+      }
+
+      const searchType = document.querySelector('input[name="search-type"]:checked').value;
+      setSearchStatus('', false);
+      const btn = document.getElementById('search-btn');
+      btn.textContent = '■ Stop';
+      btn.onclick = stopSearch;
+
+      // Clear input and output panes
+      const inputEl = document.getElementById('input-entity');
+      inputEl.value = '';
+      syncHighlight();
+      document.getElementById('entity-nav').style.display = 'none';
+      clearOutput();
+      document.getElementById('fold-output-btn').style.display = 'none';
+      setSpinner(false);
+
+      // Clear entities pane and show loader
+      embeddedEntities = [];
+      entityIndex = 0;
+      document.getElementById('entity-list').innerHTML = '';
+      document.getElementById('entity-list-label').textContent = '';
+      document.getElementById('entity-list-pagination').style.display = 'none';
+      document.getElementById('entities-pane').classList.add('visible');
+      document.querySelector('.panes').classList.add('has-entities');
+      showEntityListLoading(true);
+
+      vscode.postMessage({ type: 'searchEntity', searchType, query });
+    }
+
+    function clearSearch() {
+      document.getElementById('search-input').value = '';
+      setSearchStatus('', false);
+
+      if (entitySource === 'search') {
+        // Reload the entity list from the node using the current mode
+        entitySource = 'node';
+        pageStack = [];
+        currentCursor = undefined;
+        updateEntityModeBar();
+        vscode.postMessage({ type: 'fetchEntityPage', deleted: showDeleted });
+      }
+    }
+
+    function setSearchStatus(text, isError) {
+      const bar = document.getElementById('status-bar');
+
+      if (!text) {
+        return;
+      }
+
+      bar.className = 'status-bar' + (isError ? ' error' : ' loading');
+      bar.textContent = text;
+    }
+
+    function resetSearchBtn() {
+      const btn = document.getElementById('search-btn');
+      btn.textContent = 'Search';
+      btn.onclick = doSearch;
+    }
+
+    function stopSearch() {
+      vscode.postMessage({ type: 'stopSearch' });
+      resetSearchBtn();
+      setSearchStatus('Stopping\u2026', false);
+    }
+
+    document.getElementById('search-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doSearch();
+      }
+    });
 
     // ── Entity navigation ────────────────────────────────────────────────────
 
@@ -330,13 +793,212 @@
       syncHighlight();
       clearOutput();
 
+      // Sync active highlight in entity list
+      document.querySelectorAll('.entity-list-item').forEach((el) => {
+        const active = Number(el.dataset.idx) === entityIndex;
+        el.classList.toggle('active', active);
+
+        if (active) {
+          el.scrollIntoView({ block: 'nearest' });
+        }
+      });
+
       runEval();
+    }
+
+    function updateEntityModeBar() {
+      const isNode = entitySource === 'node';
+      const displayVal = isNode ? '' : 'none';
+
+      document.getElementById('mode-latest-option').style.display = displayVal;
+      document.getElementById('mode-deleted-option').style.display = displayVal;
+      document.getElementById('entity-mode-separator').style.display = isNode ? '' : 'none';
+
+      if (!isNode) { return; }
+
+      const latestCount = document.getElementById('mode-latest-count');
+      const deletedCount = document.getElementById('mode-deleted-count');
+
+      latestCount.textContent = datasetTotalCount > 0 ? '(' + datasetTotalCount + ')' : '';
+      deletedCount.textContent = (datasetTotalCount > 0 || datasetDeletedCount > 0)
+        ? '(' + (datasetTotalCount + datasetDeletedCount) + ' / ' + datasetDeletedCount + ' deleted)'
+        : '';
+
+      // Sync radio to current state
+      const radios = document.querySelectorAll('input[name="entity-mode"]');
+      radios.forEach((r) => { r.checked = (r.value === 'deleted') === showDeleted; });
+    }
+
+    function onEntityModeChange() {
+      showDeleted = document.querySelector('input[name="entity-mode"]:checked').value === 'deleted';
+      pageStack = [];
+      currentCursor = undefined;
+      vscode.postMessage({ type: 'fetchEntityPage', deleted: showDeleted });
+    }
+
+    function entityListPrevPage() {
+      if (entitySource === 'node') {
+        if (pageStack.length > 0) {
+          currentCursor = pageStack.pop();
+          vscode.postMessage({ type: 'fetchEntityPage', cursor: currentCursor, deleted: showDeleted });
+        }
+      } else {
+        if (entityPage > 0) { entityPage--; renderEntityList(); }
+      }
+    }
+
+    function entityListNextPage() {
+      if (entitySource === 'node') {
+        if (currentHasMore && embeddedEntities.length > 0) {
+          const last = embeddedEntities[embeddedEntities.length - 1];
+          const nextCursor = last ? Number(last['_updated']) : undefined;
+          pageStack.push(currentCursor);
+          currentCursor = nextCursor;
+          vscode.postMessage({ type: 'fetchEntityPage', cursor: nextCursor, deleted: showDeleted });
+        }
+      } else {
+        const sortedLen = embeddedEntities.length;
+        const totalPages = Math.ceil(sortedLen / ENTITY_LIST_MAX);
+        if (entityPage < totalPages - 1) { entityPage++; renderEntityList(); }
+      }
+    }
+
+    function renderEntityList(activeIdx) {
+      const list = document.getElementById('entity-list');
+      const label = document.getElementById('entity-list-label');
+      const pane = document.getElementById('entities-pane');
+      const panes = document.querySelector('.panes');
+
+      if (embeddedEntities.length === 0) {
+        pane.classList.remove('visible');
+        panes.classList.remove('has-entities');
+        list.innerHTML = '';
+        label.textContent = '';
+        return;
+      }
+
+      pane.classList.add('visible');
+      panes.classList.add('has-entities');
+
+      const pagination = document.getElementById('entity-list-pagination');
+      const pageLabel = document.getElementById('el-page-label');
+      let displayIndices;
+      let totalForMode = 0; // used for ordinal calculation in node mode
+
+      if (entitySource === 'node') {
+        // Server-side pagination: entities are already the current page, no sorting
+        displayIndices = Array.from({ length: embeddedEntities.length }, (_, i) => i);
+
+        const hasPrev = pageStack.length > 0;
+        const hasNext = currentHasMore;
+
+        if (hasPrev || hasNext) {
+          pagination.style.display = 'flex';
+          const totalForLabel = showDeleted ? datasetTotalCount + datasetDeletedCount : datasetTotalCount;
+          const totalPages = totalForLabel > 0 ? Math.ceil(totalForLabel / ENTITY_LIST_MAX) : '?';
+          pageLabel.textContent = 'page ' + (pageStack.length + 1) + ' / ' + totalPages;
+          document.getElementById('el-prev-btn').disabled = !hasPrev;
+          document.getElementById('el-next-btn').disabled = !hasNext;
+        } else {
+          pagination.style.display = 'none';
+        }
+
+        totalForMode = showDeleted ? datasetTotalCount + datasetDeletedCount : datasetTotalCount;
+        label.textContent = String(embeddedEntities.length);
+      } else {
+        // Client-side pagination: sort by _ts desc and slice
+        const total = embeddedEntities.length;
+        const totalPages = Math.ceil(total / ENTITY_LIST_MAX);
+
+        const allSorted = Array.from({ length: total }, (_, i) => i)
+          .sort((a, b) => {
+            const ta = Number(embeddedEntities[a]['_ts'] ?? 0);
+            const tb = Number(embeddedEntities[b]['_ts'] ?? 0);
+            return tb - ta;
+          });
+
+        if (entityPage >= totalPages) { entityPage = Math.max(0, totalPages - 1); }
+
+        const pageStart = entityPage * ENTITY_LIST_MAX;
+        displayIndices = allSorted.slice(pageStart, pageStart + ENTITY_LIST_MAX);
+
+        if (totalPages > 1) {
+          pagination.style.display = 'flex';
+          pageLabel.textContent = (entityPage + 1) + ' / ' + totalPages;
+          document.getElementById('el-prev-btn').disabled = entityPage === 0;
+          document.getElementById('el-next-btn').disabled = entityPage === totalPages - 1;
+        } else {
+          pagination.style.display = 'none';
+        }
+
+        const shown = displayIndices.length;
+        label.textContent = total > ENTITY_LIST_MAX
+          ? (pageStart + 1) + '–' + (pageStart + shown) + ' of ' + total
+          : String(total);
+      }
+
+      const active = activeIdx ?? entityIndex;
+      list.innerHTML = '';
+
+      displayIndices.forEach((origIdx) => {
+        const entity = embeddedEntities[origIdx];
+        const id = entity['_id'] != null ? String(entity['_id']) : '#' + (origIdx + 1);
+        const ts = entity['_ts'] != null ? formatTs(entity['_ts']) : '';
+
+        const item = document.createElement('div');
+        item.className = 'entity-list-item' + (origIdx === active ? ' active' : '');
+        item.title = id + (ts ? '\n' + ts : '');
+        item.dataset.idx = String(origIdx);
+        item.addEventListener('click', () => {
+          entityIndex = origIdx;
+          showEntity();
+        });
+
+        const ordinal = document.createElement('span');
+        ordinal.className = 'eli-ordinal';
+
+        if (entitySource === 'node' && totalForMode > 0) {
+          // Ordinal counts down from the dataset total for the current mode
+          ordinal.textContent = '#' + String(totalForMode - pageStack.length * ENTITY_LIST_MAX - origIdx);
+        } else {
+          ordinal.textContent = '#' + String(origIdx + 1);
+        }
+
+        const idEl = document.createElement('span');
+        idEl.className = 'eli-id';
+        idEl.textContent = id;
+
+        const tsEl = document.createElement('span');
+        tsEl.className = 'eli-ts';
+        tsEl.textContent = ts;
+
+        item.appendChild(ordinal);
+        item.appendChild(idEl);
+        item.appendChild(tsEl);
+        list.appendChild(item);
+      });
+    }
+
+    function formatTs(ts) {
+      try {
+        // _ts is a Unix timestamp in microseconds in Sesam
+        const ms = typeof ts === 'number' ? Math.round(ts / 1000) : Number(ts);
+        const d = new Date(ms);
+        if (isNaN(d.getTime())) { return String(ts); }
+        const pad = (n) => String(n).padStart(2, '0');
+        return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear()
+          + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+      } catch {
+        return String(ts);
+      }
     }
 
     // ── Evaluation ───────────────────────────────────────────────────────────
 
     function runEval() {
       const inputJson = document.getElementById('input-entity').value;
+      document.getElementById('status-bar').className = 'status-bar loading';
+      setSpinner(true);
       vscode.postMessage({ type: 'evaluate', inputJson });
     }
 
@@ -344,6 +1006,11 @@
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         runEval();
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        openFindWidget('input');
       }
     });
 
@@ -366,6 +1033,22 @@
     // Initial render
     syncHighlight();
 
+    // Ctrl+S on output-box opens find widget for output
+    document.getElementById('output-box').setAttribute('tabindex', '0');
+    document.getElementById('output-box').addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        openFindWidget('output');
+      }
+    });
+
+    // Global Escape closes find widget
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('find-widget').style.display !== 'none') {
+        closeFindWidget();
+      }
+    });
+
     function openSettings() {
       vscode.postMessage({ type: 'openSettings' });
     }
@@ -385,6 +1068,9 @@
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    let _evalTimerInterval = null;
+    let _evalStartMs = 0;
+
     function setErrorBanner(html) {
       const banner = document.getElementById('error-banner');
       banner.innerHTML = html;
@@ -393,10 +1079,20 @@
 
     function setSpinner(visible) {
       const overlay = document.getElementById('spinner');
+      overlay.classList.toggle('visible', visible);
+
+      clearInterval(_evalTimerInterval);
+      _evalTimerInterval = null;
+
       if (visible) {
-        overlay.classList.add('visible');
-      } else {
-        overlay.classList.remove('visible');
+        _evalStartMs = Date.now();
+        const statusBar = document.getElementById('status-bar');
+        const tick = () => {
+          const s = ((Date.now() - _evalStartMs) / 1000).toFixed(1);
+          statusBar.textContent = '\u27f3 Evaluating on node\u2026 ' + s + 's';
+        };
+        tick();
+        _evalTimerInterval = setInterval(tick, 100);
       }
     }
 
@@ -404,12 +1100,124 @@
       return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
+    // ── Foldable JSON renderer ───────────────────────────────────────────────
+
+    function renderFoldableJson(value, indent) {
+      const frag = document.createDocumentFragment();
+
+      if (value === null || typeof value !== 'object') {
+        frag.appendChild(colorPrimitive(value));
+        return frag;
+      }
+
+      const isArray = Array.isArray(value);
+      const entries = isArray
+        ? value.map((v, i) => [i, v])
+        : Object.entries(value);
+      const open = isArray ? '[' : '{';
+      const close = isArray ? ']' : '}';
+
+      if (entries.length === 0) {
+        const empty = document.createTextNode(open + close);
+        frag.appendChild(empty);
+        return frag;
+      }
+
+      const block = document.createElement('div');
+      block.className = 'fold-block';
+
+      // header line: toggle + open bracket + summary
+      const headerLine = document.createElement('span');
+      const toggle = document.createElement('span');
+      toggle.className = 'fold-toggle';
+      toggle.title = 'Collapse';
+      toggle.addEventListener('click', () => toggleFold(block));
+
+      const openText = document.createTextNode(open);
+      const summary = document.createElement('span');
+      summary.className = 'fold-summary';
+      summary.textContent = ' … ' + close;
+
+      headerLine.appendChild(toggle);
+      headerLine.appendChild(openText);
+      headerLine.appendChild(summary);
+
+      // body
+      const body = document.createElement('div');
+      body.className = 'fold-body';
+      body.style.paddingLeft = '14px';
+
+      entries.forEach(([key, val], idx) => {
+        const line = document.createElement('div');
+
+        if (!isArray) {
+          const keySpan = document.createElement('span');
+          keySpan.className = 'fold-key';
+          keySpan.textContent = JSON.stringify(String(key));
+          line.appendChild(keySpan);
+          line.appendChild(document.createTextNode(': '));
+        }
+
+        line.appendChild(renderFoldableJson(val, indent + 1));
+
+        if (idx < entries.length - 1) {
+          line.appendChild(document.createTextNode(','));
+        }
+
+        body.appendChild(line);
+      });
+
+      const closeLine = document.createElement('span');
+      closeLine.className = 'fold-close';
+      closeLine.textContent = close;
+
+      block.appendChild(headerLine);
+      block.appendChild(body);
+      block.appendChild(closeLine);
+      frag.appendChild(block);
+      return frag;
+    }
+
+    function colorPrimitive(value) {
+      const span = document.createElement('span');
+
+      if (typeof value === 'string') {
+        span.className = 'fold-str';
+        span.textContent = JSON.stringify(value);
+      } else {
+        span.className = 'fold-prim';
+        span.textContent = String(value);
+      }
+
+      return span;
+    }
+
+    function toggleFold(blockEl) {
+      blockEl.classList.toggle('collapsed');
+      const toggle = blockEl.querySelector('.fold-toggle');
+
+      if (toggle) {
+        toggle.title = blockEl.classList.contains('collapsed') ? 'Expand' : 'Collapse';
+      }
+    }
+
+    function toggleFoldAll(pane) {
+      const container = document.getElementById('output-box');
+      const btn = document.getElementById('fold-output-btn');
+      const blocks = container ? container.querySelectorAll('.fold-block') : [];
+
+      if (outputFoldedAll) {
+        blocks.forEach((b) => b.classList.remove('collapsed'));
+        if (btn) { btn.textContent = '⊟ Fold all'; }
+        outputFoldedAll = false;
+      } else {
+        blocks.forEach((b) => b.classList.add('collapsed'));
+        if (btn) { btn.textContent = '⊞ Expand all'; }
+        outputFoldedAll = true;
+      }
+    }
+
     function colorizeJson(json) {
-      // Tokenize JSON into: keys (green), string values (yellow),
-      // and everything else — numbers, booleans, null, brackets, braces,
-      // commas, colons (purple in dark / blue in light).
-      // Structural tokens (braces, brackets, commas, colons, null) also carry
-      // the `json-structural` class so light mode can colour them separately.
       const re = /("(?:\\u[0-9a-fA-F]{4}|\\[^u]|[^\\"])*")(\s*:)?|\b(true|false)\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|[{}\[\],]/g;
       let out = '';
       let last = 0;
@@ -419,19 +1227,15 @@
         last = re.lastIndex;
         const token = m[0];
         if (m[1] !== undefined) {
-          // quoted string
           if (m[2] !== undefined) {
-            // object key + colon
             out += '<span class="json-key">' + escHtml(m[1]) + '</span>'
                  + '<span class="json-punct json-structural">' + escHtml(m[2]) + '</span>';
           } else {
             out += '<span class="json-str">' + escHtml(token) + '</span>';
           }
         } else if (token === 'null' || token === '{' || token === '}' || token === '[' || token === ']' || token === ',') {
-          // structural: braces, brackets, commas, null
           out += '<span class="json-punct json-structural">' + escHtml(token) + '</span>';
         } else {
-          // boolean, number — value punctuation
           out += '<span class="json-punct">' + escHtml(token) + '</span>';
         }
       }
@@ -444,8 +1248,77 @@
     window.addEventListener('message', (event) => {
       const msg = event.data;
 
+      if (msg.type === 'searchResult') {
+        resetSearchBtn();
+        showEntityListLoading(false);
+        setSearchStatus('Search complete (' + msg.entities.length + ' found)', false);
+
+        embeddedEntities = msg.entities;
+        entityIndex = 0;
+        entitySource = 'search';
+        pageStack = [];
+        currentCursor = undefined;
+        currentHasMore = false;
+        entityPage = 0;
+        updateEntityModeBar();
+
+        const label = document.getElementById('entity-list-label');
+        label.textContent = msg.entities.length > 0 ? String(msg.entities.length) : '';
+
+        const nav = document.getElementById('entity-nav');
+        nav.style.display = 'none';
+
+        renderEntityList(0);
+
+        if (embeddedEntities.length > 0) {
+          entityIndex = 0;
+          showEntity();
+        }
+
+        return;
+      }
+
+      if (msg.type === 'searchNoMatch') {
+        resetSearchBtn();
+        showEntityListLoading(false);
+        setSearchStatus('Search complete (0 found)', false);
+
+        // Show empty state in entity list
+        const list = document.getElementById('entity-list');
+        list.innerHTML = '<div style="padding:16px 12px;font-size:11px;opacity:0.5;font-family:var(--vscode-font-family)">No results found.</div>';
+        document.getElementById('entity-list-label').textContent = '0';
+        document.getElementById('entity-list-pagination').style.display = 'none';
+        return;
+      }
+
+      if (msg.type === 'searchLoading') {
+        setSearchStatus('Searching…', false);
+        return;
+      }
+
+      if (msg.type === 'searchProgress') {
+        const pctStr = msg.pct !== null ? ' (' + msg.pct + '%)' : '';
+        setSearchStatus('Searching…' + pctStr, false);
+        return;
+      }
+
+      if (msg.type === 'searchError') {
+        resetSearchBtn();
+        showEntityListLoading(false);
+        setSearchStatus(msg.message ?? 'Search error', true);
+        return;
+      }
+
       if (msg.type === 'documentState') {
         document.getElementById('file-name').textContent = msg.fileName;
+
+        const searchBar = document.getElementById('search-bar');
+
+        if (msg.sourceDataset) {
+          searchBar.classList.add('visible');
+        } else {
+          searchBar.classList.remove('visible');
+        }
         const inputLoader = document.getElementById('input-loading-overlay');
         if (msg.loadingEntities) {
           inputLoader.classList.add('visible');
@@ -456,10 +1329,23 @@
         if (msg.loadingEntities) { return; }
         embeddedEntities = msg.entities ?? [];
         entityIndex = 0;
+        entitySource = msg.entitySource ?? null;
+        pageStack = [];
+        currentCursor = undefined;
+        currentHasMore = msg.hasMore ?? false;
+        entityPage = 0;
+        showDeleted = false;
+
+        // Update dataset stats and mode bar
+        if (msg.totalCount != null) { datasetTotalCount = msg.totalCount; }
+        if (msg.deletedCount != null) { datasetDeletedCount = msg.deletedCount; }
+        updateEntityModeBar();
+
         const nav = document.getElementById('entity-nav');
         const sourceLabel = document.getElementById('entity-source');
         nav.style.display = embeddedEntities.length > 0 ? 'flex' : 'none';
         sourceLabel.textContent = msg.entitySource ? '(' + msg.entitySource + ')' : '';
+        renderEntityList();
         if (embeddedEntities.length > 0) { showEntity(); } else { runEval(); }
         if (msg.resetOutput) {
           const outputBox = document.getElementById('output-box');
@@ -475,6 +1361,24 @@
         return;
       }
 
+      if (msg.type === 'entityPage') {
+        // Update stats only when provided (first page requests include them)
+        if (msg.totalCount != null) { datasetTotalCount = msg.totalCount; }
+        if (msg.deletedCount != null) { datasetDeletedCount = msg.deletedCount; }
+        updateEntityModeBar();
+
+        embeddedEntities = msg.entities ?? [];
+        currentHasMore = msg.hasMore ?? false;
+        entityIndex = 0;
+        const nav = document.getElementById('entity-nav');
+        nav.style.display = embeddedEntities.length > 0 ? 'flex' : 'none';
+        renderEntityList();
+
+        if (embeddedEntities.length > 0) { showEntity(); }
+
+        return;
+      }
+
       if (msg.type === 'autoEvaluate') {
         runEval();
         return;
@@ -484,7 +1388,6 @@
         setSpinner(true);
         setErrorBanner('');
         document.getElementById('status-bar').className = 'status-bar loading';
-        document.getElementById('status-bar').textContent = '⟳ Evaluating on node…';
         document.getElementById('warnings-box').style.display = 'none';
         document.getElementById('warnings-box').innerHTML = '';
         return;
@@ -503,9 +1406,13 @@
           statusBar.textContent = '✓ Entity discarded.';
           lastOutputText = null;
         } else {
-          const text = JSON.stringify(msg.output.length === 1 ? msg.output[0] : msg.output, null, 2);
-          outputBox.innerHTML = colorizeJson(text);
+          const outputValue = msg.output.length === 1 ? msg.output[0] : msg.output;
+          const text = JSON.stringify(outputValue, null, 2);
+          outputBox.innerHTML = '';
+          outputBox.appendChild(renderFoldableJson(outputValue, 0));
           lastOutputText = text;
+          document.getElementById('fold-output-btn').style.display = '';
+          outputFoldedAll = false;
           statusBar.className = 'status-bar ok';
           const count = msg.output.length;
           statusBar.textContent = '✓ ' + count + (count === 1 ? ' entity.' : ' entities.');
@@ -560,6 +1467,21 @@
           warningsBox.style.display = 'none';
           warningsBox.innerHTML = '';
         }
+        return;
+      }
+
+      if (msg.type === 'searchStopped') {
+        resetSearchBtn();
+        showEntityListLoading(false);
+        setSearchStatus('Search stopped.', false);
+        return;
+      }
+
+      if (msg.type === 'evalStopped') {
+        setSpinner(false);
+        const statusBar = document.getElementById('status-bar');
+        statusBar.className = 'status-bar';
+        statusBar.textContent = 'Evaluation stopped.';
         return;
       }
 
