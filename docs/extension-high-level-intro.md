@@ -95,13 +95,12 @@ The project is built with Copilot-driven development in mind. Everything is docu
 
 ### Typical agentic flow
 
-1. Open `agent/impl/README.md` — find the feature you want to work on
-2. Read the corresponding `impl-fXX-*.prompt.md` spec
-3. Ask Copilot: _"Implement F19 using the impl-feature skill"_
-4. Agent reads the spec, implements, writes tests, updates `README.md` status to `implemented`
+1. Ask Copilot: **"What's next?"**
+2. Agent reads [`agent/impl/README.md`](../packages/vscode-extension/agent/impl/README.md), finds the highest-priority feature still marked `planned`, and reads its spec
+3. Agent proposes (or immediately starts) the implementation
+4. Agent writes tests and updates `README.md` status to `implemented`
 
-A common shortcut is simply asking: **"What's next?"**
-The agent then reads [`agent/impl/README.md`](../packages/vscode-extension/agent/impl/README.md), finds the highest-priority feature still marked `planned`, reads its spec, and proposes (or immediately starts) the implementation — no manual lookup needed.
+You can also target a specific feature: _"Implement F19 using the impl-feature skill"_ — the agent goes straight to that spec.
 
 ---
 
