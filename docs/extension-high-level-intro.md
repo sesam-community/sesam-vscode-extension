@@ -40,6 +40,8 @@
 - **Profiles** — secure credential management, workspace-scoped profiles, safe profile switching
 - **Copilot `@sesam` agent** — LM Tools API + custom Copilot Chat participant
 
+> For a guided walkthrough of all features with demo steps, see [docs/team-intro-session.md](team-intro-session.md).
+
 ---
 
 ## Architecture in a Nutshell
