@@ -31,7 +31,7 @@
 ## Core Capabilities
 
 - **DTL language support** — syntax highlighting, autocompletion, hover docs, linting, formatter
-- **Config file intelligence** — `.conf.pipe` / `.conf.system` file types, auto-format on save, key-order-preserving formatter
+- **Config file intelligence** — auto-format on save, key-order-preserving formatter
 - **Node connectivity** — upload/download/run/verify commands, live updates via Socket.IO, status bar
 - **Navigation** — Go to Definition, Find All References, Rename (rules, aliases, datasets, cross-file)
 - **Pipe DAG** — tree views for lineage & dependents, system pipes view
