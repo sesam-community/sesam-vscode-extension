@@ -17,6 +17,7 @@
   - [Typical agentic flow](#typical-agentic-flow)
 - [Feature Status Snapshot](#feature-status-snapshot)
 - [Development Statistics](#development-statistics)
+  - [Timeline](#timeline)
 - [Agentic Coding Insights](#agentic-coding-insights)
 - [Quick Start for Contributors](#quick-start-for-contributors)
 
@@ -128,7 +129,9 @@ Full table: [`agent/impl/README.md`](../packages/vscode-extension/agent/impl/REA
 
 | Metric | Value |
 |---|---|
-| Project started | March 2026 |
+| Project started | **Friday, March 13, 2026** |
+| First release (v0.1.0) | 28 Apr 2026 |
+| Current version (v0.2.0) | 13 May 2026 |
 | Total commits | 549 |
 | Contributors | 1 (solo) |
 | TypeScript source files | 77 (extension) + 26 (`@sesam/core`) = **103** |
@@ -137,6 +140,27 @@ Full table: [`agent/impl/README.md`](../packages/vscode-extension/agent/impl/REA
 | Features tracked | ~30 |
 | Features implemented | ~25 |
 | Planning / spec prompt files | 37 (`agent/impl/` + `agent/plans/`) |
+
+### Timeline
+
+| Date | Milestone |
+|---|---|
+| **13 Mar 2026** (Friday) | Initial commit — DTL syntax highlighting, completions, formatter |
+| 18–19 Mar 2026 | Feature planning docs added (`agent/impl/`, `agent/plans/`) |
+| 20 Mar 2026 | Formatter, source-type autocomplete, New Config File command |
+| 24–25 Mar 2026 | Go to Rule Definition, Pipe Lineage/Dependents DAG, alias rename |
+| 26 Mar 2026 | DTL linting (inline diagnostics) shipped |
+| 27–30 Mar 2026 | Pipe Preview (offline entity viewer) |
+| 1 Apr 2026 | Live node-backed preview, initial credential prompt |
+| 13 Apr 2026 | Secure Credential Management, `@sesam/core` initial impl |
+| 14 Apr 2026 | Upload/Download commands, Network Status Bar |
+| 15 Apr 2026 | Node Status table, single-file upload/download |
+| 16 Apr 2026 | Profile switching, first internal release tag |
+| 20 Apr 2026 | Sync Status & Diff view, live updates via Socket.IO |
+| 28 Apr 2026 | **v0.1.0** — first public GitHub Release (VSIX + installer) |
+| 30 Apr 2026 | Permissions autocomplete / hover |
+| 5–8 May 2026 | Large workspace support, entity search in preview panel |
+| 13 May 2026 | **v0.2.0** released |
 
 ---
 
