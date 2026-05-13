@@ -315,6 +315,8 @@ export class PreviewPanel {
         ).catch(() => null);
 
         const total = stats?.totalCount ?? 0;
+        const pageSize = 200;
+        const totalRequests = total > 0 ? Math.ceil(total / pageSize) : 0;
 
         const match = await searchDatasetByText(
           credentials.nodeUrl,
@@ -324,9 +326,12 @@ export class PreviewPanel {
           undefined,
           logNodeRequest,
           searchSignal,
-          (scanned) => {
-            const pct = total > 0 ? Math.round((scanned * 100) / total) : null;
-            this._panel.webview.postMessage({ type: "searchProgress", scanned, total, pct });
+          (requestsDone) => {
+            const pct =
+              totalRequests > 0
+                ? Math.min(100, Math.round((requestsDone * 100) / totalRequests))
+                : null;
+            this._panel.webview.postMessage({ type: "searchProgress", pct });
           },
         );
 

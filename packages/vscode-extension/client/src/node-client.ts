@@ -456,11 +456,12 @@ export const searchDatasetByText = async (
   maxEntities = 10_000,
   logger?: NodeRequestLogger,
   signal?: AbortSignal,
-  onProgress?: (scanned: number) => void,
+  onProgress?: (requestsDone: number) => void,
 ): Promise<Entity | null> => {
   const lowerQuery = query.toLowerCase();
   const pageSize = 200;
   let scanned = 0;
+  let requestsDone = 0;
   let since: string | number | undefined;
 
   while (scanned < maxEntities) {
@@ -484,6 +485,9 @@ export const searchDatasetByText = async (
       break;
     }
 
+    requestsDone += 1;
+    onProgress?.(requestsDone);
+
     const match = page.find((entity) => JSON.stringify(entity).toLowerCase().includes(lowerQuery));
 
     if (match !== undefined) {
@@ -491,7 +495,6 @@ export const searchDatasetByText = async (
     }
 
     scanned += page.length;
-    onProgress?.(scanned);
 
     if (page.length < pageSize) {
       break;

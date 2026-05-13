@@ -312,12 +312,6 @@
       outline: none;
     }
     .search-input:focus { border-color: var(--vscode-focusBorder); }
-    .search-status {
-      font-size: 11px;
-      color: var(--vscode-descriptionForeground);
-      white-space: nowrap;
-    }
-    .search-status.error { color: #f48771; }
     /* Fold controls */
     .fold-toggle {
       cursor: pointer;
@@ -454,7 +448,6 @@
     <input class="search-input" id="search-input" type="text" placeholder="Search entities…">
     <button class="btn btn-secondary" id="search-clear-btn" onclick="clearSearch()" title="Clear">✕</button>
     <button class="btn btn-primary" id="search-btn" onclick="doSearch()">Search</button>
-    <span class="search-status" id="search-status"></span>
   </div>
 
   <div class="panes">
@@ -743,9 +736,14 @@
     }
 
     function setSearchStatus(text, isError) {
-      const el = document.getElementById('search-status');
-      el.textContent = text;
-      el.className = 'search-status' + (isError ? ' error' : '');
+      const bar = document.getElementById('status-bar');
+
+      if (!text) {
+        return;
+      }
+
+      bar.className = 'status-bar' + (isError ? ' error' : ' loading');
+      bar.textContent = text;
     }
 
     function resetSearchBtn() {
