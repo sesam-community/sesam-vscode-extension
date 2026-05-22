@@ -12,6 +12,7 @@
   - [Monorepo packages](#monorepo-packages)
   - [Inside the extension](#inside-the-extension)
 - [Agentic Coding Workflow](#agentic-coding-workflow)
+  - [Spec-Driven Development](#spec-driven-development)
   - [Key files](#key-files)
   - [Available skills](#available-skills)
   - [Typical agentic flow](#typical-agentic-flow)
@@ -75,6 +76,31 @@
 
 The project is built with Copilot-driven development in mind. Everything is documented so an AI agent can pick up a feature and implement it end-to-end.
 
+### Spec-Driven Development
+
+The core methodology is **Spec-Driven Development (SDD)** — a design-first approach where a human-readable specification is written and agreed upon _before_ any code is produced.
+
+```mermaid
+flowchart TD
+    Plan["💬 Plan\n(discuss with agent)"] --> Spec
+    Spec["📄 Generate plan file\nimpl-fXX-*.prompt.md"] --> Impl
+    Impl["🤖 Implement plan\n(small chunks)"] --> Review
+    Review{"Review chunk\nwith developer"} -->|changes needed| Impl
+    Review -->|approved| Commit["✅ Commit & update\nplan file status"]
+    Commit -->|next chunk| Impl
+    Commit -->|done| Plan
+```
+
+Key principles:
+
+- **The spec is the contract** — it defines scope, phases, public interface, and edge cases. The agent is not allowed to invent scope beyond what the spec says.
+- **Specs are cheap; rewrites are expensive** — spending 30 minutes in a design interview to surface hidden assumptions saves hours of misdirected implementation.
+- **Specs outlive the code** — when the agent needs to change or extend a feature months later, the spec is the authoritative record of _why_ decisions were made, not just _what_ was built.
+- **Every spec has phases** — large features are broken into Phase A, B, C… so the agent can implement incrementally and the developer can review each phase before continuing.
+- **Status as truth** — `agent/impl/README.md` is updated by the agent at the end of each session. The table is always accurate; there is no separate "done" list to maintain.
+
+This is distinct from plain "write docs first" — specs here are _executable_ in the sense that the agent actively reads and follows them, not just humans.
+
 ### Key files
 
 | File / Folder | Purpose |
@@ -98,7 +124,15 @@ The project is built with Copilot-driven development in mind. Everything is docu
 | `improve-codebase-architecture` | Review code for architectural fit (layer placement, import discipline) |
 | `release` | Cut a versioned release — changelog, version bump, VSIX build, GitHub Release |
 | `create-pr-description` | Generate a PR description from the current git diff + impl spec |
-| `grill-me` | Interview the user relentlessly about a plan until reaching shared understanding |
+| **Design interview** | Agent-led design interview — questions the developer until scope, interface, and edge cases are fully resolved |
+
+### How skills work
+
+Skills are Markdown files that act as **loadable system-prompt extensions**. When you invoke a skill, the agent reads the SKILL.md file before proceeding — it defines the exact workflow, anti-patterns to avoid, and quality gates to check. Key examples:
+
+- **`impl-feature`** follows a strict protocol: read spec → check dependencies → confirm phases with user → implement phase-by-phase → run tests → mark status `implemented`. The agent will not skip steps.
+- **`tdd`** enforces _vertical slices_ (one test → one impl → repeat), explicitly banning the anti-pattern of writing all tests first then all code. Tests must verify behavior through public interfaces, not implementation details.
+- **Design interview** is used _before_ writing a spec — the agent questions the developer until every branch of the design decision tree is resolved. Useful for complex features where the design is still unclear.
 
 ### Typical agentic flow
 
@@ -108,6 +142,15 @@ The project is built with Copilot-driven development in mind. Everything is docu
 4. Agent writes tests and updates `README.md` status to `implemented`
 
 You can also target a specific feature: _"Implement F19 using the impl-feature skill"_ — the agent goes straight to that spec.
+
+### Before starting a new feature
+
+If the design isn't clear yet, run this sequence first:
+
+1. **Design interview** — stress-test the idea until the scope and interface are solid
+2. Write an `impl-fXX-*.prompt.md` spec based on what you agreed on
+3. Add the feature row to `agent/impl/README.md` with status `planned`
+4. Then invoke `impl-feature` to implement it
 
 ---
 
