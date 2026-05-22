@@ -17,6 +17,8 @@
   - [Typical agentic flow](#typical-agentic-flow)
 - [Feature Status Snapshot](#feature-status-snapshot)
 - [Development Statistics](#development-statistics)
+  - [Output](#output)
+  - [Process](#process)
   - [Timeline](#timeline)
 - [Agentic Coding Insights](#agentic-coding-insights)
 - [Quick Start for Contributors](#quick-start-for-contributors)
@@ -125,21 +127,37 @@ Full table: [`agent/impl/README.md`](../packages/vscode-extension/agent/impl/REA
 
 ## Development Statistics
 
-> Numbers as of May 2026, ~2 months after project start (March 2026).
+> Numbers as of v0.2.0 (13 May 2026) — 61 days after project start.
+
+### Output
 
 | Metric | Value |
 |---|---|
 | Project started | **Friday, March 13, 2026** |
-| First release (v0.1.0) | 28 Apr 2026 |
+| Time to first public release (v0.1.0) | **46 days** (28 Apr 2026) |
 | Current version (v0.2.0) | 13 May 2026 |
-| Total commits | 549 |
+| Total calendar days | 61 |
+| Total commits | **549** (~9 commits/day average) |
+| Merged pull requests | 50+ |
 | Contributors | 1 (solo) |
 | TypeScript source files | 77 (extension) + 26 (`@sesam/core`) = **103** |
 | Test files | 21 |
 | DTL functions in registry | ~429 entries, 2,513 lines (`dtl-registry.ts`) |
 | Features tracked | ~30 |
-| Features implemented | ~25 |
+| Features implemented | ~25 (~3 features/week) |
 | Planning / spec prompt files | 37 (`agent/impl/` + `agent/plans/`) |
+
+### Process
+
+| Practice | How it was applied |
+|---|---|
+| **Branch-per-feature** | Every feature developed on a named branch; merged via PR — even as a solo developer |
+| **Conventional commits** | `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `build:` prefixes throughout |
+| **Spec-before-code** | Each feature has a `impl-fXX-*.prompt.md` written before the first line of code |
+| **Agentic implementation** | Copilot agent reads the spec, implements, writes tests, and updates the status table |
+| **Test coverage** | 21 Vitest test files covering LSP, formatter, evaluator, parser, DAG, and cross-references |
+| **Continuous release** | GitHub Actions builds VSIX + installer on every release tag; no manual packaging |
+| **Skills as process templates** | `.agents/skills/` codify how to add a feature, DTL function, or LSP handler — enforcing consistency across sessions |
 
 ### Timeline
 
