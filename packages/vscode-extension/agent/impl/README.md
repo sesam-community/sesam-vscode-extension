@@ -51,6 +51,7 @@
 | E2E | End-to-End Tests via Playwright | Cross-cutting | `planned` | [e2e-playwright.prompt.md](../plans/e2e-playwright.prompt.md) |
 | F29 | Large Workspace Optimization (1k+ pipes) | Cross-cutting | `fully implemented` | [large-workspace-optimization.prompt.md](../plans/large-workspace-optimization.prompt.md) |
 | F30 | Preview Panel — Entity Search (ID / Text) | Phase 3 | `implemented` | [impl-f30-preview-entity-search.prompt.md](impl-f30-preview-entity-search.prompt.md) |
+| F31 | `sesam update` — Update Expected Output | Phase 2 | `planned` | [impl-f31-update-expected.prompt.md](impl-f31-update-expected.prompt.md) |
 
 ---
 
@@ -91,6 +92,7 @@
 |---|---|
 | F05: Test Management | `planned` |
 | F06: Status / Diff View | `planned` |
+| F31: `sesam update` — Update Expected Output | `planned` |
 
 ### Phase 3: Node Connectivity
 
